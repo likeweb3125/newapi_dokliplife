@@ -1,0 +1,72 @@
+/*
+// Project      : Basic Solution
+// Copyright    : likeweb
+// FileName     : app.js
+// StartDate    : 2023.08.23 ash
+// Discription  : Basic Solution REST API
+//                베이직 솔루션
+*/
+
+const http = require('http');
+const express = require('express');
+const app = express();
+
+const fs = require('fs');
+const path = require('path');
+const helmet = require('helmet');
+
+const bodyParser = require('body-parser');
+
+const boardRoutes = require('./src/routes/board');
+const commentRoutes = require('./src/routes/comment');
+const authRoutes = require('./src/routes/auth');
+
+const adminFirstRoutes = require('./src/routes/first');
+const adminMenuRoutes = require('./src/routes/menu');
+const adminMemberRoutes = require('./src/routes/member');
+const adminBannerRoutes = require('./src/routes/banner');
+const adminPopupRoutes = require('./src/routes/popup');
+
+const adminConfigRoutes = require('./src/routes/config');
+const adminStatisticsRoutes = require('./src/routes/statistics');
+
+const adminMaintenanceRoutes = require('./src/routes/maintenance');
+
+const errorHandler = require('./src/middleware/error');
+const { logs } = require('./src/middleware/logs');
+
+app.use(helmet());
+app.use(bodyParser.urlencoded({ extended: true })); // x-www-form-urlencoded <form>
+app.use(bodyParser.json());
+
+app.use('/upload', express.static(path.join(__dirname, 'upload')));
+
+// logs
+app.use('/v1/logs', (req, res, next) => {
+   logs(req, res, next);
+   next();
+});
+
+// Routes
+app.use('/v1/board', boardRoutes);
+app.use('/v1/comment', commentRoutes);
+app.use('/v1/auth', authRoutes);
+
+// Admin Routes
+app.use('/v1/admin/first', adminFirstRoutes);
+app.use('/v1/admin/menu', adminMenuRoutes);
+
+app.use('/v1/admin/member', adminMemberRoutes);
+app.use('/v1/admin/banner', adminBannerRoutes);
+app.use('/v1/admin/popup', adminPopupRoutes);
+app.use('/v1/admin/config', adminConfigRoutes);
+app.use('/v1/admin/stat', adminStatisticsRoutes);
+
+// 유지보수 Routes
+app.use('/v1/admin/maintenance', adminMaintenanceRoutes);
+
+app.use(errorHandler.routesStatusCode);
+
+app.use(errorHandler.statusCodeReturn);
+
+app.listen(8080);
