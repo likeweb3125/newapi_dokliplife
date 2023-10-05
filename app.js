@@ -52,7 +52,7 @@ app.use('/v1/board', boardRoutes);
 app.use('/v1/comment', commentRoutes);
 app.use('/v1/auth', authRoutes);
 
-// Admin Routes
+// Admin Routes //
 app.use('/v1/admin/first', adminFirstRoutes);
 app.use('/v1/admin/menu', adminMenuRoutes);
 
