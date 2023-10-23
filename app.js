@@ -37,7 +37,7 @@ const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
 
 const corsOptions = {
-   origin: ['http://api.likeweb.co.kr/', 'http://localhost:8080'], // 리액트  localhost 3000
+   origin: ['http://api.likeweb.co.kr:5001/', 'http://localhost:5001'], // 리액트  localhost 3000
    methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
 
@@ -77,4 +77,4 @@ app.use(errorHandler.routesStatusCode);
 
 app.use(errorHandler.statusCodeReturn);
 
-app.listen(8080);
+app.listen(5001);
