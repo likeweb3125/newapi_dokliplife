@@ -13,6 +13,7 @@ const app = express();
 
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
 const helmet = require('helmet');
 
 const bodyParser = require('body-parser');
@@ -34,6 +35,13 @@ const adminMaintenanceRoutes = require('./src/routes/maintenance');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
+
+const corsOptions = {
+   origin: ['http://api.likeweb.co.kr/', 'http://localhost:3000'], // 리액트  localhost 3000
+   methods: ['GET', 'PUT', 'POST', 'DELETE'],
+};
+
+app.use(cors());
 
 app.use(helmet());
 app.use(bodyParser.urlencoded({ extended: true })); // x-www-form-urlencoded <form>

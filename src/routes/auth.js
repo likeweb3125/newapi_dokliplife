@@ -15,7 +15,7 @@ router.post(
 router.post('/login', authController.postLogin); //로그인
 
 router.post('/email', authController.postEmailDoubleCheck); //이메일 중복확인
-router.post('/email-password', authController.postPasswordEmailSendGun); // 비밀번호 재설정 이메일 전송
+router.post('/email-password', authController.postPasswordEmailSendGun); // 비밀번호 재설정 이메일 전송 MailGun , Gmail - postPasswordEmailSendGmail
 router.post(
    '/reset-password',
    isAuthMiddleware.isAuth,
