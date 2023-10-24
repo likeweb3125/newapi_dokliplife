@@ -97,7 +97,11 @@ exports.postLogin = async (req, res, next) => {
          );
       }
 
-      const accessToken = jwt.access(m_email, m_level);
+      const accessToken = jwt.access(
+         emailResult.m_email,
+         emailResult.m_level,
+         emailResult.m_name
+      );
 
       if (!accessToken) {
          errorHandler.errorThrow(
