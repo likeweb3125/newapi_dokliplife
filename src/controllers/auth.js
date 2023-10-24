@@ -120,8 +120,9 @@ exports.postLogin = async (req, res, next) => {
 
       errorHandler.successThrow(res, '', {
          accessToken: accessToken,
-         m_email: m_email,
-         m_level: m_level,
+         m_email: emailResult.m_email,
+         m_level: emailResult.m_level,
+         m_name: emailResult.m_name,
       });
    } catch (err) {
       next(err);
