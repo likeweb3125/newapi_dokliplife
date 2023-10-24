@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
-         c_eco: {
+         c_ceo: {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
@@ -23,6 +23,10 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
          },
          c_num: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+         },
+         c_num2: {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
@@ -39,6 +43,10 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
          },
          c_manager: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+         },
+         c_b_title: {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
