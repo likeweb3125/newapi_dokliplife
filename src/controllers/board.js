@@ -80,6 +80,21 @@ exports.getBoardList = async (req, res, next) => {
                [Op.like]: `%${searchTxtQuery}%`,
             };
          }
+
+         if (searchQuery === 'name') {
+            whereCondition.m_name = {
+               [Op.like]: `%${searchTxtQuery}%`,
+            };
+         }
+
+         if (searchQuery === 'titlecontents') {
+            whereCondition.b_title = {
+               [Op.like]: `%${searchTxtQuery}%`,
+            };
+            whereCondition.b_contents = {
+               [Op.like]: `%${searchTxtQuery}%`,
+            };
+         }
       }
 
       let orderField;
@@ -104,6 +119,7 @@ exports.getBoardList = async (req, res, next) => {
       }
 
       const subQuery = `(SELECT COUNT(*) FROM i_board_comment WHERE i_board_comment.board_idx = i_board.idx)`;
+      const subQuery2 = `(SELECT c_content_type FROM i_category WHERE i_category.id = i_board.category)`;
 
       // const subQuery2 = Sequelize.literal(`
       //    (SELECT c_name FROM i_category WHERE i_category.id = i_board.category)
@@ -136,7 +152,9 @@ exports.getBoardList = async (req, res, next) => {
             'b_depth',
             'b_notice',
             'b_secret',
+            'm_name',
             [Sequelize.literal(subQuery), 'comment_count'],
+            [Sequelize.literal(subQuery2), 'c_content_type'],
             ...boardItemResult.boardItem,
          ],
          include: [
@@ -162,6 +180,7 @@ exports.getBoardList = async (req, res, next) => {
          category: list.category,
          b_depth: list.b_depth,
          b_title: list.b_title,
+         m_name: list.m_name,
          b_reg_date: moment.utc(list.w_date).format('YYYY.MM.DD'),
          b_notice: list.b_notice,
          b_view: list.b_view,
@@ -169,8 +188,35 @@ exports.getBoardList = async (req, res, next) => {
          b_recom: list.b_recom,
          b_secret: list.b_secret,
          comment_count: list.getDataValue('comment_count'),
+         c_content_type: list.getDataValue('c_content_type'),
          c_name: list.icategory.c_name,
       }));
+
+      const BoardName = await i_category.findAll({
+         where: {
+            id: { [Op.ne]: [category] },
+            c_use_yn: enumConfig.useType.Y[0],
+            c_content_type: boardItemResult.c_content_type,
+         },
+         attributes: [
+            'id',
+            'c_depth',
+            'c_name',
+            'c_reg_date',
+            'c_content_type',
+         ],
+         order: [['id', 'ASC']],
+      });
+
+      const boardNameResult = BoardName.map((main) => {
+         const listObj = {
+            category: main.id,
+            c_depth: main.c_depth,
+            c_name: main.c_name,
+            c_content_type: main.c_content_type,
+         };
+         return listObj;
+      });
 
       errorHandler.successThrow(res, '', {
          limit: limit,
@@ -180,6 +226,7 @@ exports.getBoardList = async (req, res, next) => {
          last_page: lastPage,
          end_page: endPage,
          total_count: boardList.count,
+         c_content_type: boardItemResult.c_content_type, //게시판 유형
          b_column_title: boardItemResult.b_column_title, //제목 노출 여부
          b_column_date: boardItemResult.b_column_date, //등록일자 노출 여부
          b_column_view: boardItemResult.b_column_view, //조회수 노출 여부
@@ -202,6 +249,7 @@ exports.getBoardList = async (req, res, next) => {
          b_top_html: boardItemResult.b_top_html, //게시판 상단 HTML 내용
          b_template: boardItemResult.b_template, // 게시글 템플릿 적용
          b_template_text: boardItemResult.b_template_text, //템플릿 내용
+         board_Name: boardNameResult,
          board_list: listResult,
       });
    } catch (err) {
@@ -589,7 +637,7 @@ exports.putBoardMove = async (req, res, next) => {
 // 게시글 공지 설정
 // 2023.09.11 ash
 exports.putBoardNotice = async (req, res, next) => {
-   const { idx, category } = req.body;
+   const { notice, idx, category } = req.body;
 
    let transaction;
 
@@ -603,7 +651,7 @@ exports.putBoardNotice = async (req, res, next) => {
 
       const boardNotice = await i_board.update(
          {
-            b_notice: '1',
+            b_notice: notice || 1,
          },
          {
             where: whereCondition,

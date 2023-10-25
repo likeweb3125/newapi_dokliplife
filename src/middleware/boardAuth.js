@@ -63,6 +63,12 @@ const boardListItem = async (category) => {
    const boardItem = await i_category_board.findOne({
       where: { parent_id: category, use_yn: enumConfig.useType.Y[0] },
       attributes: [
+         [
+            Sequelize.literal(
+               `(SELECT c_content_type FROM i_category WHERE i_category.id = i_category_board.parent_id)`
+            ),
+            'c_content_type',
+         ],
          'b_list_cnt',
          'b_column_title',
          'b_column_date',
@@ -112,6 +118,7 @@ const boardListItem = async (category) => {
    }
 
    return {
+      c_content_type: boardItem.getDataValue('c_content_type'),
       b_list_cnt: boardItem.b_list_cnt,
       b_thumbnail_with: boardItem.b_thumbnail_with,
       b_thumbnail_height: boardItem.b_thumbnail_height,
