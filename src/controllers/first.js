@@ -10,6 +10,7 @@ const {
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const db = require('../models');
+const cheerio = require('cheerio');
 
 // 게시글 알림
 exports.getFirstBoardAlarm = async (req, res, next) => {
@@ -30,6 +31,7 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
 
       const subQuery1 = ` (select c_name from i_category where i_category.id = i_board.category) `;
       const subQuery2 = ` (select c_name from i_category where i_category.id = (select category from i_board where i_board.idx = i_board_comment.parent_idx))`;
+      const subQuery3 = ` (select b_title from i_board where i_board.idx = i_board_comment.parent_idx)`;
 
       if (follow === 'board') {
          data = await i_board.findAll({
@@ -37,7 +39,9 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'm_name',
                'b_title',
+               'b_contents',
                'b_reg_date',
                [Sequelize.literal(subQuery1), 'c_name'],
                'a_read',
@@ -49,6 +53,8 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'm_name',
+               'b_title',
                'c_contents',
                'c_reg_date',
                [Sequelize.literal(subQuery2), 'c_name'],
@@ -61,7 +67,9 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'm_name',
                'b_title',
+               'b_contents',
                'b_reg_date',
                [Sequelize.literal(subQuery1), 'c_name'],
                'a_read',
@@ -73,6 +81,8 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'm_name',
+               [Sequelize.literal(subQuery3), 'b_title'],
                'c_contents',
                'c_reg_date',
                [Sequelize.literal(subQuery2), 'c_name'],
@@ -96,8 +106,15 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             idx: item.idx,
             follow: item.c_contents === undefined ? '게시글' : '댓글',
             c_name: item.getDataValue('c_name'),
+            m_name: item.m_name,
+            title:
+               item.c_contents === undefined
+                  ? item.b_title
+                  : item.getDataValue('b_title'),
             content:
-               item.c_contents === undefined ? item.b_title : item.c_contents,
+               item.c_contents === undefined
+                  ? cheerio.load(item.b_contents).text()
+                  : cheerio.load(item.c_contents).text(),
             reg_date:
                item.c_contents === undefined
                   ? moment.utc(item.b_reg_date).format('YYYY.MM.DD hh:mm')
