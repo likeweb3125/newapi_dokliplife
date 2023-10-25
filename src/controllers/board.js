@@ -605,7 +605,7 @@ exports.putBoardMove = async (req, res, next) => {
       transaction = await db.mariaDBSequelize.transaction();
 
       const whereCondition = {
-         category: category,
+         //category: category,
          idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
       };
 
