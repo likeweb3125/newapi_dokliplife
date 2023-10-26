@@ -133,11 +133,11 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
 };
 
 // 게시글 알림 전체읽기, 삭제
-exports.getFirstBoardAlarmReadDelete = async (req, res, next) => {
-   const follow = req.params.follow;
+exports.putFirstBoardAlarmReadDelete = async (req, res, next) => {
+   const { follow, idx, flg } = req.body;
 
    let transaction;
-
+   console.log(flg);
    try {
       transaction = await db.mariaDBSequelize.transaction();
 
@@ -167,43 +167,53 @@ exports.getFirstBoardAlarmReadDelete = async (req, res, next) => {
             break;
       }
 
-      if (req.user !== undefined) {
-         whereCondition.m_email = {
-            [Op.ne]: req.user,
+      if (idx !== '') {
+         whereCondition.idx = {
+            [Op.eq]: idx,
          };
       }
 
-      const boardUpdate = await i_board.update(
-         {
-            a_read: readValue,
-            a_delete: deleteValue,
-         },
-         {
-            where: whereCondition,
-         }
-      );
+      //if (req.user !== undefined) {
+      //   whereCondition.m_email = {
+      //      [Op.ne]: req.user,
+      //   };
+      //}
 
-      if (!boardUpdate) {
-         errorHandler.errorThrow(404, '');
+      if (flg === '' || flg === '게시글') {
+         const boardUpdate = await i_board.update(
+            {
+               a_read: readValue,
+               a_delete: deleteValue,
+            },
+            {
+               where: whereCondition,
+            }
+         );
+
+         if (!boardUpdate) {
+            errorHandler.errorThrow(404, '');
+         }
       }
 
-      const commentUpdate = await i_board_comment.update(
-         {
-            a_read: readValue,
-            a_delete: deleteValue,
-         },
-         {
-            where: whereCondition,
-         }
-      );
+      if (flg === '' || flg === '댓글') {
+         const commentUpdate = await i_board_comment.update(
+            {
+               a_read: readValue,
+               a_delete: deleteValue,
+            },
+            {
+               where: whereCondition,
+            }
+         );
 
-      if (!commentUpdate) {
-         errorHandler.errorThrow(404, '');
+         if (!commentUpdate) {
+            errorHandler.errorThrow(404, '');
+         }
       }
 
       await transaction.commit();
 
-      errorHandler.successThrow(res, '', boardUpdate);
+      errorHandler.successThrow(res, '', '');
    } catch (err) {
       if (transaction) {
          await transaction.rollback();

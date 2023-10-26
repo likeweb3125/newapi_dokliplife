@@ -10,10 +10,10 @@ router.get(
    mainController.getFirstBoardAlarm
 ); //관리자 메인 게시글 알림
 
-router.get(
-   '/alarm-read-delete/:follow',
+router.put(
+   '/alarm-read-delete',
    isAuthMiddleware.isAuthAdmin,
-   mainController.getFirstBoardAlarmReadDelete
+   mainController.putFirstBoardAlarmReadDelete
 ); //관리자 메인 게시글 알림 읽은 알림 삭제
 
 router.get(
