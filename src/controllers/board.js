@@ -277,6 +277,18 @@ exports.getBoardView = async (req, res, next) => {
       //    );
       // }
 
+      const viewUpdate = await i_board.update(
+         {
+            b_view: Sequelize.literal('b_view + 1'),
+         },
+         {
+            where: {
+               category: category,
+               idx: idx,
+            },
+         }
+      );
+
       const boardView = await i_board.findOne({
          where: {
             category: category,
@@ -286,10 +298,23 @@ exports.getBoardView = async (req, res, next) => {
             'idx',
             'category',
             'm_email',
+            'm_name',
+            'm_pwd',
             'b_title',
             'b_contents',
             'b_reg_date',
+            'parent_id',
+            'b_depth',
+            'b_notice',
+            'b_view',
+            'b_img',
+            'b_file',
+            'b_sms_yn',
+            'b_sms_phone',
+            'b_email_yn',
+            'b_email',
             'b_secret',
+            'b_status',
          ],
       });
 
@@ -330,9 +355,24 @@ exports.getBoardView = async (req, res, next) => {
       const boardObj = {
          idx: boardView.idx,
          category: boardView.category,
+         m_email: boardView.m_email,
+         m_name: boardView.m_name,
+         m_pwd: boardView.m_pwd,
          b_title: boardView.b_title,
          b_contents: boardView.b_contents,
          b_reg_date: moment.utc(boardView.b_reg_date).format('YYYY.MM.DD'),
+         parent_id: boardView.parent_id,
+         b_depth: boardView.b_depth,
+         b_notice: boardView.b_notice,
+         b_view: boardView.b_view,
+         b_img: boardView.b_img,
+         b_file: boardView.b_file,
+         b_sms_yn: boardView.b_sms_yn,
+         b_sms_phone: boardView.b_sms_phone,
+         b_email_yn: boardView.b_email_yn,
+         b_email: boardView.b_email,
+         b_secret: boardView.b_secret,
+         b_status: boardView.b_status,
          prev_board: prevBoard !== null ? prevBoard : false,
          next_board: nextBoard !== null ? nextBoard : false,
       };
@@ -478,7 +518,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 
       const board_b_file = req.files['b_file'];
       const board_b_img = req.files['b_img'];
-
+      //console.log(board_b_file[0].path);
       if (board_b_file) {
          if (
             boardView.b_file !== null &&
