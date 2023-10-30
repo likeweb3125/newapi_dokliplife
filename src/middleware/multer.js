@@ -59,7 +59,10 @@ exports.fileMulter = multer({
    storage: fileStorage('upload/board'),
    fileFilter: fileFilter,
    limits: { fileSize: fileSizeLimit },
-}).single('b_file');
+}).fields([
+   { name: 'b_file', maxCount: 1 },
+   { name: 'b_img', maxCount: 1 },
+]);
 
 exports.menuFileMulter = multer({
    storage: fileStorage('upload/menu'),

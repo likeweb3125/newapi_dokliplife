@@ -356,11 +356,13 @@ exports.postBoardCreate = async (req, res, next) => {
       parent_id,
       b_depth,
       b_notice,
+      b_img,
       b_file,
       b_sms_yn,
       b_sms_phone,
       b_email_yn,
       b_secret,
+      b_status,
    } = req.body;
 
    try {
@@ -385,6 +387,9 @@ exports.postBoardCreate = async (req, res, next) => {
          hashedPw = m_pwd;
       }
 
+      const board_b_file = req.files['b_file'];
+      const board_b_img = req.files['b_img'];
+
       const boardCreate = await i_board.create({
          category: category,
          m_email: req.user,
@@ -395,11 +400,13 @@ exports.postBoardCreate = async (req, res, next) => {
          parent_id: parent_id,
          b_depth: b_depth,
          b_notice: b_notice,
-         b_file: req.file ? req.file.path : null,
+         b_file: board_b_file ? board_b_file[0].path : null,
+         b_img: board_b_img ? board_b_img[0].path : null,
          b_sms_yn: b_sms_yn,
          b_sms_phone: b_sms_phone,
          b_email_yn: b_email_yn,
          b_secret: b_secret,
+         b_status: b_status,
       });
 
       if (!boardCreate) {
@@ -441,10 +448,12 @@ exports.putBoardUpdate = async (req, res, next) => {
       b_contents,
       b_depth,
       b_notice,
+      b_img,
       b_file,
       b_sms_yn,
       b_sms_phone,
       b_email_yn,
+      b_status,
    } = req.body;
 
    try {
@@ -453,20 +462,38 @@ exports.putBoardUpdate = async (req, res, next) => {
             category: category,
             idx: idx,
          },
-         attributes: ['idx', 'category', 'm_email', 'b_file'],
+         attributes: ['idx', 'category', 'm_email', 'b_file', 'b_img'],
       });
 
       if (!boardView) {
          errorHandler.errorThrow(404, '');
       }
 
-      if (req.user !== boardView.m_email) {
+      if (
+         req.user !== boardView.m_email &&
+         req.level !== enumConfig.userLevel.USER_LV9
+      ) {
          errorHandler.errorThrow(403, '');
       }
 
-      if (req.file) {
-         if (boardView.b_file !== req.file.path) {
+      const board_b_file = req.files['b_file'];
+      const board_b_img = req.files['b_img'];
+
+      if (board_b_file) {
+         if (
+            boardView.b_file !== null &&
+            boardView.b_file !== board_b_file[0].path
+         ) {
             multerMiddleware.clearFile(boardView.b_file);
+         }
+      }
+
+      if (board_b_img) {
+         if (
+            boardView.b_img !== null &&
+            boardView.b_img !== board_b_img[0].path
+         ) {
+            multerMiddleware.clearFile(boardView.b_img);
          }
       }
 
@@ -479,14 +506,20 @@ exports.putBoardUpdate = async (req, res, next) => {
             b_contents: b_contents,
             b_depth: b_depth,
             b_notice: b_notice,
-            b_file: req.file
-               ? req.file.path
+            b_file: board_b_file
+               ? board_b_file[0].path
                : boardView
                ? boardView.b_file
+               : null,
+            b_img: board_b_img
+               ? board_b_img[0].path
+               : boardView
+               ? boardView.b_img
                : null,
             b_sms_yn: b_sms_yn,
             b_sms_phone: b_sms_phone,
             b_email_yn: b_email_yn,
+            b_status: b_status,
          },
          {
             where: {
@@ -540,6 +573,10 @@ exports.deleteBoardDestroy = async (req, res, next) => {
 
          if (boardView.b_file) {
             multerMiddleware.clearFile(boardView.b_file);
+         }
+
+         if (boardView.b_img) {
+            multerMiddleware.clearFile(boardView.b_img);
          }
       }
 

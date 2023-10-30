@@ -51,6 +51,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: true,
          },
+         b_img: {
+            type: DataTypes.STRING(500),
+            allowNull: true,
+         },
          b_file: {
             type: DataTypes.STRING(500),
             allowNull: true,
@@ -85,6 +89,10 @@ module.exports = (sequelize, DataTypes) => {
          },
          a_delete: {
             type: DataTypes.STRING(1),
+            allowNull: true,
+         },
+         b_status: {
+            type: DataTypes.STRING(50),
             allowNull: true,
          },
       },
