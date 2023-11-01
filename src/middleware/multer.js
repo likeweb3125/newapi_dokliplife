@@ -60,7 +60,7 @@ exports.fileMulter = multer({
    fileFilter: fileFilter,
    limits: { fileSize: fileSizeLimit },
 }).fields([
-   { name: 'b_file', maxCount: 1 },
+   { name: 'b_file', maxCount: 10 },
    { name: 'b_img', maxCount: 1 },
 ]);
 

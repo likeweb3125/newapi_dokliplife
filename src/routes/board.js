@@ -31,6 +31,12 @@ router.put(
 
 router.delete('/', isAuthMiddleware.isAuth, boardController.deleteBoardDestroy); //게시글 삭제
 
+router.delete(
+   '/file',
+   isAuthMiddleware.isAuth,
+   boardController.deleteBoardFileDestroy
+); //게시첨부파일 삭제
+
 router.post('/password', boardController.postBoardPassword); //게시글 비밀번호 확인
 
 router.put(

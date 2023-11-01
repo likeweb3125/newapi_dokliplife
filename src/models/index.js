@@ -33,6 +33,7 @@ db.i_category_board_group = require('./category_board_group')(
 
 db.i_board = require('./board')(mariaDBSequelize, Sequelize);
 db.i_board_comment = require('./board_comment')(mariaDBSequelize, Sequelize);
+db.i_board_file = require('./board_file')(mariaDBSequelize, Sequelize);
 
 db.i_member = require('./member')(mariaDBSequelize, Sequelize);
 db.i_member_level = require('./member_level')(mariaDBSequelize, Sequelize);

@@ -3,6 +3,7 @@ const { Op, Sequelize } = require('sequelize');
 const {
    i_board,
    i_board_comment,
+   i_board_file,
    i_category,
    i_category_board,
 } = require('../models');
@@ -120,6 +121,7 @@ exports.getBoardList = async (req, res, next) => {
 
       const subQuery = `(SELECT COUNT(*) FROM i_board_comment WHERE i_board_comment.board_idx = i_board.idx)`;
       const subQuery2 = `(SELECT c_content_type FROM i_category WHERE i_category.id = i_board.category)`;
+      const subQuery3 = `(SELECT COUNT(*) FROM i_board_file WHERE i_board_file.parent_idx = i_board.idx)`;
 
       // const subQuery2 = Sequelize.literal(`
       //    (SELECT c_name FROM i_category WHERE i_category.id = i_board.category)
@@ -155,6 +157,7 @@ exports.getBoardList = async (req, res, next) => {
             'm_name',
             [Sequelize.literal(subQuery), 'comment_count'],
             [Sequelize.literal(subQuery2), 'c_content_type'],
+            [Sequelize.literal(subQuery3), 'file_count'],
             ...boardItemResult.boardItem,
          ],
          include: [
@@ -184,7 +187,7 @@ exports.getBoardList = async (req, res, next) => {
          b_reg_date: moment.utc(list.w_date).format('YYYY.MM.DD'),
          b_notice: list.b_notice,
          b_view: list.b_view,
-         b_file: list.b_file,
+         b_file: list.getDataValue('file_count'),
          b_recom: list.b_recom,
          b_secret: list.b_secret,
          comment_count: list.getDataValue('comment_count'),
@@ -352,6 +355,11 @@ exports.getBoardView = async (req, res, next) => {
          }),
       ]);
 
+      const boardFileViews = await i_board_file.findAll({
+         where: { parent_idx: idx },
+         attributes: ['idx', 'file_name'],
+      });
+
       const boardObj = {
          idx: boardView.idx,
          category: boardView.category,
@@ -366,7 +374,7 @@ exports.getBoardView = async (req, res, next) => {
          b_notice: boardView.b_notice,
          b_view: boardView.b_view,
          b_img: boardView.b_img,
-         b_file: boardView.b_file,
+         b_file: boardFileViews,
          b_sms_yn: boardView.b_sms_yn,
          b_sms_phone: boardView.b_sms_phone,
          b_email_yn: boardView.b_email_yn,
@@ -440,7 +448,6 @@ exports.postBoardCreate = async (req, res, next) => {
          parent_id: parent_id,
          b_depth: b_depth,
          b_notice: b_notice,
-         b_file: board_b_file ? board_b_file[0].path : null,
          b_img: board_b_img ? board_b_img[0].path : null,
          b_sms_yn: b_sms_yn,
          b_sms_phone: b_sms_phone,
@@ -451,6 +458,14 @@ exports.postBoardCreate = async (req, res, next) => {
 
       if (!boardCreate) {
          errorHandler.errorThrow(404, '');
+      }
+
+      for (const file of req.files['b_file']) {
+         console.log(file.path);
+         const boardFileCreate = await i_board_file.create({
+            parent_idx: boardCreate.getDataValue('idx'),
+            file_name: file.path,
+         });
       }
 
       // 게시판 설정 땡겨유~
@@ -496,7 +511,11 @@ exports.putBoardUpdate = async (req, res, next) => {
       b_status,
    } = req.body;
 
+   let transaction;
+
    try {
+      transaction = await db.mariaDBSequelize.transaction();
+
       const boardView = await i_board.findOne({
          where: {
             category: category,
@@ -518,14 +537,24 @@ exports.putBoardUpdate = async (req, res, next) => {
 
       const board_b_file = req.files['b_file'];
       const board_b_img = req.files['b_img'];
-      //console.log(board_b_file[0].path);
-      if (board_b_file) {
-         if (
-            boardView.b_file !== null &&
-            boardView.b_file !== board_b_file[0].path
-         ) {
-            multerMiddleware.clearFile(boardView.b_file);
-         }
+
+      //console.log(board_b_file.length);
+
+      // if (board_b_file) {
+      //    if (
+      //       boardView.b_file !== null &&
+      //       boardView.b_file !== board_b_file[0].path
+      //    ) {
+      //       multerMiddleware.clearFile(boardView.b_file);
+      //    }
+      // }
+
+      for (const file of req.files['b_file']) {
+         console.log(file.path);
+         const boardFileCreate = await i_board_file.create({
+            parent_idx: idx,
+            file_name: file.path,
+         });
       }
 
       if (board_b_img) {
@@ -546,11 +575,6 @@ exports.putBoardUpdate = async (req, res, next) => {
             b_contents: b_contents,
             b_depth: b_depth,
             b_notice: b_notice,
-            b_file: board_b_file
-               ? board_b_file[0].path
-               : boardView
-               ? boardView.b_file
-               : null,
             b_img: board_b_img
                ? board_b_img[0].path
                : boardView
@@ -573,8 +597,14 @@ exports.putBoardUpdate = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 
+      await transaction.commit();
+
       errorHandler.successThrow(res, '', boardUpdate);
    } catch (err) {
+      if (transaction) {
+         await transaction.rollback();
+      }
+
       next(err);
    }
 };
@@ -628,6 +658,10 @@ exports.deleteBoardDestroy = async (req, res, next) => {
          errorHandler.errorThrow(404, '삭제 할 게시물이 없습니다.');
       }
 
+      const boardFileDelete = await i_board_file.destroy({
+         where: { parent_idx: Array.isArray(idx) ? { [Op.in]: idx } : idx },
+      });
+
       await transaction.commit();
 
       errorHandler.successThrow(res, '', boardDelete);
@@ -636,6 +670,40 @@ exports.deleteBoardDestroy = async (req, res, next) => {
          await transaction.rollback();
       }
 
+      next(err);
+   }
+};
+
+// 게시글 첨부파일 삭제
+exports.deleteBoardFileDestroy = async (req, res, next) => {
+   const { idx, parent_idx } = req.body;
+
+   try {
+      const whereCondition = {
+         idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
+      };
+
+      const boardFileViews = await i_board_file.findAll({
+         where: whereCondition,
+         attributes: ['idx', 'parent_idx', 'file_name'],
+      });
+
+      if (!boardFileViews || boardFileViews.length === 0) {
+         errorHandler.errorThrow(404, 'No boards File found');
+      }
+
+      for (const boardFile of boardFileViews) {
+         if (boardFile.file_name) {
+            multerMiddleware.clearFile(boardFile.file_name);
+         }
+      }
+
+      const boardFileDelete = await i_board_file.destroy({
+         where: whereCondition,
+      });
+
+      errorHandler.successThrow(res, '', boardFileDelete);
+   } catch (err) {
       next(err);
    }
 };
