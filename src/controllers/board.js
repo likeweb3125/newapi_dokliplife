@@ -549,12 +549,14 @@ exports.putBoardUpdate = async (req, res, next) => {
       //    }
       // }
 
-      for (const file of req.files['b_file']) {
-         console.log(file.path);
-         const boardFileCreate = await i_board_file.create({
-            parent_idx: idx,
-            file_name: file.path,
-         });
+      if (board_b_file) {
+         for (const file of req.files['b_file']) {
+            console.log(file.path);
+            const boardFileCreate = await i_board_file.create({
+               parent_idx: idx,
+               file_name: file.path,
+            });
+         }
       }
 
       if (board_b_img) {
