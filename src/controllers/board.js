@@ -460,12 +460,14 @@ exports.postBoardCreate = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 
-      for (const file of req.files['b_file']) {
-         console.log(file.path);
-         const boardFileCreate = await i_board_file.create({
-            parent_idx: boardCreate.getDataValue('idx'),
-            file_name: file.path,
-         });
+      if (board_b_file) {
+         for (const file of req.files['b_file']) {
+            console.log(file.path);
+            const boardFileCreate = await i_board_file.create({
+               parent_idx: boardCreate.getDataValue('idx'),
+               file_name: file.path,
+            });
+         }
       }
 
       // 게시판 설정 땡겨유~
