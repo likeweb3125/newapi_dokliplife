@@ -73,11 +73,11 @@ module.exports = (sequelize, DataTypes) => {
          },
          b_write_alarm: {
             type: DataTypes.STRING(50),
-            allowNull: false,
+            allowNull: true,
          },
          b_write_send: {
             type: DataTypes.STRING(50),
-            allowNull: false,
+            allowNull: true,
          },
          b_alarm: {
             type: DataTypes.STRING(50),

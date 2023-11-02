@@ -11,6 +11,7 @@ const {
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const multerMiddleware = require('../middleware/multer');
+const db = require('../models');
 
 // Get SubMenu Create
 // 2023.09.04 ash
@@ -62,13 +63,13 @@ exports.postSubCategoryCreate = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       let calculatedCNum = c_num;
 
       if (!c_num) {
          const categoryCount = await i_category.count({
-            attributes: [[sequelize.literal('count(*) + 1'), 'count']],
+            attributes: [[Sequelize.literal('count(*) + 1'), 'count']],
             where: {
                c_depth: c_depth,
                c_depth_parent: c_depth_parent,
@@ -86,9 +87,9 @@ exports.postSubCategoryCreate = async (req, res, next) => {
       const mainBannerFilePath =
          mainBannerFile && mainBannerFile[0] ? mainBannerFile[0].path : null;
       const menuOnImgPath =
-         menuOnImgPath && menuOnImgPath[0] ? menuOnImgPath[0].path : null;
+         menuOnImg && menuOnImg[0] ? menuOnImg[0].path : null;
       const menuOffImgPath =
-         menuOffImgPath && menuOffImgPath[0] ? menuOffImgPath[0].path : null;
+         menuOffImg && menuOffImg[0] ? menuOffImg[0].path : null;
 
       const newCategory = await i_category.create({
          c_depth: c_depth,
@@ -305,6 +306,8 @@ exports.getSubCategoryView = async (req, res, next) => {
                   'b_reply_lv',
                   'b_comment',
                   'b_comment_lv',
+                  'b_write_alarm',
+                  'b_write_send',
                   'b_alarm',
                   'b_alarm_phone',
                   'b_top_html',
@@ -358,6 +361,8 @@ exports.getSubCategoryView = async (req, res, next) => {
             menuObj.b_reply_lv = subView.b_reply_lv;
             menuObj.b_comment = subView.b_comment;
             menuObj.b_comment_lv = subView.b_comment_lv;
+            menuObj.b_write_alarm = subView.b_write_alarm;
+            menuObj.b_write_send = subView.b_write_send;
             menuObj.b_alarm = subView.b_alarm;
             menuObj.b_alarm_phone = subView.b_alarm_phone;
             menuObj.b_top_html = subView.b_top_html;
