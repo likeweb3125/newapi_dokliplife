@@ -12,11 +12,16 @@ const fileStorage = (destination) =>
          const originalName = file.originalname;
          const _fileLen = originalName.length;
          const _lastDot = originalName.lastIndexOf('.') + 1;
+         const _fileNameWithoutExt = originalName.substring(0, _lastDot - 1);
          const _fileExt = originalName
             .substring(_lastDot, _fileLen)
             .toLowerCase();
          const _fileName =
-            moment.utc().format('YYYYMMDDHHmmssSSS') + '.' + _fileExt;
+            _fileNameWithoutExt +
+            '_' +
+            moment.utc().format('YYYYMMDDHHmmssSSS') +
+            '.' +
+            _fileExt;
          cb(null, _fileName);
       },
    });
