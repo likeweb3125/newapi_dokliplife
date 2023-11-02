@@ -466,6 +466,7 @@ exports.postBoardCreate = async (req, res, next) => {
             const boardFileCreate = await i_board_file.create({
                parent_idx: boardCreate.getDataValue('idx'),
                file_name: file.path,
+               original_name: file.originalname,
             });
          }
       }
@@ -557,6 +558,7 @@ exports.putBoardUpdate = async (req, res, next) => {
             const boardFileCreate = await i_board_file.create({
                parent_idx: idx,
                file_name: file.path,
+               original_name: file.originalname,
             });
          }
       }

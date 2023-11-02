@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(500),
             allowNull: false,
          },
+         original_name: {
+            type: DataTypes.STRING(500),
+            allowNull: false,
+         },
          reg_date: {
             type: DataTypes.DATE,
          },
