@@ -153,7 +153,7 @@ exports.postCategoryCreate = async (req, res, next) => {
 
       if (!c_num) {
          const categoryCount = await i_category.count({
-            attributes: [[sequelize.literal('count(*) + 1'), 'count']],
+            attributes: [[Sequelize.literal('count(*) + 1'), 'count']],
             where: {
                c_depth: c_depth,
                c_depth_parent: c_depth_parent,
@@ -409,7 +409,7 @@ exports.putMoveCategory = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const menuView = await i_category.findByPk(id);
 
@@ -423,7 +423,7 @@ exports.putMoveCategory = async (req, res, next) => {
 
       await i_category.update(
          {
-            c_num: sequelize.literal('c_num + 1'),
+            c_num: Sequelize.literal('c_num + 1'),
          },
          {
             where: {

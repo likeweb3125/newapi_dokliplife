@@ -431,7 +431,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const menuView = await i_category.findByPk(id);
 
@@ -582,7 +582,7 @@ exports.deleteSubCategoryDestroy = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const menuView = await i_category.findByPk(id);
 
