@@ -359,7 +359,7 @@ exports.getBoardView = async (req, res, next) => {
 
       const boardFileViews = await i_board_file.findAll({
          where: { parent_idx: idx },
-         attributes: ['idx', 'file_name', 'original_name'],
+         attributes: ['idx', 'parent_idx', 'file_name', 'original_name'],
       });
 
       const boardObj = {
