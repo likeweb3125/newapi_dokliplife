@@ -13,6 +13,8 @@ const enumConfig = require('../middleware/enum');
 const boardAuth = require('../middleware/boardAuth');
 const db = require('../models');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 
 // 게시글 메인 리스트
 // 2023.08.30 ash
@@ -821,6 +823,45 @@ exports.putBoardNotice = async (req, res, next) => {
          await transaction.rollback();
       }
 
+      next(err);
+   }
+};
+
+// 게시글 첨부파일 다운로드
+exports.getFileDownload = async (req, res, next) => {
+   const { parent_idx, idx } = req.params;
+
+   try {
+      const boardFile = await i_board_file.findOne({
+         where: {
+            parent_idx: parent_idx,
+            idx: idx,
+         },
+         attributes: ['file_name', 'original_name'],
+      });
+
+      if (!boardFile) {
+         errorHandler.errorThrow(404, '');
+      }
+
+      const originalFileName = boardFile.original_name;
+      const changedFileName = boardFile.file_name;
+
+      const filePath = path.join(__dirname, '../../', changedFileName);
+
+      if (fs.existsSync(filePath)) {
+         res.setHeader(
+            'Content-Disposition',
+            'attachment; filename=' + originalFileName
+         );
+         res.setHeader('Content-Type', 'application/octet-stream');
+
+         const fileStream = fs.createReadStream(filePath);
+         fileStream.pipe(res);
+      } else {
+         errorHandler.errorThrow(404, 'File not found');
+      }
+   } catch (err) {
       next(err);
    }
 };

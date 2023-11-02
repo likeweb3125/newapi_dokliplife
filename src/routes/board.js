@@ -53,4 +53,10 @@ router.put(
    boardController.putBoardNotice
 ); //관리자 게시글 공지 설정
 
+router.get(
+   '/download/:category/:parent_idx/:idx',
+   isAuthMiddleware.isAuthBoard,
+   boardController.getFileDownload
+); //게시판 첨부파일 다운로드
+
 module.exports = router;
