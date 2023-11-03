@@ -39,6 +39,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false,
          },
+         b_thumbnail: {
+            type: DataTypes.STRING(50),
+            allowNull: false,
+         },
          b_read_lv: {
             type: DataTypes.INTEGER,
             allowNull: false,

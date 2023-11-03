@@ -45,6 +45,7 @@ exports.postSubCategoryCreate = async (req, res, next) => {
       b_column_file,
       b_thumbnail_with,
       b_thumbnail_height,
+      b_thumbnail,
       b_read_lv,
       b_write_lv,
       b_group,
@@ -166,6 +167,7 @@ exports.postSubCategoryCreate = async (req, res, next) => {
                   b_column_file: b_column_file,
                   b_thumbnail_with: b_thumbnail_with,
                   b_thumbnail_height: b_thumbnail_height,
+                  b_thumbnail: b_thumbnail,
                   b_read_lv: b_read_lv,
                   b_write_lv: b_write_lv,
                   b_group: b_group,
@@ -277,7 +279,14 @@ exports.getSubCategoryView = async (req, res, next) => {
                where: {
                   parent_id: id,
                },
-               attributes: ['parent_id'],
+               attributes: [
+                  'parent_id',
+                  'c_type',
+                  'file_path',
+                  'admin_file_path',
+                  'sms',
+                  'email',
+               ],
             });
             break;
          case enumConfig.contentType.BOARD[0]:
@@ -298,6 +307,7 @@ exports.getSubCategoryView = async (req, res, next) => {
                   'b_column_file',
                   'b_thumbnail_with',
                   'b_thumbnail_height',
+                  'b_thumbnail',
                   'b_read_lv',
                   'b_write_lv',
                   'b_group',
@@ -353,6 +363,7 @@ exports.getSubCategoryView = async (req, res, next) => {
             menuObj.b_column_file = subView.b_column_file;
             menuObj.b_thumbnail_with = subView.b_thumbnail_with;
             menuObj.b_thumbnail_height = subView.b_thumbnail_height;
+            menuObj.b_thumbnail = subView.b_thumbnail;
             menuObj.b_read_lv = subView.b_read_lv;
             menuObj.b_write_lv = subView.b_write_lv;
             menuObj.b_group = subView.b_group;
@@ -413,6 +424,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
       b_column_file,
       b_thumbnail_with,
       b_thumbnail_height,
+      b_thumbnail,
       b_read_lv,
       b_write_lv,
       b_group,
@@ -533,6 +545,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                   b_column_file: b_column_file,
                   b_thumbnail_with: b_thumbnail_with,
                   b_thumbnail_height: b_thumbnail_height,
+                  b_thumbnail: b_thumbnail,
                   b_read_lv: b_read_lv,
                   b_write_lv: b_write_lv,
                   b_group: b_group,
