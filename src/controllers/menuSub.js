@@ -466,7 +466,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
       );
       const menuOnImgPath = getFile('c_menu_on_img', menuView.c_menu_on_img);
       const menuOffImgPath = getFile('c_menu_off_img', menuView.c_menu_off_img);
-
+      console.log(c_content_type);
       await i_category.update(
          {
             c_depth: c_depth,
@@ -478,7 +478,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
             c_menu_ui: c_menu_ui,
             c_menu_on_img: menuOnImgPath,
             c_menu_off_img: menuOffImgPath,
-            c_contents_type: c_content_type,
+            c_content_type: c_content_type,
             c_use_yn: c_use_yn || enumConfig.useType.Y[0],
          },
          {
@@ -488,55 +488,104 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
          }
       );
 
-      let subCatetory;
+      let subCategory;
 
       switch (parseInt(c_content_type)) {
          case enumConfig.contentType.HTML[0]:
-            subCatetory = await i_category_html.update(
-               {
+            const htmlView = await i_category_html.findOrCreate({
+               where: {
+                  parent_id: id,
+                  use_yn: enumConfig.useType.Y[0],
+               },
+               defaults: {
+                  parent_id: id,
                   content: content,
                },
-               {
-                  where: {
-                     parent_id: id,
+            });
+
+            if (htmlView[1] === false) {
+               subCategory = await i_category_html.update(
+                  {
+                     content: content,
                   },
-               }
-            );
+                  {
+                     where: {
+                        parent_id: id,
+                     },
+                  }
+               );
+            }
+
             break;
          case enumConfig.contentType.EMPTY[0]:
-            subCatetory = await i_category_empty.update(
-               {
+            const emptyView = await i_category_empty.findOrCreate({
+               where: {
                   parent_id: id,
                },
-               {
-                  where: {
+               defaults: {
+                  parent_id: id,
+               },
+            });
+
+            if (emptyView[1] === false) {
+               subCategory = await i_category_empty.update(
+                  {
                      parent_id: id,
                   },
-               }
-            );
+                  {
+                     where: {
+                        parent_id: id,
+                     },
+                  }
+               );
+            }
+
             break;
          case enumConfig.contentType.CUSTOM[0]:
-            subCatetory = await i_category_custom.update(
-               {
+            const customView = await i_category_custom.findOrCreate({
+               where: {
+                  parent_id: newCategory.id,
+                  use_yn: enumConfig.useType.Y[0],
+               },
+               defaults: {
+                  parent_id: newCategory.id,
                   c_type: c_type,
                   file_path: file_path,
                   admin_file_path: admin_file_path,
                   sms: sms,
                   email: email,
                },
-               {
-                  where: {
-                     parent_id: id,
+            });
+
+            if (customView[1] === false) {
+               subCategory = await i_category_custom.update(
+                  {
+                     c_type: c_type,
+                     file_path: file_path,
+                     admin_file_path: admin_file_path,
+                     sms: sms,
+                     email: email,
                   },
-               }
-            );
+                  {
+                     where: {
+                        parent_id: id,
+                     },
+                  }
+               );
+            }
+
             break;
          case enumConfig.contentType.BOARD[0]:
          case enumConfig.contentType.GALLERY[0]:
          case enumConfig.contentType.FAQ[0]:
          case enumConfig.contentType.QNA[0]:
-            subCatetory = await i_category_board.update(
-               {
+            const boardView = await i_category_board.findOrCreate({
+               where: {
+                  parent_id: id,
+                  use_yn: enumConfig.useType.Y[0],
+               },
+               defaults: {
+                  parent_id: id,
                   b_list_cnt: b_list_cnt,
                   b_column_title: b_column_title,
                   b_column_date: b_column_date,
@@ -560,20 +609,49 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                   b_template: b_template,
                   b_template_text: b_template_text,
                },
-               {
-                  where: {
-                     parent_id: id,
+            });
+
+            if (boardView[1] === false) {
+               subCategory = await i_category_board.update(
+                  {
+                     b_list_cnt: b_list_cnt,
+                     b_column_title: b_column_title,
+                     b_column_date: b_column_date,
+                     b_column_view: b_column_view,
+                     b_column_recom: b_column_recom,
+                     b_column_file: b_column_file,
+                     b_thumbnail_with: b_thumbnail_with,
+                     b_thumbnail_height: b_thumbnail_height,
+                     b_thumbnail: b_thumbnail,
+                     b_read_lv: b_read_lv,
+                     b_write_lv: b_write_lv,
+                     b_group: b_group,
+                     b_secret: b_secret,
+                     b_reply: b_reply,
+                     b_reply_lv: b_reply_lv,
+                     b_comment: b_comment,
+                     b_comment_lv: b_comment_lv,
+                     b_alarm: b_alarm,
+                     b_alarm_phone: b_alarm_phone,
+                     b_top_html: b_top_html,
+                     b_template: b_template,
+                     b_template_text: b_template_text,
                   },
-               }
-            );
+                  {
+                     where: {
+                        parent_id: id,
+                     },
+                  }
+               );
+            }
             break;
          default:
             errorHandler.errorThrow(404, 'Invalid c_contents_type');
       }
 
-      if (!subCatetory) {
-         errorHandler.errorThrow(404, '');
-      }
+      //if (!subCategory) {
+      //   errorHandler.errorThrow(404, '');
+      //}
 
       await transaction.commit();
 
