@@ -59,11 +59,12 @@ exports.clearFile = (filePath) => {
 
 // Add a file size limit (in bytes)
 const fileSizeLimit = 5 * 1024 * 1024; // 5MB
+const fieldSizeLimit = 50 * 1024 * 1024; // 50MB
 
 exports.fileMulter = multer({
    storage: fileStorage('upload/board'),
    fileFilter: fileFilter,
-   limits: { fileSize: fileSizeLimit },
+   limits: { fileSize: fileSizeLimit, fieldSize: fieldSizeLimit },
 }).fields([
    { name: 'b_file', maxCount: 10 },
    { name: 'b_img', maxCount: 1 },
@@ -72,7 +73,7 @@ exports.fileMulter = multer({
 exports.menuFileMulter = multer({
    storage: fileStorage('upload/menu'),
    fileFilter: fileFilter,
-   limits: { fileSize: fileSizeLimit },
+   limits: { fileSize: fileSizeLimit, fieldSize: fieldSizeLimit },
 }).fields([
    { name: 'c_main_banner_file', maxCount: 1 },
    { name: 'c_menu_on_img', maxCount: 1 },

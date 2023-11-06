@@ -440,13 +440,15 @@ exports.postBoardCreate = async (req, res, next) => {
       const board_b_file = req.files['b_file'];
       const board_b_img = req.files['b_img'];
 
+      const processedContents = await base64ToImagesPath(b_contents);
+
       const boardCreate = await i_board.create({
          category: category,
          m_email: req.user,
          m_name: m_name,
          m_pwd: hashedPw,
          b_title: b_title,
-         b_contents: b_contents,
+         b_contents: processedContents,
          parent_id: parent_id,
          b_depth: b_depth,
          b_notice: b_notice,
@@ -864,4 +866,46 @@ exports.getFileDownload = async (req, res, next) => {
    } catch (err) {
       next(err);
    }
+};
+
+//게시글 내용 base64 이미지 변경
+const base64ToImagesPath = async (b_contents) => {
+   let temp_contents = b_contents;
+
+   const imageMatches = temp_contents.match(/data:image\/\w+;base64,([^"]+)/g);
+   const imagePaths = [];
+
+   if (imageMatches) {
+      for (let index = 0; index < imageMatches.length; index++) {
+         const imageData = imageMatches[index];
+         const imageDataWithoutPrefix = imageData.replace(
+            /^data:image\/\w+;base64,/,
+            ''
+         );
+         const decodedImage = Buffer.from(imageDataWithoutPrefix, 'base64');
+
+         // 이미지 파일 경로 및 이름 생성
+         const imageName = Date.now() + '_' + index + '.jpg';
+         const imagePath = 'upload/board/' + imageName; // uploads 폴더에 저장
+         imagePaths.push(imagePath);
+
+         // 이미지 파일을 저장
+         try {
+            await fs.promises.writeFile(imagePath, decodedImage);
+            console.log('Image saved as ' + imagePath);
+
+            // Replace the base64 data with the image path in temp_contents
+            temp_contents = temp_contents.replace(
+               imageData,
+               'http://api.likeweb.co.kr/' + imagePath
+            );
+         } catch (err) {
+            console.error('Failed to save the image: ' + err);
+            throw new Error('Image upload failed');
+         }
+      }
+   }
+
+   console.log(temp_contents);
+   return temp_contents;
 };
