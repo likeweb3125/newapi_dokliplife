@@ -11,10 +11,12 @@ const multerMiddleware = require('../middleware/multer');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const boardAuth = require('../middleware/boardAuth');
+const utilMiddleware = require('../middleware/util');
 const db = require('../models');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
+const { clearScreenDown } = require('readline');
 
 // 게시글 메인 리스트
 // 2023.08.30 ash
@@ -123,7 +125,10 @@ exports.getBoardList = async (req, res, next) => {
 
       const subQuery = `(SELECT COUNT(*) FROM i_board_comment WHERE i_board_comment.board_idx = i_board.idx)`;
       const subQuery2 = `(SELECT c_content_type FROM i_category WHERE i_category.id = i_board.category)`;
-      const subQuery3 = `(SELECT COUNT(*) FROM i_board_file WHERE i_board_file.parent_idx = i_board.idx)`;
+      const subQuery3 =
+         `(SELECT COUNT(*) FROM i_board_file WHERE i_board_file.parent_idx = i_board.idx and i_board_file.kind = '` +
+         enumConfig.boardFileType.B[0] +
+         `')`;
 
       // const subQuery2 = Sequelize.literal(`
       //    (SELECT c_name FROM i_category WHERE i_category.id = i_board.category)
@@ -358,7 +363,7 @@ exports.getBoardView = async (req, res, next) => {
       ]);
 
       const boardFileViews = await i_board_file.findAll({
-         where: { parent_idx: idx },
+         where: { parent_idx: idx, kind: enumConfig.boardFileType.B[0] },
          attributes: ['idx', 'parent_idx', 'file_name', 'original_name'],
       });
 
@@ -416,20 +421,6 @@ exports.postBoardCreate = async (req, res, next) => {
    } = req.body;
 
    try {
-      // 게시판 등록 권한 확인
-      // const authorizationResult = await boardAuth.authorizeUser(
-      //    category,
-      //    enumConfig.boardAuthType.CREATE,
-      //    req.level
-      // );
-
-      // if (authorizationResult) {
-      //    return errorHandler.errorThrow(
-      //       authorizationResult.statusCode,
-      //       authorizationResult.message
-      //    );
-      // }
-
       let hashedPw;
       if (m_pwd !== '') {
          hashedPw = await bcrypt.hash(m_pwd, 12);
@@ -440,7 +431,9 @@ exports.postBoardCreate = async (req, res, next) => {
       const board_b_file = req.files['b_file'];
       const board_b_img = req.files['b_img'];
 
-      const processedContents = await base64ToImagesPath(b_contents);
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         b_contents
+      );
 
       const boardCreate = await i_board.create({
          category: category,
@@ -448,7 +441,7 @@ exports.postBoardCreate = async (req, res, next) => {
          m_name: m_name,
          m_pwd: hashedPw,
          b_title: b_title,
-         b_contents: processedContents,
+         b_contents: processedContents.temp_contents,
          parent_id: parent_id,
          b_depth: b_depth,
          b_notice: b_notice,
@@ -463,14 +456,30 @@ exports.postBoardCreate = async (req, res, next) => {
       if (!boardCreate) {
          errorHandler.errorThrow(404, '');
       }
+      //console.log(board_b_file);
 
       if (board_b_file) {
-         for (const file of req.files['b_file']) {
-            console.log(file.path);
+         for (let index = 0; index < board_b_file.length; index++) {
+            //console.log(board_b_file[index].originalname);
             const boardFileCreate = await i_board_file.create({
                parent_idx: boardCreate.getDataValue('idx'),
-               file_name: file.path,
-               original_name: file.originalname,
+               file_name: board_b_file[index].path,
+               original_name: board_b_file[index].originalname,
+               kind: enumConfig.boardFileType.B[0],
+            });
+            if (!boardFileCreate) {
+               errorHandler.errorThrow(404, '');
+            }
+         }
+      }
+
+      //에디터 이미지 경로 저장
+      if (processedContents.imagePaths) {
+         for (const editFile of processedContents.imagePaths) {
+            const editFileCreate = await i_board_file.create({
+               parent_idx: boardCreate.getDataValue('idx'),
+               file_name: editFile,
+               kind: enumConfig.boardFileType.E[0],
             });
          }
       }
@@ -478,7 +487,7 @@ exports.postBoardCreate = async (req, res, next) => {
       // 게시판 설정 땡겨유~
       const boardItem = await boardAuth.boardListItem(category);
 
-      console.log(boardItem);
+      //console.log(boardItem);
       //게시판 등록 알림 일 경우 등록된 번호로 SMS 발송
       if (boardItem.b_alarm === 'Y') {
          // boardItem.b_alarm_phone
@@ -557,13 +566,17 @@ exports.putBoardUpdate = async (req, res, next) => {
       // }
 
       if (board_b_file) {
-         for (const file of req.files['b_file']) {
-            console.log(file.path);
+         for (let index = 0; index < board_b_file.length; index++) {
+            //console.log(board_b_file[index].originalname);
             const boardFileCreate = await i_board_file.create({
                parent_idx: idx,
-               file_name: file.path,
-               original_name: file.originalname,
+               file_name: board_b_file[index].path,
+               original_name: board_b_file[index].originalname,
+               kind: enumConfig.boardFileType.B[0],
             });
+            if (!boardFileCreate) {
+               errorHandler.errorThrow(404, '');
+            }
          }
       }
 
@@ -576,13 +589,28 @@ exports.putBoardUpdate = async (req, res, next) => {
          }
       }
 
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         b_contents
+      );
+
+      //에디터 이미지 경로 저장
+      if (processedContents.imagePaths) {
+         for (const file of processedContents.imagePaths) {
+            const editFileCreate = await i_board_file.create({
+               parent_idx: idx,
+               file_name: file.imagePaths,
+               kind: enumConfig.boardFileType.E[0],
+            });
+         }
+      }
+
       const boardUpdate = await i_board.update(
          {
             m_email: m_email,
             m_name: m_name,
             m_pwd: m_pwd,
             b_title: b_title,
-            b_contents: b_contents,
+            b_contents: processedContents.temp_contents,
             b_depth: b_depth,
             b_notice: b_notice,
             b_img: board_b_img
@@ -636,7 +664,7 @@ exports.deleteBoardDestroy = async (req, res, next) => {
 
       const boardViews = await i_board.findAll({
          where: whereCondition,
-         attributes: ['idx', 'category', 'm_email', 'b_file'],
+         attributes: ['idx', 'category', 'm_email', 'b_file', 'b_img'],
       });
 
       if (!boardViews || boardViews.length === 0) {
@@ -651,9 +679,9 @@ exports.deleteBoardDestroy = async (req, res, next) => {
             errorHandler.errorThrow(403, 'No authorization');
          }
 
-         if (boardView.b_file) {
-            multerMiddleware.clearFile(boardView.b_file);
-         }
+         //if (boardView.b_file) {
+         //   multerMiddleware.clearFile(boardView.b_file);
+         //}
 
          if (boardView.b_img) {
             multerMiddleware.clearFile(boardView.b_img);
@@ -666,6 +694,18 @@ exports.deleteBoardDestroy = async (req, res, next) => {
 
       if (!boardDelete) {
          errorHandler.errorThrow(404, '삭제 할 게시물이 없습니다.');
+      }
+
+      //첨부파일 삭제
+      const boardFileViews = await i_board_file.findAll({
+         where: { parent_idx: Array.isArray(idx) ? { [Op.in]: idx } : idx },
+         attributes: ['file_name'],
+      });
+
+      for (const boardFile of boardFileViews) {
+         if (boardFile.file_name) {
+            multerMiddleware.clearFile(boardFile.file_name);
+         }
       }
 
       const boardFileDelete = await i_board_file.destroy({
@@ -866,46 +906,4 @@ exports.getFileDownload = async (req, res, next) => {
    } catch (err) {
       next(err);
    }
-};
-
-//게시글 내용 base64 이미지 변경
-const base64ToImagesPath = async (b_contents) => {
-   let temp_contents = b_contents;
-
-   const imageMatches = temp_contents.match(/data:image\/\w+;base64,([^"]+)/g);
-   const imagePaths = [];
-
-   if (imageMatches) {
-      for (let index = 0; index < imageMatches.length; index++) {
-         const imageData = imageMatches[index];
-         const imageDataWithoutPrefix = imageData.replace(
-            /^data:image\/\w+;base64,/,
-            ''
-         );
-         const decodedImage = Buffer.from(imageDataWithoutPrefix, 'base64');
-
-         // 이미지 파일 경로 및 이름 생성
-         const imageName = Date.now() + '_' + index + '.jpg';
-         const imagePath = 'upload/board/' + imageName; // uploads 폴더에 저장
-         imagePaths.push(imagePath);
-
-         // 이미지 파일을 저장
-         try {
-            await fs.promises.writeFile(imagePath, decodedImage);
-            console.log('Image saved as ' + imagePath);
-
-            // Replace the base64 data with the image path in temp_contents
-            temp_contents = temp_contents.replace(
-               imageData,
-               'http://api.likeweb.co.kr/' + imagePath
-            );
-         } catch (err) {
-            console.error('Failed to save the image: ' + err);
-            throw new Error('Image upload failed');
-         }
-      }
-   }
-
-   console.log(temp_contents);
-   return temp_contents;
 };

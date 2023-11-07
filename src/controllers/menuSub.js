@@ -11,6 +11,7 @@ const {
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const multerMiddleware = require('../middleware/multer');
+const utilMiddleware = require('../middleware/util');
 const db = require('../models');
 
 // Get SubMenu Create
@@ -110,6 +111,8 @@ exports.postSubCategoryCreate = async (req, res, next) => {
 
       switch (parseInt(c_content_type)) {
          case enumConfig.contentType.HTML[0]:
+            const processedHtmlContents =
+               await utilMiddleware.base64ToImagesPath(content);
             subCategory = await i_category_html.findOrCreate({
                where: {
                   parent_id: newCategory.id,
@@ -117,7 +120,7 @@ exports.postSubCategoryCreate = async (req, res, next) => {
                },
                defaults: {
                   parent_id: newCategory.id,
-                  content: content,
+                  content: processedHtmlContents.temp_contents,
                },
             });
             break;
@@ -152,6 +155,11 @@ exports.postSubCategoryCreate = async (req, res, next) => {
          case enumConfig.contentType.GALLERY[0]:
          case enumConfig.contentType.FAQ[0]:
          case enumConfig.contentType.QNA[0]:
+            const processedTopHtmlContents =
+               await utilMiddleware.base64ToImagesPath(b_top_html);
+            const processedTemplateContents =
+               await utilMiddleware.base64ToImagesPath(b_template_text);
+
             subCategory = await i_category_board.findOrCreate({
                where: {
                   parent_id: newCategory.id,
@@ -178,9 +186,9 @@ exports.postSubCategoryCreate = async (req, res, next) => {
                   b_comment_lv: b_comment_lv,
                   b_alarm: b_alarm,
                   b_alarm_phone: b_alarm_phone,
-                  b_top_html: b_top_html,
+                  b_top_html: processedTopHtmlContents.temp_contents,
                   b_template: b_template,
-                  b_template_text: b_template_text,
+                  b_template_text: processedTemplateContents.temp_contents,
                },
             });
             break;
@@ -492,6 +500,9 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
 
       switch (parseInt(c_content_type)) {
          case enumConfig.contentType.HTML[0]:
+            const processedHtmlContents =
+               await utilMiddleware.base64ToImagesPath(content);
+
             const htmlView = await i_category_html.findOrCreate({
                where: {
                   parent_id: id,
@@ -499,7 +510,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                },
                defaults: {
                   parent_id: id,
-                  content: content,
+                  content: processedHtmlContents.temp_contents,
                },
             });
 
@@ -579,6 +590,11 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
          case enumConfig.contentType.GALLERY[0]:
          case enumConfig.contentType.FAQ[0]:
          case enumConfig.contentType.QNA[0]:
+            const processedTopHtmlContents =
+               await utilMiddleware.base64ToImagesPath(b_top_html);
+            const processedTemplateContents =
+               await utilMiddleware.base64ToImagesPath(b_template_text);
+
             const boardView = await i_category_board.findOrCreate({
                where: {
                   parent_id: id,
@@ -605,7 +621,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                   b_comment_lv: b_comment_lv,
                   b_alarm: b_alarm,
                   b_alarm_phone: b_alarm_phone,
-                  b_top_html: b_top_html,
+                  b_top_html: processedTopHtmlContents.temp_contents,
                   b_template: b_template,
                   b_template_text: b_template_text,
                },
@@ -635,7 +651,7 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                      b_alarm_phone: b_alarm_phone,
                      b_top_html: b_top_html,
                      b_template: b_template,
-                     b_template_text: b_template_text,
+                     b_template_text: processedTemplateContents.temp_contents,
                   },
                   {
                      where: {

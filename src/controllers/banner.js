@@ -2,6 +2,7 @@ const moment = require('moment');
 const { Op, Sequelize } = require('sequelize');
 const { i_banner } = require('../models');
 const multerMiddleware = require('../middleware/multer');
+const utilMiddleware = require('../middleware/util');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const db = require('../models');
@@ -29,6 +30,10 @@ exports.postBannerCreate = async (req, res, next) => {
    } = req.body;
 
    try {
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         b_content
+      );
+
       const bannerCreate = await i_banner.create({
          b_type: b_type,
          b_open: b_open,
@@ -45,7 +50,7 @@ exports.postBannerCreate = async (req, res, next) => {
          b_mov_type: b_mov_type,
          b_mov_play: b_mov_play,
          b_mov_sound: b_mov_sound,
-         b_content: b_content,
+         b_content: processedContents.temp_contents,
       });
 
       if (!bannerCreate) {
@@ -277,6 +282,10 @@ exports.postBannerUpdate = async (req, res, next) => {
          }
       }
 
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         b_content
+      );
+
       const bannerUpdate = await i_banner.update(
          {
             b_type: b_type,
@@ -298,7 +307,7 @@ exports.postBannerUpdate = async (req, res, next) => {
             b_mov_type: b_mov_type,
             b_mov_play: b_mov_play,
             b_mov_sound: b_mov_sound,
-            b_content: b_content,
+            b_content: processedContents.temp_contents,
          },
          {
             where: {

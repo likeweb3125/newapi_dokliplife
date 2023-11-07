@@ -2,6 +2,7 @@ const moment = require('moment');
 const { Op, Sequelize } = require('sequelize');
 const { i_popup } = require('../models');
 const multerMiddleware = require('../middleware/multer');
+const utilMiddleware = require('../middleware/util');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const db = require('../models');
@@ -28,6 +29,10 @@ exports.postPopupCreate = async (req, res, next) => {
 
    console.log(req.body);
    try {
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         p_content
+      );
+
       const popupCreate = await i_popup.create({
          p_type: p_type,
          p_open: p_open,
@@ -42,7 +47,7 @@ exports.postPopupCreate = async (req, res, next) => {
          p_top_point: p_top_point,
          p_scroll: p_scroll,
          p_link_target: p_link_target,
-         p_content: p_content,
+         p_content: processedContents.temp_contents,
       });
 
       if (!popupCreate) {
@@ -269,6 +274,10 @@ exports.putBannerUpdate = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         p_content
+      );
+
       const popupUpdate = await i_popup.update(
          {
             p_type: p_type,
@@ -284,7 +293,7 @@ exports.putBannerUpdate = async (req, res, next) => {
             p_top_point: p_top_point,
             p_scroll: p_scroll,
             p_link_target: p_link_target,
-            p_content: p_content,
+            p_content: processedContents.temp_contents,
          },
          {
             where: {

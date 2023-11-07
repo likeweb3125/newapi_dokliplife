@@ -18,10 +18,14 @@ module.exports = (sequelize, DataTypes) => {
          },
          original_name: {
             type: DataTypes.STRING(500),
-            allowNull: false,
+            allowNull: true,
          },
          reg_date: {
             type: DataTypes.DATE,
+         },
+         kind: {
+            type: DataTypes.STRING(1),
+            allowNull: false,
          },
       },
       {

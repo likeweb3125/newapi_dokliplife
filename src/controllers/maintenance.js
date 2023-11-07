@@ -6,6 +6,7 @@ const { Sequelize } = require('sequelize');
 const { ib_admin, i_comment } = require('../models');
 
 const multerMiddleware = require('../middleware/multer');
+const utilMiddleware = require('../middleware/util');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 
@@ -178,13 +179,17 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       //      console.log('다른 서버 응답:', response.data);
       //   }
 
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         contents
+      );
+
       const boardCreate = await ib_admin.create({
          category_id: category,
          m_id: '',
          password: password,
          name: name,
          subject: subject,
-         contents: contents,
+         contents: processedContents.temp_contents,
          notice: '0',
          reply: maxReply + 1,
          reply_level: '0',

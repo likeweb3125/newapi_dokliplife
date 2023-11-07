@@ -58,6 +58,11 @@ exports.boardAuthType = {
    COMMENT: 'comment', // 댓글
 };
 
+exports.boardFileType = {
+   B: ['B', '게시판첨부파일'],
+   E: ['E', '에디터이미지파일'],
+};
+
 exports.bannerOpenType = {
    Y: ['Y', '노출'],
    N: ['N', '중단'],

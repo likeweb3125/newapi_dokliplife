@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const { i_config, i_member_level, i_policy } = require('../models');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
+const utilMiddleware = require('../middleware/util');
 
 exports.getConfigSite = async (req, res, next) => {
    const site_id = req.params;
@@ -189,9 +190,13 @@ exports.postConfigPolicyCreate = async (req, res, next) => {
    const { p_title, p_contents, p_use_yn } = req.body;
 
    try {
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         p_contents
+      );
+
       const policyCreate = await i_policy.create({
          p_title: p_title,
-         p_contents: p_contents,
+         p_contents: processedContents.temp_contents,
          p_use_yn: p_use_yn,
       });
 
@@ -249,10 +254,14 @@ exports.putConfigPolicyUpdate = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 
+      const processedContents = await utilMiddleware.base64ToImagesPath(
+         p_contents
+      );
+
       const policyUpdate = await i_policy.update(
          {
             p_title: p_title,
-            p_contents: p_contents,
+            p_contents: processedContents.temp_contents,
             p_use_yn: p_use_yn,
          },
          {
