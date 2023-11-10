@@ -30,7 +30,7 @@ exports.base64ToImagesPath = async (b_contents) => {
             // Replace the base64 data with the image path in temp_contents
             temp_contents = temp_contents.replace(
                imageData,
-               'http://api.likeweb.co.kr/' + imagePath
+               'http://api.likeweb.co.kr:5001/' + imagePath
             );
          } catch (err) {
             console.error('Failed to save the image: ' + err);
