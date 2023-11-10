@@ -133,7 +133,7 @@ exports.postBoardGroupCreate = async (req, res, next) => {
 
       if (!g_num) {
          const categoryCount = await i_category_board_group.count({
-            attributes: [[sequelize.literal('count(*) + 1'), 'count']],
+            attributes: [[Sequelize.literal('count(*) + 1'), 'count']],
             where: {
                parent_id: parent_id,
                use_yn: use_yn || enumConfig.useType.Y[0],
