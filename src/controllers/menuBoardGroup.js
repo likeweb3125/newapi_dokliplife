@@ -19,6 +19,7 @@ exports.getBoardGroupList = async (req, res, next) => {
          where: [{ parent_id: parent_id, use_yn: enumConfig.useType.Y[0] }],
          order: [['g_num', 'ASC']],
          attributes: [
+            'id',
             'parent_id',
             'g_num',
             'g_name',
@@ -35,6 +36,7 @@ exports.getBoardGroupList = async (req, res, next) => {
 
       const categoryGroupListYResult = categoryGroupListY.map((list) => {
          const listObj = {
+            id: list.id,
             parent_id: list.parent_id,
             g_num: list.g_num,
             g_name: list.g_name,
@@ -50,6 +52,7 @@ exports.getBoardGroupList = async (req, res, next) => {
          where: [{ parent_id: parent_id, use_yn: enumConfig.useType.N[0] }],
          order: [['g_num', 'ASC']],
          attributes: [
+            'id',
             'parent_id',
             'g_num',
             'g_name',
@@ -62,6 +65,7 @@ exports.getBoardGroupList = async (req, res, next) => {
 
       const categoryGroupListNResult = categorGroupListN.map((list) => {
          const listObj = {
+            id: list.id,
             parent_id: list.parent_id,
             g_num: list.g_num,
             g_name: list.g_name,
@@ -76,6 +80,7 @@ exports.getBoardGroupList = async (req, res, next) => {
       const hierarchicalMenu = categoryGroupListYResult;
 
       hierarchicalMenu.push({
+         id: '',
          parent_id: parent_id,
          g_num: '0',
          g_name: '숨긴분류',
