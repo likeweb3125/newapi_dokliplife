@@ -900,7 +900,7 @@ exports.getFileDownload = async (req, res, next) => {
       if (fs.existsSync(filePath)) {
          res.setHeader(
             'Content-Disposition',
-            'attachment; filename=' + originalFileName
+            'attachment; filename=' + encodeURI(originalFileName)
          );
          res.setHeader('Content-Type', 'application/octet-stream');
 
