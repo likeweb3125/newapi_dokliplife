@@ -9,7 +9,7 @@ const fileStorage = (destination) =>
          cb(null, destination);
       },
       filename: (req, file, cb) => {
-         const originalName = file.originalname;
+         const originalName = decodeURIComponent(file.originalname);
          const _fileLen = originalName.length;
          const _lastDot = originalName.lastIndexOf('.') + 1;
          const _fileNameWithoutExt = originalName.substring(0, _lastDot - 1);
