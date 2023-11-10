@@ -101,8 +101,16 @@ exports.getBoardGroupList = async (req, res, next) => {
 // Post Board Group Create
 // 2023.09.06 ash
 exports.postBoardGroupCreate = async (req, res, next) => {
-   const { parent_id, g_num, g_name, g_menu_ui, g_img_on, g_img_off, use_yn } =
-      req.body;
+   const {
+      parent_id,
+      g_num,
+      all_board,
+      g_name,
+      g_menu_ui,
+      g_img_on,
+      g_img_off,
+      use_yn,
+   } = req.body;
 
    try {
       const groupParent = await i_category.findOne({
@@ -146,6 +154,7 @@ exports.postBoardGroupCreate = async (req, res, next) => {
       const groupCreate = await i_category_board_group.create({
          parent_id: parent_id,
          g_num: calculatedCNum,
+         all_board: all_board,
          g_name: g_name,
          g_menu_ui: g_menu_ui,
          g_img_on: groupOnImgPath,
@@ -178,6 +187,7 @@ exports.getBoardGroupView = async (req, res, next) => {
             'id',
             'parent_id',
             'g_num',
+            'all_board',
             'g_name',
             'g_menu_ui',
             'g_img_on',
@@ -194,6 +204,7 @@ exports.getBoardGroupView = async (req, res, next) => {
          id: groupView.id,
          parent_id: groupView.parent_id,
          g_num: groupView.g_num,
+         all_board: groupView.all_board,
          g_name: groupView.g_name,
          g_menu_ui: groupView.g_menu_ui,
          g_img_on: groupView.g_img_on,
@@ -210,8 +221,16 @@ exports.getBoardGroupView = async (req, res, next) => {
 // Post Board Group Update
 // 2023.09.07 ash
 exports.putBoardGroupUpdate = async (req, res, next) => {
-   const { parent_id, g_num, g_name, g_menu_ui, g_img_on, g_img_off, use_yn } =
-      req.body;
+   const {
+      parent_id,
+      g_num,
+      all_board,
+      g_name,
+      g_menu_ui,
+      g_img_on,
+      g_img_off,
+      use_yn,
+   } = req.body;
 
    try {
       const groupOnImg = req.files['g_img_on'];
@@ -226,6 +245,7 @@ exports.putBoardGroupUpdate = async (req, res, next) => {
          {
             parent_id: parent_id,
             g_num: g_num,
+            all_board: all_board,
             g_name: g_name,
             g_menu_ui: g_menu_ui,
             g_img_on: groupOnImgPath,

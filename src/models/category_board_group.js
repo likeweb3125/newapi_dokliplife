@@ -36,6 +36,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
+         all_board: {
+            type: DataTypes.STRING(1),
+            allowNull: true,
+         },
       },
       {
          timestamps: false,

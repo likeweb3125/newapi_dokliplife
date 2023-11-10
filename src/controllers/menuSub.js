@@ -55,6 +55,9 @@ exports.postSubCategoryCreate = async (req, res, next) => {
       b_reply_lv,
       b_comment,
       b_comment_lv,
+      b_write_alarm,
+      b_write_send,
+      b_write_sms,
       b_alarm,
       b_alarm_phone,
       b_top_html,
@@ -184,6 +187,9 @@ exports.postSubCategoryCreate = async (req, res, next) => {
                   b_reply_lv: b_reply_lv,
                   b_comment: b_comment,
                   b_comment_lv: b_comment_lv,
+                  b_write_alarm: b_write_alarm,
+                  b_write_send: b_write_send,
+                  b_write_sms: b_write_sms,
                   b_alarm: b_alarm,
                   b_alarm_phone: b_alarm_phone,
                   b_top_html: processedTopHtmlContents.temp_contents,
@@ -326,6 +332,7 @@ exports.getSubCategoryView = async (req, res, next) => {
                   'b_comment_lv',
                   'b_write_alarm',
                   'b_write_send',
+                  'b_write_sms',
                   'b_alarm',
                   'b_alarm_phone',
                   'b_top_html',
@@ -382,6 +389,7 @@ exports.getSubCategoryView = async (req, res, next) => {
             menuObj.b_comment_lv = subView.b_comment_lv;
             menuObj.b_write_alarm = subView.b_write_alarm;
             menuObj.b_write_send = subView.b_write_send;
+            menuObj.b_write_sms = subView.b_write_sms;
             menuObj.b_alarm = subView.b_alarm;
             menuObj.b_alarm_phone = subView.b_alarm_phone;
             menuObj.b_top_html = subView.b_top_html;
@@ -441,6 +449,9 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
       b_reply_lv,
       b_comment,
       b_comment_lv,
+      b_write_alarm,
+      b_write_send,
+      b_write_sms,
       b_alarm,
       b_alarm_phone,
       b_top_html,
@@ -619,6 +630,9 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                   b_reply_lv: b_reply_lv,
                   b_comment: b_comment,
                   b_comment_lv: b_comment_lv,
+                  b_write_alarm: b_write_alarm,
+                  b_write_send: b_write_send,
+                  b_write_sms: b_write_sms,
                   b_alarm: b_alarm,
                   b_alarm_phone: b_alarm_phone,
                   b_top_html: processedTopHtmlContents.temp_contents,
@@ -647,6 +661,9 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
                      b_reply_lv: b_reply_lv,
                      b_comment: b_comment,
                      b_comment_lv: b_comment_lv,
+                     b_write_alarm: b_write_alarm,
+                     b_write_send: b_write_send,
+                     b_write_sms: b_write_sms,
                      b_alarm: b_alarm,
                      b_alarm_phone: b_alarm_phone,
                      b_top_html: b_top_html,

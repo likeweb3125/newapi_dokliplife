@@ -83,6 +83,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
+         b_write_sms: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+         },
          b_alarm: {
             type: DataTypes.STRING(50),
             allowNull: false,
