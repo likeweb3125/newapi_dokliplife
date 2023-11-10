@@ -464,7 +464,10 @@ exports.postBoardCreate = async (req, res, next) => {
             const boardFileCreate = await i_board_file.create({
                parent_idx: boardCreate.getDataValue('idx'),
                file_name: board_b_file[index].path,
-               original_name: board_b_file[index].originalname,
+               original_name: Buffer.from(
+                  board_b_file[index].originalname,
+                  'latin1'
+               ).toString('utf8'),
                kind: enumConfig.boardFileType.B[0],
             });
             if (!boardFileCreate) {
@@ -571,7 +574,10 @@ exports.putBoardUpdate = async (req, res, next) => {
             const boardFileCreate = await i_board_file.create({
                parent_idx: idx,
                file_name: board_b_file[index].path,
-               original_name: board_b_file[index].originalname,
+               original_name: Buffer.from(
+                  board_b_file[index].originalname,
+                  'latin1'
+               ).toString('utf8'),
                kind: enumConfig.boardFileType.B[0],
             });
             if (!boardFileCreate) {
