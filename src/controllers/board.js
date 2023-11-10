@@ -595,10 +595,10 @@ exports.putBoardUpdate = async (req, res, next) => {
 
       //에디터 이미지 경로 저장
       if (processedContents.imagePaths) {
-         for (const file of processedContents.imagePaths) {
+         for (const editFile of processedContents.imagePaths) {
             const editFileCreate = await i_board_file.create({
                parent_idx: idx,
-               file_name: file.imagePaths,
+               file_name: editFile,
                kind: enumConfig.boardFileType.E[0],
             });
          }
