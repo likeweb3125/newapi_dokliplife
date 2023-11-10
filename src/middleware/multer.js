@@ -9,6 +9,7 @@ const fileStorage = (destination) =>
          cb(null, destination);
       },
       filename: (req, file, cb) => {
+         console.log(file.originalname);
          const originalName = file.originalname;
          const _fileLen = originalName.length;
          const _lastDot = originalName.lastIndexOf('.') + 1;

@@ -567,7 +567,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 
       if (board_b_file) {
          for (let index = 0; index < board_b_file.length; index++) {
-            console.log(board_b_file[index].originalname);
+            //console.log(board_b_file[index].originalname);
             const boardFileCreate = await i_board_file.create({
                parent_idx: idx,
                file_name: board_b_file[index].path,
