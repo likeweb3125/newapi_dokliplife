@@ -107,7 +107,7 @@ router.delete(
 ); // 서브메뉴 게시판 구분 삭제
 
 router.put(
-   '/boardGroup',
+   '/boardGroupMove',
    isAuthMiddleware.isAuthAdmin,
    menuBoardGroupController.putBoardGroupMove
 ); // 서브메뉴 게시판 구분 이동

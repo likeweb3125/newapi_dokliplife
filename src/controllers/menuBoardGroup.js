@@ -9,6 +9,7 @@ const {
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const multerMiddleware = require('../middleware/multer');
+const db = require('../models');
 
 // Get Category Group List
 // 2023.09.06 ash
@@ -331,20 +332,58 @@ exports.putBoardGroupMove = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
-      await i_category_board_group.update(
-         {
-            c_num: sequelize.literal('g_num + 1'),
+      const groupNum = await i_category_board_group.findOne({
+         where: {
+            id: id,
+            use_yn: enumConfig.useType.Y[0],
          },
-         {
-            where: {
-               g_num: { [Op.gte]: g_num },
-               parent_id: parent_id,
-               use_yn: use_yn,
+         attributes: ['g_num'],
+      });
+
+      if (!groupNum) {
+         errorHandler.errorThrow(404, '');
+      }
+
+      let moveDirection;
+      if (g_num < groupNum.g_num) {
+         moveDirection = 'UP';
+      }
+
+      if (g_num > groupNum.g_num) {
+         moveDirection = 'DOWN';
+      }
+
+      if (moveDirection === 'UP') {
+         await i_category_board_group.update(
+            {
+               g_num: Sequelize.literal('g_num + 1'),
             },
-         }
-      );
+            {
+               where: {
+                  g_num: { [Op.gte]: g_num, [Op.lt]: groupNum.g_num },
+                  parent_id: parent_id,
+                  use_yn: enumConfig.useType.Y[0],
+               },
+            }
+         );
+      }
+
+      if (moveDirection === 'DOWN') {
+         await i_category_board_group.update(
+            {
+               g_num: Sequelize.literal('g_num - 1'),
+            },
+            {
+               where: {
+                  g_num: { [Op.gt]: groupNum.g_num, [Op.lte]: g_num },
+                  parent_id: parent_id,
+                  use_yn: enumConfig.useType.Y[0],
+               },
+            }
+         );
+      }
 
       await i_category_board_group.update(
          {
