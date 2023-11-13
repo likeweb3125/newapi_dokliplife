@@ -186,7 +186,8 @@ exports.getPopupView = async (req, res, next) => {
       if (!popupView) {
          errorHandler.errorThrow(404, '');
       }
-
+      console.log(popupView.p_type);
+      console.log(enumConfig.bannerLinkType.PARENT[0]);
       const popupObj = {
          idx: idx,
          p_type:
@@ -226,13 +227,13 @@ exports.getPopupView = async (req, res, next) => {
                : popupView.p_scroll === enumConfig.useType.N[0]
                ? enumConfig.useType.N
                : null,
-         b_url_target:
-            popupView.b_url_target === enumConfig.bannerLinkType.PARENT[0]
+         p_link_target:
+            popupView.p_link_target === enumConfig.bannerLinkType.PARENT[0]
                ? enumConfig.bannerLinkType.PARENT
-               : popupView.b_url_target === enumConfig.bannerLinkType.BLANK[0]
+               : popupView.p_link_target === enumConfig.bannerLinkType.BLANK[0]
                ? enumConfig.bannerLinkType.BLANK
                : null,
-         b_content: popupView.b_content,
+         p_content: popupView.p_content,
       };
 
       errorHandler.successThrow(res, '', popupObj);
