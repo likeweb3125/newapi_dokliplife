@@ -320,7 +320,7 @@ exports.deletePopupDestroy = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await db.sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const whereCondition = {
          idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
@@ -363,7 +363,7 @@ exports.postPopupOpen = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await db.sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const whereCondition = {
          idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,

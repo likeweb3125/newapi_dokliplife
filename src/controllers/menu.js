@@ -404,7 +404,7 @@ exports.deleteCategoryDestroy = async (req, res, next) => {
 // Put Menu Move
 // 2023.09.04 ash
 exports.putMoveCategory = async (req, res, next) => {
-   const { id, c_depth, c_depth_parent, c_num, c_use_yn } = req.body;
+   const { id, c_depth, c_depth_parent, c_num } = req.body;
 
    let transaction;
 
@@ -421,25 +421,48 @@ exports.putMoveCategory = async (req, res, next) => {
          errorHandler.errorThrow(404, 'depth 가 다르면 이동이 안됩니다.');
       }
 
-      await i_category.update(
-         {
-            c_num: Sequelize.literal('c_num + 1'),
-         },
-         {
-            where: {
-               c_num: { [Op.gte]: c_num },
-               c_depth_parent: c_depth_parent,
-               c_use_yn: c_use_yn,
+      let moveDirection;
+      if (c_num < menuView.c_num) {
+         moveDirection = 'UP';
+      }
+
+      if (c_num > menuView.c_num) {
+         moveDirection = 'DOWN';
+      }
+
+      if (moveDirection === 'UP') {
+         await i_category.update(
+            {
+               c_num: Sequelize.literal('c_num + 1'),
             },
-         }
-      );
+            {
+               where: {
+                  c_num: { [Op.gte]: c_num, [Op.lt]: menuView.c_num },
+                  c_depth_parent: c_depth_parent,
+                  c_use_yn: enumConfig.useType.Y[0],
+               },
+            }
+         );
+      }
+
+      if (moveDirection === 'DOWN') {
+         await i_category.update(
+            {
+               c_num: Sequelize.literal('c_num - 1'),
+            },
+            {
+               where: {
+                  c_num: { [Op.gt]: menuView.c_num, [Op.lte]: c_num },
+                  c_depth_parent: c_depth_parent,
+                  c_use_yn: enumConfig.useType.Y[0],
+               },
+            }
+         );
+      }
 
       await i_category.update(
          {
-            //c_depth: c_depth,
-            //c_depth_parent: c_depth_parent,
             c_num: c_num,
-            //c_use_yn: c_use_yn,
          },
          {
             where: {
