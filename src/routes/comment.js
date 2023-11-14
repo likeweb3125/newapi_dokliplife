@@ -7,12 +7,12 @@ const isAuthMiddleware = require('../middleware/is-auth');
 
 router.get(
    '/admin',
-   isAuthMiddleware.isAuthBoard,
+   isAuthMiddleware.isAuthAdmin,
    commentController.getCommentListAdmin
 ); //관리자 댓글 리스트
 
 router.get(
-   '/user/:board_idx',
+   '/user/:category/:board_idx',
    isAuthMiddleware.isAuthBoard,
    commentController.postCommentList
 ); //댓글 리스트

@@ -39,6 +39,7 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'category',
                'm_name',
                'b_title',
                'b_contents',
@@ -53,6 +54,7 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'board_idx',
                'm_name',
                'b_title',
                'c_contents',
@@ -67,6 +69,7 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'category',
                'm_name',
                'b_title',
                'b_contents',
@@ -81,6 +84,7 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
             order: [['idx', 'DESC']],
             attributes: [
                'idx',
+               'board_idx',
                'm_name',
                [Sequelize.literal(subQuery3), 'b_title'],
                'c_contents',
@@ -104,6 +108,8 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
          totalCnt: data.length,
          list: data.map((item) => ({
             idx: item.idx,
+            category:
+               item.c_contents === undefined ? item.category : item.board_idx,
             follow: item.c_contents === undefined ? '게시글' : '댓글',
             c_name: item.getDataValue('c_name'),
             m_name: item.m_name,

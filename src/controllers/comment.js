@@ -140,7 +140,7 @@ exports.getCommentListAdmin = async (req, res, next) => {
 // 댓글 리스트
 exports.postCommentList = async (req, res, next) => {
    const board_idx = req.params.board_idx;
-   //console.log(req.params);
+   console.log(board_idx);
    try {
       const allComments = await i_board_comment.findAll({
          where: { board_idx: board_idx },
@@ -201,17 +201,17 @@ function buildCommentTree(allComments, parentIdx = null, currentDepth = 0) {
 
 // 댓글 등록
 exports.postCommentCreate = async (req, res, next) => {
-   const { board_idx, parent_idx, depth, m_email, m_name, m_pwd, c_contents } =
+   const { category, parent_idx, depth, m_email, m_name, m_pwd, c_contents } =
       req.body;
 
    let transaction;
 
    try {
-      transaction = await db.sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const parentBoard = await i_board.findOne({
          where: {
-            idx: board_idx,
+            idx: parent_idx,
          },
          attributes: ['idx'],
       });
@@ -221,7 +221,7 @@ exports.postCommentCreate = async (req, res, next) => {
       }
 
       const commentCreate = await i_board_comment.create({
-         board_idx: board_idx,
+         board_idx: category,
          parent_idx: parent_idx,
          depth: depth,
          m_email: m_email,
@@ -295,7 +295,7 @@ exports.deleteCommentDestroy = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await db.sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const whereCondition = {
          idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
