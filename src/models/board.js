@@ -91,8 +91,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(1),
             allowNull: true,
          },
-         b_status: {
-            type: DataTypes.STRING(50),
+         b_reply: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+         },
+         group_id: {
+            type: DataTypes.INTEGER,
             allowNull: true,
          },
       },

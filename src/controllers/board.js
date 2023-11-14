@@ -129,6 +129,7 @@ exports.getBoardList = async (req, res, next) => {
          `(SELECT COUNT(*) FROM i_board_file WHERE i_board_file.parent_idx = i_board.idx and i_board_file.kind = '` +
          enumConfig.boardFileType.B[0] +
          `')`;
+      const subQuery4 = `(SELECT g_name FROM i_category_board_group WHERE i_category_board_group.id = i_board.group_id)`;
 
       // const subQuery2 = Sequelize.literal(`
       //    (SELECT c_name FROM i_category WHERE i_category.id = i_board.category)
@@ -162,9 +163,11 @@ exports.getBoardList = async (req, res, next) => {
             'b_notice',
             'b_secret',
             'm_name',
+            'b_reply',
             [Sequelize.literal(subQuery), 'comment_count'],
             [Sequelize.literal(subQuery2), 'c_content_type'],
             [Sequelize.literal(subQuery3), 'file_count'],
+            [Sequelize.literal(subQuery4), 'g_name'],
             ...boardItemResult.boardItem,
          ],
          include: [
@@ -199,6 +202,8 @@ exports.getBoardList = async (req, res, next) => {
          b_secret: list.b_secret,
          comment_count: list.getDataValue('comment_count'),
          c_content_type: list.getDataValue('c_content_type'),
+         g_name: list.getDataValue('g_name'),
+         g_status: list.b_reply !== null ? '답변완료' : '답변대기',
          c_name: list.icategory.c_name,
       }));
 
@@ -505,6 +510,45 @@ exports.postBoardCreate = async (req, res, next) => {
       }
 
       errorHandler.successThrow(res, '', boardCreate);
+   } catch (err) {
+      next(err);
+   }
+};
+
+//답변 등록
+exports.postBoardReplyUpdate = async (req, res, next) => {
+   const { category, idx, b_reply } = req.body;
+
+   try {
+      const boardReplyView = await i_board.findOne({
+         where: {
+            category: category,
+            idx: idx,
+         },
+         attributes: ['idx'],
+      });
+
+      if (!boardReplyView) {
+         errorHandler.errorThrow(404, '');
+      }
+
+      const boardReplyUpdate = await i_board.update(
+         {
+            b_reply: b_reply,
+         },
+         {
+            where: {
+               category: category,
+               idx: idx,
+            },
+         }
+      );
+
+      if (!boardReplyUpdate) {
+         errorHandler.errorThrow(404, '');
+      }
+
+      errorHandler.successThrow(res, '', boardReplyUpdate);
    } catch (err) {
       next(err);
    }

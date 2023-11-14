@@ -22,6 +22,13 @@ router.post(
    boardController.postBoardCreate
 ); //게시글 등록
 
+router.post(
+   '/reply',
+   multerMiddleware.fileMulter,
+   isAuthMiddleware.isAuthBoard,
+   boardController.postBoardReplyUpdate
+); //게시글답변 등록
+
 router.put(
    '/',
    multerMiddleware.fileMulter,

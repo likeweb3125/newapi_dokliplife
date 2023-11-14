@@ -457,6 +457,10 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
       b_top_html,
       b_template,
       b_template_text,
+
+      c_main_banner_file_del,
+      c_menu_on_img_del,
+      c_menu_off_img_del,
    } = req.body;
 
    let transaction;
@@ -485,7 +489,20 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
       );
       const menuOnImgPath = getFile('c_menu_on_img', menuView.c_menu_on_img);
       const menuOffImgPath = getFile('c_menu_off_img', menuView.c_menu_off_img);
-      console.log(c_content_type);
+      //console.log(c_content_type);
+
+      if (c_main_banner_file_del === 'Y') {
+         multerMiddleware.clearFile(menuView.c_main_banner_file);
+      }
+
+      if (c_menu_on_img_del === 'Y') {
+         multerMiddleware.clearFile(menuView.c_menu_on_img);
+      }
+
+      if (c_menu_off_img_del === 'Y') {
+         multerMiddleware.clearFile(menuView.c_menu_off_img);
+      }
+
       await i_category.update(
          {
             c_depth: c_depth,
@@ -493,10 +510,11 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
             c_num: c_num,
             c_name: c_name,
             c_main_banner: c_main_banner,
-            c_main_banner_file: mainBannerFilePath,
+            c_main_banner_file:
+               c_main_banner_file_del === 'Y' ? '' : mainBannerFilePath,
             c_menu_ui: c_menu_ui,
-            c_menu_on_img: menuOnImgPath,
-            c_menu_off_img: menuOffImgPath,
+            c_menu_on_img: c_menu_on_img_del === 'Y' ? '' : menuOnImgPath,
+            c_menu_off_img: c_menu_off_img_del === 'Y' ? '' : menuOffImgPath,
             c_content_type: c_content_type,
             c_use_yn: c_use_yn || enumConfig.useType.Y[0],
          },
