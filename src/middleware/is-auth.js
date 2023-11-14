@@ -70,7 +70,7 @@ exports.isAuthBoard = async (req, res, next) => {
    let category = req.body.category || req.params.category;
    let boardAuthType = req.body.boardAuthType;
    let idx = req.query.idx;
-   console.log(req.body);
+   console.log(boardAuthType);
    try {
       // 조회일 경우
       if (!idx && boardAuthType === undefined) {

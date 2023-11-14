@@ -56,7 +56,7 @@ exports.getFirstBoardAlarm = async (req, res, next) => {
                'idx',
                'board_idx',
                'm_name',
-               'b_title',
+               [Sequelize.literal(subQuery3), 'b_title'],
                'c_contents',
                'c_reg_date',
                [Sequelize.literal(subQuery2), 'c_name'],
