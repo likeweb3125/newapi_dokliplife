@@ -332,6 +332,7 @@ exports.getBoardView = async (req, res, next) => {
             'b_email',
             'b_secret',
             'b_reply',
+            'group_id',
          ],
       });
 
@@ -395,6 +396,7 @@ exports.getBoardView = async (req, res, next) => {
          b_email: boardView.b_email,
          b_secret: boardView.b_secret,
          b_reply: boardView.b_reply,
+         group_id: boardView.group_id,
          prev_board: prevBoard !== null ? prevBoard : false,
          next_board: nextBoard !== null ? nextBoard : false,
       };
