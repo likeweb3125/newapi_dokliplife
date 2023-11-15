@@ -190,7 +190,8 @@ exports.getBoardList = async (req, res, next) => {
       console.log(offset);
       const listResult = boardList.rows.map((list, index) => ({
          idx: list.idx,
-         num: boardList.count - (offset + index),
+         num:
+            list.b_notice === '1' ? '공지' : boardList.count - (offset + index),
          category: list.category,
          b_depth: list.b_depth,
          b_title: list.b_title,
