@@ -187,9 +187,10 @@ exports.getBoardList = async (req, res, next) => {
          Math.floor((page - 1) / maxPage) * maxPage + 1
       );
       const endPage = Math.min(lastPage, startPage + maxPage - 1);
-
-      const listResult = boardList.rows.map((list) => ({
+      console.log(offset);
+      const listResult = boardList.rows.map((list, index) => ({
          idx: list.idx,
+         num: boardList.count - (offset + index),
          category: list.category,
          b_depth: list.b_depth,
          b_title: list.b_title,
@@ -209,7 +210,7 @@ exports.getBoardList = async (req, res, next) => {
 
       const BoardName = await i_category.findAll({
          where: {
-            id: { [Op.ne]: [category] },
+            id: { [Op.eq]: [category] },
             c_use_yn: enumConfig.useType.Y[0],
             c_content_type: boardItemResult.c_content_type,
          },
