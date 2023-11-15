@@ -227,16 +227,8 @@ exports.getBoardGroupView = async (req, res, next) => {
 // Post Board Group Update
 // 2023.09.07 ash
 exports.putBoardGroupUpdate = async (req, res, next) => {
-   const {
-      parent_id,
-      g_num,
-      all_board,
-      g_name,
-      g_menu_ui,
-      g_img_on,
-      g_img_off,
-      use_yn,
-   } = req.body;
+   const { id, all_board, g_name, g_menu_ui, g_img_on, g_img_off, use_yn } =
+      req.body;
 
    try {
       const groupOnImg = req.files['g_img_on'];
@@ -246,11 +238,9 @@ exports.putBoardGroupUpdate = async (req, res, next) => {
          groupOnImg && groupOnImg[0] ? groupOnImg[0].path : null;
       const groupOffImgPath =
          groupOffImg && groupOffImg[0] ? groupOffImg[0].path : null;
-
+      console.log(groupOnImgPath);
       const groupCreate = await i_category_board_group.update(
          {
-            parent_id: parent_id,
-            g_num: g_num,
             all_board: all_board,
             g_name: g_name,
             g_menu_ui: g_menu_ui,
@@ -260,8 +250,7 @@ exports.putBoardGroupUpdate = async (req, res, next) => {
          },
          {
             where: {
-               parent_id: parent_id,
-               g_num: g_num,
+               id: id,
                use_yn: enumConfig.useType.Y[0],
             },
          }
