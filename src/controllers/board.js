@@ -211,7 +211,7 @@ exports.getBoardList = async (req, res, next) => {
 
       const BoardName = await i_category.findAll({
          where: {
-            id: { [Op.eq]: [category] },
+            id: { [Op.ne]: [category] },
             c_use_yn: enumConfig.useType.Y[0],
             c_content_type: boardItemResult.c_content_type,
          },
