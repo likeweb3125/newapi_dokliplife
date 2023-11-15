@@ -227,10 +227,25 @@ exports.getBoardGroupView = async (req, res, next) => {
 // Post Board Group Update
 // 2023.09.07 ash
 exports.putBoardGroupUpdate = async (req, res, next) => {
-   const { id, all_board, g_name, g_menu_ui, g_img_on, g_img_off, use_yn } =
-      req.body;
+   const {
+      id,
+      all_board,
+      g_name,
+      g_menu_ui,
+      g_img_on,
+      g_img_off,
+      use_yn,
+      g_img_on_del,
+      g_img_off_del,
+   } = req.body;
 
    try {
+      const groupView = await i_category_board_group.findByPk(id);
+
+      if (!groupView) {
+         errorHandler.errorThrow(402, '');
+      }
+
       const groupOnImg = req.files['g_img_on'];
       const groupOffImg = req.files['g_img_off'];
 
@@ -238,14 +253,23 @@ exports.putBoardGroupUpdate = async (req, res, next) => {
          groupOnImg && groupOnImg[0] ? groupOnImg[0].path : null;
       const groupOffImgPath =
          groupOffImg && groupOffImg[0] ? groupOffImg[0].path : null;
-      console.log(groupOnImgPath);
+      //console.log(groupOnImgPath);
+
+      if (g_img_on_del === 'Y') {
+         multerMiddleware.clearFile(groupView.g_img_on);
+      }
+
+      if (g_img_off_del === 'Y') {
+         multerMiddleware.clearFile(groupView.g_img_off);
+      }
+
       const groupCreate = await i_category_board_group.update(
          {
             all_board: all_board,
             g_name: g_name,
             g_menu_ui: g_menu_ui,
-            g_img_on: groupOnImgPath,
-            g_img_off: groupOffImgPath,
+            g_img_on: g_img_on_del === 'Y' ? '' : groupOnImgPath,
+            g_img_off: g_img_off_del === 'Y' ? '' : groupOffImgPath,
             use_yn: use_yn,
          },
          {
