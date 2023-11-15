@@ -425,6 +425,7 @@ exports.postBoardCreate = async (req, res, next) => {
       b_email_yn,
       b_secret,
       b_status,
+      group_id,
    } = req.body;
 
    try {
@@ -458,6 +459,7 @@ exports.postBoardCreate = async (req, res, next) => {
          b_email_yn: b_email_yn,
          b_secret: b_secret,
          b_status: b_status,
+         group_id: group_id,
       });
 
       if (!boardCreate) {
@@ -575,6 +577,7 @@ exports.putBoardUpdate = async (req, res, next) => {
       b_sms_phone,
       b_email_yn,
       b_status,
+      group_id,
    } = req.body;
 
    let transaction;
@@ -676,6 +679,7 @@ exports.putBoardUpdate = async (req, res, next) => {
             b_sms_phone: b_sms_phone,
             b_email_yn: b_email_yn,
             b_status: b_status,
+            group_id: group_id,
          },
          {
             where: {
