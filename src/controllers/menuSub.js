@@ -13,6 +13,7 @@ const enumConfig = require('../middleware/enum');
 const multerMiddleware = require('../middleware/multer');
 const utilMiddleware = require('../middleware/util');
 const db = require('../models');
+const fs = require('fs').promises;
 
 // Get SubMenu Create
 // 2023.09.04 ash
@@ -492,7 +493,12 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
       //console.log(c_content_type);
 
       if (c_main_banner_file_del === 'Y') {
-         multerMiddleware.clearFile(menuView.c_main_banner_file);
+         try {
+            await fs.access(menuView.c_main_banner_file, fs.constants.F_OK);
+            await multerMiddleware.clearFile(menuView.c_main_banner_file);
+         } catch (err) {
+            console.log('파일이 존재하지 않습니다.');
+         }
       }
 
       if (c_menu_on_img_del === 'Y') {

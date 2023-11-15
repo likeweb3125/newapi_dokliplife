@@ -287,7 +287,7 @@ exports.deleteConfigPolicyDestroy = async (req, res, next) => {
    try {
       const policyView = await i_policy.findOne({
          where: {
-            idx: idx,
+            idx: { [Op.in]: idx },
          },
          attributes: ['idx'],
       });
@@ -298,7 +298,7 @@ exports.deleteConfigPolicyDestroy = async (req, res, next) => {
 
       const policyDelete = await i_policy.destroy({
          where: {
-            idx: idx,
+            idx: { [Op.in]: idx },
          },
       });
 
