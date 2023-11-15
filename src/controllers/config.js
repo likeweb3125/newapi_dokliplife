@@ -306,7 +306,7 @@ exports.deleteConfigPolicyDestroy = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 
-      errorHandler.successThrow(res, '', '');
+      errorHandler.successThrow(res, '', policyDelete);
    } catch (err) {
       next(err);
    }
