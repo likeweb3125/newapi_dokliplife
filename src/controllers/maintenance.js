@@ -80,9 +80,10 @@ exports.getMaintenanceBoardList = async (req, res, next) => {
       );
       const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
-      const listResult = boardList.rows.map((list) => ({
+      const listResult = boardList.rows.map((list, index) => ({
          list_no: list.list_no,
          category_id: list.category_id,
+         num: boardList.count - (offset + index),
          subject: list.subject,
          name: list.name,
          w_date: moment.utc(list.w_date).format('YYYY.MM.DD hh:mm'),
