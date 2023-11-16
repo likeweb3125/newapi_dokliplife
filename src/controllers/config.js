@@ -160,10 +160,11 @@ exports.getConfigPolicy = async (req, res, next) => {
       );
       const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
-      const policyResult = policyList.rows.map((list) => {
+      const policyResult = policyList.rows.map((list, index) => {
          const boardDate = moment.utc(list.p_reg_date).format('YYYY.MM.DD');
          const listObj = {
             idx: list.idx,
+            num: policyList.count - (offset + index),
             p_title: list.p_title,
             p_reg_date: boardDate,
             p_use_yn: list.p_use_yn,
