@@ -121,6 +121,7 @@ exports.getMaintenanceBoardView = async (req, res, next) => {
             'contents',
             'b_file',
             'counter',
+            'process',
          ],
       });
 
@@ -137,6 +138,7 @@ exports.getMaintenanceBoardView = async (req, res, next) => {
          counter: boardView.counter,
          contents: boardView.contents,
          b_file: boardView.b_file,
+         process: boardView.process,
       };
 
       errorHandler.successThrow(res, '', boardObj);
