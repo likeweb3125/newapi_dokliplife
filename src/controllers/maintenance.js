@@ -153,36 +153,36 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       const uploadedFile = req.files['b_file'];
 
       // 파일이 업로드된 경우에만 처리
-      // if (uploadedFile) {
-      //    // FormData 생성
-      //    const formData = new FormData();
+      if (uploadedFile) {
+         // FormData 생성
+         const formData = new FormData();
 
-      //    //console.log(fs.createReadStream(path.join(__dirname, '../../', uploadedFile[0].path)));
+         // 파일 추가
+         formData.append(
+            'file',
+            fs.createReadStream(
+               path.join(__dirname, '../../', uploadedFile[0].path)
+            )
+         ); // 업로드된 파일 추가
 
-      //    // 파일 추가
-      //    formData.append(
-      //       'file',
-      //       fs.createReadStream(
-      //          path.join(__dirname, '../../', uploadedFile[0].path)
-      //       )
-      //    ); // 업로드된 파일 추가
+         formData.append('category', category);
 
-      //    // 다른 서버의 업로드 엔드포인트 URL 설정
-      //    const uploadServerUrl = 'http://www.likeweb.co.kr/api_attachfile.asp'; // 대상 서버 URL
+         // 다른 서버의 업로드 엔드포인트 URL 설정
+         const uploadServerUrl = 'https://www.likeweb.co.kr/api_attachfile.asp'; // 대상 서버 URL
 
-      //    // Axios를 사용하여 파일 및 데이터를 다른 서버로 전송
-      //    const response = await axios.post(uploadServerUrl, formData, {
-      //       headers: {
-      //          ...formData.getHeaders(), // 필수: FormData 헤더 추가
-      //       },
-      //    });
+         // Axios를 사용하여 파일 및 데이터를 다른 서버로 전송
+         const response = await axios.post(uploadServerUrl, formData, {
+            headers: {
+               ...formData.getHeaders(), // 필수: FormData 헤더 추가
+            },
+         });
 
-      //    // 업로드 완료 후 업로드된 파일 삭제 (옵션)
-      //    multerMiddleware.clearFile(uploadedFile[0].path);
+         // 업로드 완료 후 업로드된 파일 삭제 (옵션)
+         multerMiddleware.clearFile(uploadedFile[0].path);
 
-      //    // 다른 서버에서의 응답 처리
-      //    console.log('다른 서버 응답:', response.data);
-      // }
+         // 다른 서버에서의 응답 처리
+         console.log('다른 서버 응답:', response.data);
+      }
 
       const processedContents = await utilMiddleware.base64ToImagesPath(
          contents
@@ -201,7 +201,9 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          reply: maxReply + 1,
          reply_level: '0',
          reply_step: '0',
-         b_file: uploadedFile ? uploadedFile[0].filename : null,
+         b_file: uploadedFile
+            ? category + '_' + uploadedFile[0].filename
+            : null,
          counter: '0',
          recommend: '0',
          bad: '0',
