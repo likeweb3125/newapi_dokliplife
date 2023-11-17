@@ -150,8 +150,6 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
    const { category, name, password, subject, contents, b_file } = req.body;
 
    try {
-      const maxReply = await ib_admin.max('reply');
-
       const uploadedFile = req.files['b_file'];
 
       // 파일이 업로드된 경우에만 처리
@@ -189,6 +187,8 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       const processedContents = await utilMiddleware.base64ToImagesPath(
          contents
       );
+
+      const maxReply = await ib_admin.max('reply');
 
       const boardCreate = await ib_admin.create({
          category_id: category,
