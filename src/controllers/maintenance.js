@@ -176,7 +176,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          });
 
          // 업로드 완료 후 업로드된 파일 삭제 (옵션)
-         multerMiddleware.clearFile(uploadedFile[0].path);
+         //multerMiddleware.clearFile(uploadedFile[0].path);
 
          // 다른 서버에서의 응답 처리
          console.log('다른 서버 응답:', response.data);
