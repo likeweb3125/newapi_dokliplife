@@ -272,3 +272,42 @@ exports.getMaintenanceCommentList = async (req, res, next) => {
       next(err);
    }
 };
+
+// 유지보수 첨부파일 다운로드
+exports.getFileDownload = async (req, res, next) => {
+   const { list_no } = req.params;
+
+   try {
+      const boardFile = await ib_admin.findOne({
+         where: {
+            list_no: list_no,
+         },
+         attributes: ['b_file'],
+      });
+
+      if (!boardFile) {
+         errorHandler.errorThrow(404, '');
+      }
+
+      const fileUrl =
+         'https://www.likeweb.co.kr/upload/admin/' + boardFile.b_file;
+
+      const response = await axios({
+         method: 'get',
+         url: fileUrl,
+         responseType: 'stream',
+      });
+
+      const fileName = path.basename(fileUrl);
+
+      res.setHeader(
+         'Content-Disposition',
+         'attachment; filename=' + encodeURI(fileName)
+      );
+      res.setHeader('Content-Type', 'application/octet-stream');
+
+      response.data.pipe(res);
+   } catch (err) {
+      next(err);
+   }
+};

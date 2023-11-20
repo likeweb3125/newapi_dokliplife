@@ -34,4 +34,10 @@ router.get(
    maintenanceController.getMaintenanceCommentList
 ); // 게시판 댓글 리스트
 
+router.get(
+   '/download/:list_no',
+   isAuthMiddleware.isAuthAdmin,
+   maintenanceController.getFileDownload
+); //게시판 첨부파일 다운로드
+
 module.exports = router;
