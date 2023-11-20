@@ -286,7 +286,7 @@ exports.getFileDownload = async (req, res, next) => {
       if (!boardFile) {
          errorHandler.errorThrow(404, '');
       }
-
+      //
       const fileUrl =
          'https://www.likeweb.co.kr/upload/admin/' + boardFile.b_file;
 
