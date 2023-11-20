@@ -189,7 +189,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       const maxReply = await ib_admin.max('reply');
       console.log(uploadedFile[0].filename.normalize('NFC'));
       const normalizedFilename = uploadedFile
-         ? category + '_' + uploadedFile[0].filename
+         ? category + '_' + uploadedFile[0].filename.normalize('NFC')
          : '';
       console.log(normalizedFilename);
       const boardCreate = await ib_admin.create({
