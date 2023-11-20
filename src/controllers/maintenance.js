@@ -271,7 +271,7 @@ exports.getMaintenanceCommentList = async (req, res, next) => {
    }
 };
 
-// 유지보수 첨부파일 다운로드
+// 유지보수 첨부파일 다운로드 //
 exports.getFileDownload = async (req, res, next) => {
    const { list_no } = req.params;
 
