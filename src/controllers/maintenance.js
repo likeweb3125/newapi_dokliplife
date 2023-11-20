@@ -298,7 +298,10 @@ exports.getFileDownload = async (req, res, next) => {
 
       const fileName = path.basename(fileUrl);
 
-      res.setHeader('Content-Disposition', 'attachment; filename=' + fileName);
+      res.setHeader(
+         'Content-Disposition',
+         'attachment; filename=' + encodeURI(originalFileName)
+      );
       res.setHeader('Content-Type', 'application/octet-stream');
 
       response.data.pipe(res);
