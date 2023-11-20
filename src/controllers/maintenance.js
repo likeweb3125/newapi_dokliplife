@@ -176,7 +176,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          });
 
          // 업로드 완료 후 업로드된 파일 삭제 (옵션) 주석처리 TEST
-         //multerMiddleware.clearFile(uploadedFile[0].path);
+         multerMiddleware.clearFile(uploadedFile[0].path);
 
          // 다른 서버에서의 응답 처리
          console.log('다른 서버 응답:', response.data);
@@ -187,9 +187,9 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       );
 
       const maxReply = await ib_admin.max('reply');
-      //console.log(uploadedFile[0].filename);
+      console.log(uploadedFile[0].filename.normalize('NFC'));
       const normalizedFilename = uploadedFile
-         ? category + '_' + uploadedFile[0].filename.normalize('NFC')
+         ? category + '_' + uploadedFile[0].filename
          : '';
       console.log(normalizedFilename);
       const boardCreate = await ib_admin.create({
