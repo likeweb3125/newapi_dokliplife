@@ -159,13 +159,9 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          // FormData 생성
          const formData = new FormData();
 
+         const filePath = path.join(__dirname, '../../', uploadedFile[0].path);
          // 파일 추가
-         formData.append(
-            'file',
-            fs.createReadStream(
-               path.join(__dirname, '../../', uploadedFile[0].path)
-            )
-         ); // 업로드된 파일 추가
+         formData.append('file', fs.createReadStream(filePath)); // 업로드된 파일 추가
 
          formData.append('category', category);
 
@@ -191,7 +187,11 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       );
 
       const maxReply = await ib_admin.max('reply');
-
+      //console.log(uploadedFile[0].filename);
+      const normalizedFilename = uploadedFile
+         ? category + '_' + uploadedFile[0].filename
+         : '';
+      console.log(normalizedFilename);
       const boardCreate = await ib_admin.create({
          category_id: category,
          m_id: '',
@@ -203,9 +203,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          reply: maxReply + 1,
          reply_level: '0',
          reply_step: '0',
-         b_file: uploadedFile
-            ? category + '_' + uploadedFile[0].filename
-            : null,
+         b_file: normalizedFilename,
          counter: '0',
          recommend: '0',
          bad: '0',
@@ -300,10 +298,7 @@ exports.getFileDownload = async (req, res, next) => {
 
       const fileName = path.basename(fileUrl);
 
-      res.setHeader(
-         'Content-Disposition',
-         'attachment; filename=' + encodeURI(fileName)
-      );
+      res.setHeader('Content-Disposition', 'attachment; filename=' + fileName);
       res.setHeader('Content-Type', 'application/octet-stream');
 
       response.data.pipe(res);

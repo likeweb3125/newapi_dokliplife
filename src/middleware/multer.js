@@ -12,6 +12,9 @@ const fileStorage = (destination) =>
          // const originalName = Buffer.from(file.originalname, 'latin1').toString(
          //    'utf8'
          // ); 1.4.4 로 변경
+         console.log(
+            Buffer.from(file.originalname, 'binary').toString('utf-8')
+         );
          const originalName = file.originalname;
          const _fileLen = originalName.length;
          const _lastDot = originalName.lastIndexOf('.') + 1;
