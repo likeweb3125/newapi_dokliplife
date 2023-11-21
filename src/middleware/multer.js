@@ -10,11 +10,11 @@ const fileStorage = (destination) =>
          cb(null, destination);
       },
       filename: (req, file, cb) => {
-         const originalName = Buffer.from(file.originalname, 'latin1').toString(
-            'utf8'
-         );
+         //const originalName = Buffer.from(file.originalname, 'latin1').toString(
+         //   'utf8'
+         //);
 
-         //const originalName = file.originalname;
+         const originalName = file.originalname;
 
          const _fileLen = originalName.length;
          const _lastDot = originalName.lastIndexOf('.') + 1;
