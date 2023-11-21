@@ -164,7 +164,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          formData.append('file', fs.createReadStream(filePath)); // 업로드된 파일 추가
 
          formData.append('category', category);
-         formData.append('originalname', uploadedFile[0].fileName);
+         formData.append('originalname', uploadedFile[0].filename);
 
          // 다른 서버의 업로드 엔드포인트 URL 설정
          const uploadServerUrl = 'https://www.likeweb.co.kr/api_attachfile.asp'; // 대상 서버 URL
