@@ -47,6 +47,8 @@ app.use(helmet());
 app.use(bodyParser.urlencoded({ extended: true })); // x-www-form-urlencoded <form>
 app.use(bodyParser.json());
 
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
 // logs
