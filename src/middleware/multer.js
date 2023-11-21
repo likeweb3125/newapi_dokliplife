@@ -13,10 +13,7 @@ const fileStorage = (destination) =>
          //    'utf8'
          // ); 1.4.4 로 변경
 
-         const originalName = Buffer.from(file.originalname, 'latin1').toString(
-            'utf8'
-         );
-         const _fileLen = originalName.length;
+         const _fileLen = file.originalname.length;
          const _lastDot = originalName.lastIndexOf('.') + 1;
          const _fileNameWithoutExt = originalName.substring(0, _lastDot - 1);
          const _fileExt = originalName
