@@ -158,7 +158,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       if (uploadedFile) {
          // FormData 생성
          const formData = new FormData();
-
+         console.log(uploadedFile);
          const filePath = path.join(__dirname, '../../', uploadedFile[0].path);
          // 파일 추가
          formData.append('file', fs.createReadStream(filePath)); // 업로드된 파일 추가
@@ -177,7 +177,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          });
 
          // 업로드 완료 후 업로드된 파일 삭제 (옵션) 주석처리 TEST
-         //multerMiddleware.clearFile(uploadedFile[0].path);
+         multerMiddleware.clearFile(uploadedFile[0].path);
 
          // 다른 서버에서의 응답 처리
          console.log('다른 서버 응답:', response.data);
