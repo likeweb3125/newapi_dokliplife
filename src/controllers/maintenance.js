@@ -164,7 +164,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          formData.append('file', fs.createReadStream(filePath)); // 업로드된 파일 추가
 
          formData.append('category', category);
-         formData.append('originalname', uploadedFile[0].originalname);
+         formData.append('originalname', uploadedFile[0].fileName);
 
          // 다른 서버의 업로드 엔드포인트 URL 설정
          const uploadServerUrl = 'https://www.likeweb.co.kr/api_attachfile.asp'; // 대상 서버 URL
@@ -177,7 +177,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          });
 
          // 업로드 완료 후 업로드된 파일 삭제 (옵션) 주석처리 TEST
-         multerMiddleware.clearFile(uploadedFile[0].path);
+         //multerMiddleware.clearFile(uploadedFile[0].path);
 
          // 다른 서버에서의 응답 처리
          console.log('다른 서버 응답:', response.data);
@@ -188,7 +188,7 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
       );
 
       const maxReply = await ib_admin.max('reply');
-      console.log(uploadedFile[0].filename);
+
       const normalizedFilename = uploadedFile
          ? category + '_' + uploadedFile[0].filename
          : '';

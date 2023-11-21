@@ -7,6 +7,7 @@ const fileStorage = (destination) =>
    multer.diskStorage({
       destination: (req, file, cb) => {
          console.log('Destination:', destination);
+         console.log(destination);
          cb(null, destination);
       },
       filename: (req, file, cb) => {
