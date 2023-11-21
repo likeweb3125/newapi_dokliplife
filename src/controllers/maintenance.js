@@ -301,7 +301,7 @@ exports.getFileDownload = async (req, res, next) => {
 
       res.setHeader(
          'Content-Disposition',
-         'attachment; filename=' + encodeURI(originalFileName)
+         'attachment; filename=' + encodeURI(fileName)
       );
       res.setHeader('Content-Type', 'application/octet-stream');
 
