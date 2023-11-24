@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const dotenv = require('dotenv');
+
+dotenv.config({ path: path.join(__dirname, '/config/env/.env') });
 
 //게시글 내용 base64 이미지 변경
 exports.base64ToImagesPath = async (b_contents) => {
@@ -30,7 +33,7 @@ exports.base64ToImagesPath = async (b_contents) => {
             // Replace the base64 data with the image path in temp_contents
             temp_contents = temp_contents.replace(
                imageData,
-               'http://api.likeweb.co.kr:5001/' + imagePath
+               process.env.API_URL + imagePath
             );
          } catch (err) {
             console.error('Failed to save the image: ' + err);
