@@ -10,6 +10,9 @@ const errorHandler = require('./error');
 const enumConfig = require('../middleware/enum');
 
 const authorizeUser = async (category, boardAuthType, userLv) => {
+   if (userLv === undefined) {
+      userLv = 0;
+   }
    const boardConfigLv = await i_category_board.findOne({
       where: { parent_id: category },
       attributes: ['b_read_lv', 'b_write_lv', 'b_reply_lv', 'b_comment_lv'],

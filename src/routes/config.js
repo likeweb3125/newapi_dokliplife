@@ -30,7 +30,7 @@ router.post(
 
 router.get(
    '/policy/:idx',
-   isAuthMiddleware.isAuthAdmin,
+   //isAuthMiddleware.isAuthAdmin,
    configController.postConfigPolicyView
 ); //운영정책 내용
 

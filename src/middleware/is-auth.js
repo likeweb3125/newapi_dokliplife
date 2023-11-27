@@ -8,10 +8,13 @@ const authenticate = (req, level = null) => {
    const authHeader = req.get('Authorization');
 
    if (!authHeader) {
-      errorHandler.errorThrow(
-         enumConfig.statusErrorCode._401_ERROR[0],
-         'No token in header.'
-      );
+      req.user = '';
+      req.level = 0;
+      return;
+      // errorHandler.errorThrow(
+      //    enumConfig.statusErrorCode._401_ERROR[0],
+      //    'No token in header.'
+      // );
    }
 
    const token = authHeader.split(' ')[1];
