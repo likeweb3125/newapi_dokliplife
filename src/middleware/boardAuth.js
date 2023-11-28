@@ -68,6 +68,12 @@ const boardListItem = async (category) => {
       attributes: [
          [
             Sequelize.literal(
+               `(SELECT c_name FROM i_category WHERE i_category.id = i_category_board.parent_id)`
+            ),
+            'c_name',
+         ],
+         [
+            Sequelize.literal(
                `(SELECT c_content_type FROM i_category WHERE i_category.id = i_category_board.parent_id)`
             ),
             'c_content_type',
@@ -122,6 +128,7 @@ const boardListItem = async (category) => {
    }
 
    return {
+      c_name: boardItem.getDataValue('c_name'),
       c_content_type: boardItem.getDataValue('c_content_type'),
       b_list_cnt: boardItem.b_list_cnt,
       b_column_title: boardItem.b_column_title,
