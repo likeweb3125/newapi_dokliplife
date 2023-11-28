@@ -508,7 +508,16 @@ exports.postBoardCreate = async (req, res, next) => {
       //console.log(boardItem);
       //게시판 등록 알림 일 경우 등록된 번호로 SMS 발송
       if (boardItem.b_alarm === 'Y') {
-         // boardItem.b_alarm_phone
+         if (boardItem.b_alarm_phone !== '') {
+         } else {
+            const mailSendresult = utilMiddleware.postEmailSendGun(
+               res,
+               '',
+               req.user,
+               b_title + ' 게시글이 등록 되었습니다.',
+               processedContents.temp_contents
+            );
+         }
       }
 
       //답변 게시물
