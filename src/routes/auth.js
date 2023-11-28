@@ -29,4 +29,6 @@ router.delete(
    authController.deleteUserDestroy
 ); // 회원탈퇴하기
 
+router.get('/popup', authController.getPopupList); //팝업 리스트
+
 module.exports = router;

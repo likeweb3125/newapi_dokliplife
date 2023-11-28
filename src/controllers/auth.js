@@ -400,3 +400,105 @@ exports.deleteUserDestroy = async (req, res, next) => {
       next(err);
    }
 };
+
+//사용자 페이지 팝업 리스트
+exports.getPopupList = async (req, res, next) => {
+   const limit = req.query.limit || 10;
+   const page = parseInt(req.query.page) || 1;
+   const offset = (page - 1) * limit;
+   const p_type = req.query.p_type || 'P';
+   const searchTxtQuery = req.query.searchtxt;
+
+   try {
+      const whereCondition = {
+         p_type: p_type,
+         p_open: enumConfig.bannerOpenType.Y[0],
+      };
+
+      if (searchTxtQuery) {
+         whereCondition.p_title = {
+            [Op.like]: `%${searchTxtQuery}%`,
+         };
+      }
+
+      const popupList = await i_popup.findAndCountAll({
+         offset: offset,
+         limit: limit,
+         where: whereCondition,
+         order: [['idx', 'DESC']],
+         attributes: [
+            'idx',
+            'p_type',
+            'p_title',
+            'p_s_date',
+            'p_e_date',
+            'p_width_size',
+            'p_height_size',
+            'p_one_day',
+            'p_left_point',
+            'p_top_point',
+            'p_open',
+            'p_layer_pop',
+            'p_scroll',
+            'p_link_target',
+            'p_link_url',
+            'p_content',
+         ],
+      });
+
+      const lastPage = Math.ceil(popupList.count / limit);
+      const maxPage = 10;
+      const startPage = Math.max(
+         1,
+         Math.floor((page - 1) / maxPage) * maxPage + 1
+      );
+      const endPage = Math.min(lastPage, startPage + maxPage - 1);
+
+      const popupResult = popupList.rows.map((list) => ({
+         idx: list.idx,
+         p_type:
+            list.p_type === enumConfig.bannerType.PC[0]
+               ? enumConfig.bannerType.PC
+               : list.p_type === enumConfig.bannerType.MOBILE[0]
+               ? enumConfig.bannerType.MOBILE
+               : null,
+         p_title: list.p_title,
+         p_s_date: list.p_s_date,
+         p_e_date: list.p_e_date,
+         p_width_size: list.p_width_size,
+         p_height_size: list.p_height_size,
+         p_one_day: list.p_one_day,
+         p_left_point: list.p_left_point,
+         p_top_point: list.p_top_point,
+         p_open:
+            list.p_open === enumConfig.bannerOpenType.Y[0]
+               ? enumConfig.bannerOpenType.Y
+               : list.p_open === enumConfig.bannerOpenType.N[0]
+               ? enumConfig.bannerOpenType.N
+               : null,
+         p_layer_pop:
+            list.p_layer_pop === enumConfig.popupType.LAYER[0]
+               ? enumConfig.popupType.LAYER
+               : list.p_layer_pop === enumConfig.popupType.POPUP[0]
+               ? enumConfig.popupType.POPUP
+               : null,
+         p_scroll: list.p_scroll,
+         p_link_target: list.p_link_target,
+         p_link_url: list.p_link_url,
+         p_content: list.p_content,
+      }));
+
+      errorHandler.successThrow(res, '', {
+         limit: limit,
+         current_page: page,
+         start_page: startPage,
+         max_page: maxPage,
+         last_page: lastPage,
+         end_page: endPage,
+         total_count: popupList.count,
+         popup_list: popupResult,
+      });
+   } catch (err) {
+      next(err);
+   }
+};
