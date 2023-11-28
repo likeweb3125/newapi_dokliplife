@@ -24,6 +24,7 @@ exports.postPopupCreate = async (req, res, next) => {
       p_top_point,
       p_scroll,
       p_link_target,
+      p_link_url,
       p_content,
    } = req.body;
 
@@ -47,6 +48,7 @@ exports.postPopupCreate = async (req, res, next) => {
          p_top_point: p_top_point,
          p_scroll: p_scroll,
          p_link_target: p_link_target,
+         p_link_url: p_link_url,
          p_content: processedContents.temp_contents,
       });
 
@@ -179,6 +181,7 @@ exports.getPopupView = async (req, res, next) => {
             'p_top_point',
             'p_scroll',
             'p_link_target',
+            'p_link_rul',
             'p_content',
          ],
       });
@@ -233,6 +236,7 @@ exports.getPopupView = async (req, res, next) => {
                : popupView.p_link_target === enumConfig.bannerLinkType.BLANK[0]
                ? enumConfig.bannerLinkType.BLANK
                : null,
+         p_link_url: popupView.p_link_url,
          p_content: popupView.p_content,
       };
 
@@ -260,6 +264,7 @@ exports.putBannerUpdate = async (req, res, next) => {
       p_top_point,
       p_scroll,
       p_link_target,
+      p_link_url,
       p_content,
    } = req.body;
 
@@ -294,6 +299,7 @@ exports.putBannerUpdate = async (req, res, next) => {
             p_top_point: p_top_point,
             p_scroll: p_scroll,
             p_link_target: p_link_target,
+            p_link_url: p_link_url,
             p_content: processedContents.temp_contents,
          },
          {

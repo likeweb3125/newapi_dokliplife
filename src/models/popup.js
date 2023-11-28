@@ -60,6 +60,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(1),
             allowNull: true,
          },
+         p_link_url: {
+            type: DataTypes.STRING(500),
+            allowNull: true,
+         },
          p_content: {
             type: DataTypes.TEXT,
             allowNull: true,
