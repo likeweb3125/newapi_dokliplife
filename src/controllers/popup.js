@@ -100,6 +100,7 @@ exports.getPopupList = async (req, res, next) => {
             'p_top_point',
             'p_open',
             'p_layer_pop',
+            'p_link_url',
          ],
       });
 
@@ -139,6 +140,7 @@ exports.getPopupList = async (req, res, next) => {
                : list.p_layer_pop === enumConfig.popupType.POPUP[0]
                ? enumConfig.popupType.POPUP
                : null,
+         p_link_url: list.p_link_url,
       }));
 
       errorHandler.successThrow(res, '', {
