@@ -115,11 +115,15 @@ exports.getMaintenanceBoardView = async (req, res, next) => {
          attributes: [
             'list_no',
             'category_id',
+            'email',
+            'company',
             'subject',
             'name',
             'w_date',
             'contents',
             'b_file',
+            'm_tel',
+            'm_email',
             'counter',
             'process',
          ],
@@ -132,12 +136,16 @@ exports.getMaintenanceBoardView = async (req, res, next) => {
       const boardObj = {
          list_no: boardView.list_no,
          category_id: boardView.category_id,
+         email: boardView.email,
+         company: boardView.company,
          subject: boardView.subject,
          name: boardView.name,
          w_date: moment.utc(boardView.w_date).format('YYYY.MM.DD hh:mm'),
          counter: boardView.counter,
          contents: boardView.contents,
          b_file: boardView.b_file,
+         m_tel: boardView.m_tel,
+         m_email: boardView.m_email,
          process: boardView.process,
       };
 
@@ -149,7 +157,18 @@ exports.getMaintenanceBoardView = async (req, res, next) => {
 
 // 유지보수 게시판 등록
 exports.getMaintenanceBoardCreate = async (req, res, next) => {
-   const { category, name, password, subject, contents, b_file } = req.body;
+   const {
+      category,
+      name,
+      password,
+      subject,
+      company,
+      email,
+      m_tel,
+      m_email,
+      contents,
+      b_file,
+   } = req.body;
 
    try {
       const uploadedFile = req.files['b_file'];
@@ -197,6 +216,8 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          category_id: category,
          m_id: '',
          password: password,
+         email: email,
+         company: company,
          name: name,
          subject: subject,
          contents: processedContents.temp_contents,
@@ -208,6 +229,8 @@ exports.getMaintenanceBoardCreate = async (req, res, next) => {
          counter: '0',
          recommend: '0',
          bad: '0',
+         m_tel: m_tel,
+         m_email: m_email,
       });
 
       if (!boardCreate) {
