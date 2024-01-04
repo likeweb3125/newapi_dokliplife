@@ -42,6 +42,12 @@ router.put(
    menuController.putMoveCategory
 ); //메뉴 이동
 
+router.put(
+   '/moveLast',
+   isAuthMiddleware.isAuthAdmin,
+   menuController.putMoveLastCategory
+); //메뉴 순서 마지막으로 이동
+
 //
 // Sub Menu
 //

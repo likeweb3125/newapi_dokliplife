@@ -483,6 +483,58 @@ exports.putMoveCategory = async (req, res, next) => {
    }
 };
 
+// 2023-12-12 카테고리이동시 마지막 번호로
+exports.putMoveLastCategory = async (req, res, next) => {
+   const { id, c_depth, c_depth_parent } = req.body;
+
+   let transaction;
+
+   try {
+      transaction = await db.mariaDBSequelize.transaction();
+
+      const menuView = await i_category.findByPk(id);
+
+      if (!menuView) {
+         errorHandler.errorThrow(204, '메뉴 id 가 없습니다.');
+      }
+
+      if (menuView.c_depth !== parseInt(c_depth)) {
+         errorHandler.errorThrow(404, 'depth 가 다르면 이동이 안됩니다.');
+      }
+
+      const maxNumResult = await i_category.findOne({
+         attributes: [[Sequelize.fn('MAX', Sequelize.col('c_num')), 'maxNum']],
+         where: [
+            {
+               c_use_yn: enumConfig.useType.Y[0],
+               c_depth_parent: c_depth_parent,
+            },
+         ],
+      });
+
+      await i_category.update(
+         {
+            c_num: maxNumResult.maxNum,
+         },
+         {
+            where: {
+               id: id,
+            },
+         }
+      );
+
+      await transaction.commit();
+
+      errorHandler.successThrow(res, '', '');
+   } catch (err) {
+      if (transaction) {
+         await transaction.rollback();
+      }
+
+      next(err);
+   }
+};
+
 function mapContentType(contentType) {
    switch (contentType) {
       case 1:

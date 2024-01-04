@@ -39,6 +39,7 @@ const { logs } = require('./src/middleware/logs');
 const corsOptions = {
    origin: [
       'http://api.likeweb.co.kr:5001/',
+      'http://api.likeweb.co.kr/',
       'http://localhost:5001',
       'http://react.likeweb.co.kr',
    ], // 리액트  localhost 3000
