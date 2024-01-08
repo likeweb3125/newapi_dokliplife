@@ -48,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(50),
             allowNull: true,
          },
-         b_move_url: {
+         b_mov_url: {
             type: DataTypes.STRING(500),
             allowNull: true,
          },
