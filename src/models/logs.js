@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
          },
          clientIp: {
-            type: DataTypes.STRING(14),
+            type: DataTypes.STRING(16),
             allowNull: true,
          },
          previousUrl: {
