@@ -42,8 +42,8 @@ console.log(req.file)
          b_s_date: b_s_date,
          b_e_date: b_e_date,
          b_size: b_size,
-         b_width_size: replace(b_width_size,',',''),
-         b_height_size: replace(b_height_size,',',''),
+         b_width_size: b_width_size.replace(',',''),
+         b_height_size: b_height_size.replace(',',''),
          b_c_type: b_c_type,
          b_file: req.file ? req.file.path : null,
          b_mov_url: b_mov_url,
@@ -299,8 +299,8 @@ exports.postBannerUpdate = async (req, res, next) => {
             b_s_date: b_s_date,
             b_e_date: b_e_date,
             b_size: b_size,
-            b_width_size: replace(b_width_size,',',''),
-            b_height_size: replace(b_height_size,',',''),
+            b_width_size: b_width_size.replace(',',''),
+            b_height_size: b_height_size.replace(',',''),
             b_c_type: b_c_type,
             b_file: req.file
                ? req.file.path
