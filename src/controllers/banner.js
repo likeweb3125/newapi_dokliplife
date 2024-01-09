@@ -172,6 +172,7 @@ exports.getBannerView = async (req, res, next) => {
             'b_height_size',
             'b_c_type',
             'b_file',
+            'b_mov_url',
             'b_url',
             'b_url_target',
             'b_mov_type',
@@ -218,6 +219,7 @@ exports.getBannerView = async (req, res, next) => {
                ? enumConfig.bannerCategoryType.HTML
                : null,
          b_file: bannerView.b_file,
+         b_mov_url: bannerView.b_mov_url,
          b_url: bannerView.b_url,
          b_url_target:
             bannerView.b_url_target === enumConfig.bannerLinkType.PARENT[0]
@@ -258,6 +260,7 @@ exports.postBannerUpdate = async (req, res, next) => {
       b_height_size,
       b_c_type,
       b_file,
+      b_mov_url,
       b_url,
       b_url_target,
       b_mov_type,
@@ -304,6 +307,7 @@ exports.postBannerUpdate = async (req, res, next) => {
                : bannerView
                ? bannerView.b_file
                : null,
+            b_mov_url: b_mov_url,
             b_url: b_url,
             b_url_target: b_url_target,
             b_mov_type: b_mov_type,
