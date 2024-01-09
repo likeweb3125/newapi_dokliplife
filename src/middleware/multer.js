@@ -14,7 +14,7 @@ const fileStorage = (destination) =>
          //const originalName = Buffer.from(file.originalname, 'latin1').toString(
          //   'utf8'
          //);
-console.log(file.originalname)
+
          const originalName = file.originalname;
 
          const _fileLen = originalName.length;

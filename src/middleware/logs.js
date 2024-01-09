@@ -1,4 +1,5 @@
 const requestIp = require('request-ip');
+const parseurl = require('parseurl');
 
 const { Op } = require('sequelize');
 const { i_logs } = require('../models');
@@ -17,7 +18,8 @@ exports.logs = async (req, res, next) => {
       }
    }
 
-   const previousUrl = req.headers.referer;
+   //const previousUrl = req.headers.referer;
+   const previousUrl = parseurl(req).path;
    const clientIp = requestIp.getClientIp(req);
    const userAgent = req.get('user-agent');
 
