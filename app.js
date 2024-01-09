@@ -57,7 +57,7 @@ app.use(bodyParser.json());
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
 // logs
-app.use('/v1/logs', (req, res, next) => {
+app.use((req, res, next) => {
    logs(req, res, next);
    next();
 });
