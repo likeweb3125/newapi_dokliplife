@@ -21,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
          },
          userAgent: {
-            type: DataTypes.STRING(100),
+            type: DataTypes.STRING(500),
             allowNull: true,
          },
          reg_date: {
