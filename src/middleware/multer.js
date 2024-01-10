@@ -48,6 +48,13 @@ const allowedMimeTypes = [
    'application/x-hwp', // HWP files
    'application/zip', // ZIP files
    'text/plain',
+   'video/mpg', // MPG
+   'video/mpeg', // MPEG
+   'video/avi', // AVI
+   'video/x-ms-wmv', // WMV
+   'video/x-ms-asf', // ASF
+   'video/x-ms-asx', // ASX
+   'video/mp4', // MP4
 ];
 
 const fileFilter = (req, file, cb) => {
