@@ -29,7 +29,7 @@ exports.postBannerCreate = async (req, res, next) => {
       b_mov_sound,
       b_content,
    } = req.body;
-
+console.log(req.file)
    try {
       const processedContents = await utilMiddleware.base64ToImagesPath(
          b_content
