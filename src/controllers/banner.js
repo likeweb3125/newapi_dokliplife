@@ -269,6 +269,8 @@ exports.postBannerUpdate = async (req, res, next) => {
       b_content,
    } = req.body;
 
+   let file_name;
+
    try {
       const bannerView = await i_banner.findOne({
          where: {
@@ -281,9 +283,24 @@ exports.postBannerUpdate = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 
-      if (req.file) {
-         if (bannerView.b_file !== req.file.path) {
+      if (b_c_type === '3') {
+         if (bannerView.b_file) {
             multerMiddleware.clearFile(bannerView.b_file);
+         }
+         file_name = null;
+      }else{
+         if (req.file) {
+            if (bannerView.b_file !== null && bannerView.b_file !== req.file.path) {
+               multerMiddleware.clearFile(bannerView.b_file);
+            }
+         }
+         
+         if (req.file) {
+            file_name = req.file.path;
+         } else if (bannerView) { 
+            file_name = bannerView.b_file;
+         } else {
+            file_name = null;
          }
       }
 
@@ -302,11 +319,7 @@ exports.postBannerUpdate = async (req, res, next) => {
             b_width_size: b_width_size.replace(',',''),
             b_height_size: b_height_size.replace(',',''),
             b_c_type: b_c_type,
-            b_file: req.file
-               ? req.file.path
-               : bannerView
-               ? bannerView.b_file
-               : null,
+            b_file: file_name,
             b_mov_url: b_mov_url,
             b_url: b_url,
             b_url_target: b_url_target,
