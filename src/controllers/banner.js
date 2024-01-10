@@ -29,8 +29,7 @@ exports.postBannerCreate = async (req, res, next) => {
       b_mov_sound,
       b_content,
    } = req.body;
-   console.log("123")
-console.log(req.file)
+
    try {
       const processedContents = await utilMiddleware.base64ToImagesPath(
          b_content
@@ -341,7 +340,7 @@ exports.deleteBannerDestroy = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await db.sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const whereCondition = {
          idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
@@ -390,7 +389,7 @@ exports.postBannerOpen = async (req, res, next) => {
    let transaction;
 
    try {
-      transaction = await db.sequelize.transaction();
+      transaction = await db.mariaDBSequelize.transaction();
 
       const whereCondition = {
          idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
