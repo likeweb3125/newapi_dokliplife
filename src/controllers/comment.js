@@ -141,7 +141,6 @@ exports.getCommentListAdmin = async (req, res, next) => {
 exports.postCommentList = async (req, res, next) => {
    const { category, board_idx } = req.params;
 
-   console.log(board_idx);
    try {
       const allComments = await i_board_comment.findAll({
          where: { board_idx: category, parent_idx: board_idx },
@@ -161,7 +160,7 @@ exports.postCommentList = async (req, res, next) => {
       if (!allComments) {
          errorHandler.errorThrow(404, '');
       }
-
+console.log(allComments)
       const commentTree = buildCommentTree(allComments);
 
       errorHandler.successThrow(res, '', commentTree);
