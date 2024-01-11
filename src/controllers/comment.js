@@ -175,7 +175,7 @@ console.log(allComments)
          };
          return listObj;
       });
-
+console.log(boardCommentResult)
       const commentTree = buildCommentTree(boardCommentResult);
       console.log(commentTree)
       errorHandler.successThrow(res, '', commentTree);
