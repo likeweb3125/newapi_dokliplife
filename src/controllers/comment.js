@@ -162,7 +162,7 @@ exports.postCommentList = async (req, res, next) => {
       }
 console.log(allComments)
       const commentTree = buildCommentTree(allComments);
-
+      console.log(commentTree)
       errorHandler.successThrow(res, '', commentTree);
    } catch (err) {
       next(err);
