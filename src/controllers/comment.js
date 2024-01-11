@@ -139,11 +139,12 @@ exports.getCommentListAdmin = async (req, res, next) => {
 
 // 댓글 리스트
 exports.postCommentList = async (req, res, next) => {
-   const board_idx = req.params.board_idx;
+   const { category, board_idx } = req.params;
+
    console.log(board_idx);
    try {
       const allComments = await i_board_comment.findAll({
-         where: { board_idx: board_idx },
+         where: { board_idx: category, parent_idx: board_idx },
          order: [['idx', 'DESC']],
          attributes: [
             'idx',
