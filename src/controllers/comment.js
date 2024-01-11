@@ -161,7 +161,22 @@ exports.postCommentList = async (req, res, next) => {
          errorHandler.errorThrow(404, '');
       }
 console.log(allComments)
-      const commentTree = buildCommentTree(allComments);
+
+      const boardCommentResult = allComments.map((main) => {
+         const listObj = {
+            idx: main.idx,
+            board_idx: main.board_idx,
+            parent_idx: main.parent_idx,
+            depth: main.depth,
+            m_email: main.m_email,
+            m_name: main.m_name,
+            c_contents: main.c_contents,
+            c_reg_date: main.c_reg_date,
+         };
+         return listObj;
+      });
+
+      const commentTree = buildCommentTree(boardCommentResult);
       console.log(commentTree)
       errorHandler.successThrow(res, '', commentTree);
    } catch (err) {
