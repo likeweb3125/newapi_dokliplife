@@ -139,12 +139,12 @@ exports.getCommentListAdmin = async (req, res, next) => {
 
 // 댓글 리스트
 exports.postCommentList = async (req, res, next) => {
-   const { category, board_idx } = req.params;
+   const board_idx = req.params.board_idx;
 
    try {
       const allComments = await i_board_comment.findAll({
-         where: { board_idx: category, parent_idx: board_idx },
-         order: [['idx', 'DESC']],
+         where: { board_idx: board_idx },
+         order: [['idx', 'ASC']],
          attributes: [
             'idx',
             'board_idx',
@@ -160,7 +160,7 @@ exports.postCommentList = async (req, res, next) => {
       if (!allComments) {
          errorHandler.errorThrow(404, '');
       }
-console.log(allComments)
+
 
       const boardCommentResult = allComments.map((main) => {
          const listObj = {
@@ -175,8 +175,8 @@ console.log(allComments)
          };
          return listObj;
       });
-console.log(boardCommentResult)
-      const commentTree = buildCommentTree(boardCommentResult);
+
+      const commentTree = buildCommentTree(allComments);
       console.log(commentTree)
       errorHandler.successThrow(res, '', commentTree);
    } catch (err) {
@@ -184,17 +184,13 @@ console.log(boardCommentResult)
    }
 };
 
-function buildCommentTree(allComments, parentIdx = null, currentDepth = 0) {
+function buildCommentTree(allComments, parentIdx = 0) {
    const result = [];
 
    for (const comment of allComments) {
-      if (comment.parent_idx === parentIdx && comment.depth === currentDepth) {
-         const children = buildCommentTree(
-            allComments,
-            comment.idx,
-            currentDepth + 1
-         );
-
+      if (comment.parent_idx === parentIdx) {
+         const children = buildCommentTree(allComments, comment.idx);
+      
          result.push({
             idx: comment.idx,
             board_idx: comment.board_idx,
@@ -203,9 +199,7 @@ function buildCommentTree(allComments, parentIdx = null, currentDepth = 0) {
             m_email: comment.m_email,
             m_name: comment.m_name,
             c_contents: comment.c_contents,
-            c_reg_date: moment
-               .utc(comment.c_reg_date)
-               .format('YYYY.MM.DD hh:mm:ss'),
+            c_reg_date: comment.c_reg_date,
             children: children,
          });
       }
@@ -216,7 +210,7 @@ function buildCommentTree(allComments, parentIdx = null, currentDepth = 0) {
 
 // 댓글 등록
 exports.postCommentCreate = async (req, res, next) => {
-   const { category, parent_idx, depth, m_email, m_name, m_pwd, c_contents } =
+   const { board_idx, parent_idx, depth, m_email, m_name, m_pwd, c_contents } =
       req.body;
 
    let transaction;
@@ -226,7 +220,7 @@ exports.postCommentCreate = async (req, res, next) => {
 
       const parentBoard = await i_board.findOne({
          where: {
-            idx: parent_idx,
+            idx: board_idx,
          },
          attributes: ['idx'],
       });
@@ -236,7 +230,7 @@ exports.postCommentCreate = async (req, res, next) => {
       }
 
       const commentCreate = await i_board_comment.create({
-         board_idx: category,
+         board_idx: board_idx,
          parent_idx: parent_idx,
          depth: depth,
          m_email: m_email,
