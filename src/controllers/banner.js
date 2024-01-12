@@ -29,7 +29,7 @@ exports.postBannerCreate = async (req, res, next) => {
       b_mov_sound,
       b_content,
    } = req.body;
-console.log(req.file)
+
    try {
       const processedContents = await utilMiddleware.base64ToImagesPath(
          b_content
@@ -99,6 +99,7 @@ exports.getBannerList = async (req, res, next) => {
             'b_e_date',
             'b_size',
             'b_open',
+            'b_movenum',
          ],
       });
 
@@ -134,6 +135,7 @@ exports.getBannerList = async (req, res, next) => {
                : list.b_open === enumConfig.bannerOpenType.N[0]
                ? enumConfig.bannerOpenType.N
                : null,
+         b_movenum: list.b_movenum,
       }));
 
       errorHandler.successThrow(res, '', {
@@ -433,6 +435,55 @@ exports.postBannerOpen = async (req, res, next) => {
       await transaction.commit();
 
       errorHandler.successThrow(res, '', '');
+   } catch (err) {
+      if (transaction) {
+         await transaction.rollback();
+      }
+
+      next(err);
+   }
+};
+
+
+// 배너 이동
+// 2024.01.12 ash
+exports.putBannerMove = async (req, res, next) => {
+   const { idx, moveNum, targetNum } = req.body;
+
+   let transaction;
+
+   try {
+      transaction = await db.mariaDBSequelize.transaction();
+
+      const whereCondition = {
+         idx: idx,
+      };
+
+      const bannerUpDown = await i_banner.update(
+         {
+            b_moveNum: targetNum,
+         },
+         {
+            where: whereCondition,
+         }
+      );
+
+      const bannerMoves = await i_banner.update(
+         {
+            b_moveNum: targetNum,
+         },
+         {
+            where: whereCondition,
+         }
+      );
+
+      if (!bannerMoves) {
+         errorHandler.errorThrow(404, '이동 할 게시물이 없습니다.');
+      }
+
+      await transaction.commit();
+
+      errorHandler.successThrow(res, '', bannerMoves);
    } catch (err) {
       if (transaction) {
          await transaction.rollback();

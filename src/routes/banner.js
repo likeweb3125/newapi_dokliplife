@@ -47,4 +47,11 @@ router.post(
    bannerController.postBannerOpen
 ); //배너 노출, 중단
 
+router.put(
+   '/move',
+   isAuthMiddleware.isAuthAdmin,
+   multerMiddleware.bannerMulter,
+   bannerController.putBannerMove
+); //배너 이동
+
 module.exports = router;

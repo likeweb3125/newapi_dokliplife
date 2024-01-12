@@ -324,7 +324,7 @@ exports.deleteCommentDestroy = async (req, res, next) => {
             req.user !== commentView.m_email &&
             req.level !== enumConfig.userLevel.USER_LV9
          ) {
-            errorHandler.errorThrow(403, '');
+            errorHandler.errorThrow(403, '삭제 권한이 없습니다.');
          }
       }
 
