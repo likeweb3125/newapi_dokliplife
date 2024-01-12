@@ -338,7 +338,7 @@ exports.deleteCommentDestroy = async (req, res, next) => {
 
       await transaction.commit();
 
-      errorHandler.successThrow(res, '', commentUpdate);
+      errorHandler.successThrow(res, '', commentDelete);
    } catch (err) {
       if (transaction) {
          await transaction.rollback();
