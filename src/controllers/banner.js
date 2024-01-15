@@ -105,6 +105,7 @@ exports.getBannerList = async (req, res, next) => {
             'b_e_date',
             'b_size',
             'b_open',
+            'b_c_type',
             'b_moveNum',
          ],
       });
@@ -141,6 +142,7 @@ exports.getBannerList = async (req, res, next) => {
                : list.b_open === enumConfig.bannerOpenType.N[0]
                ? enumConfig.bannerOpenType.N
                : null,
+         b_c_type: list.b_c_type,
          b_moveNum: list.b_moveNum,
       }));
 
