@@ -76,7 +76,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: true,
          },
-         b_movenum: {
+         b_moveNum: {
             type: DataTypes.INTEGER,
             allowNull: true,
          },

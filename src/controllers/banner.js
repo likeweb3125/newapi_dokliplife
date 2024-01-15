@@ -35,6 +35,11 @@ exports.postBannerCreate = async (req, res, next) => {
          b_content
       );
 
+      
+      const categoryCount = await i_banner.max('b_moveNum');
+
+      const countWithIncrement = (categoryCount || 0) + 1;
+      
       const bannerCreate = await i_banner.create({
          b_type: b_type,
          b_open: b_open,
@@ -53,6 +58,7 @@ exports.postBannerCreate = async (req, res, next) => {
          b_mov_play: b_mov_play,
          b_mov_sound: b_mov_sound,
          b_content: processedContents.temp_contents,
+         b_moveNum: countWithIncrement,
       });
 
       if (!bannerCreate) {
@@ -89,7 +95,7 @@ exports.getBannerList = async (req, res, next) => {
          offset: offset,
          limit: limit,
          where: whereCondition,
-         order: [['idx', 'DESC']],
+         order: [['b_moveNum', 'ASC']],
          attributes: [
             'idx',
             'b_type',
@@ -99,7 +105,7 @@ exports.getBannerList = async (req, res, next) => {
             'b_e_date',
             'b_size',
             'b_open',
-            'b_movenum',
+            'b_moveNum',
          ],
       });
 
@@ -135,7 +141,7 @@ exports.getBannerList = async (req, res, next) => {
                : list.b_open === enumConfig.bannerOpenType.N[0]
                ? enumConfig.bannerOpenType.N
                : null,
-         b_movenum: list.b_movenum,
+         b_moveNum: list.b_moveNum,
       }));
 
       errorHandler.successThrow(res, '', {
@@ -448,32 +454,60 @@ exports.postBannerOpen = async (req, res, next) => {
 // 배너 이동
 // 2024.01.12 ash
 exports.putBannerMove = async (req, res, next) => {
-   const { idx, moveNum, targetNum } = req.body;
+   const { idx, moveNum } = req.body;
 
    let transaction;
 
    try {
       transaction = await db.mariaDBSequelize.transaction();
 
-      const whereCondition = {
-         idx: idx,
-      };
+      const bannerView = await i_banner.findByPk(idx);
 
-      const bannerUpDown = await i_banner.update(
-         {
-            b_moveNum: targetNum,
-         },
-         {
-            where: whereCondition,
-         }
-      );
+      if (!bannerView) {
+         errorHandler.errorThrow(204, '배너가 없습니다.');
+      }
+
+      let moveDirection;
+      if (moveNum < bannerView.b_moveNum) {
+         moveDirection = 'UP';
+      }
+
+      if (moveNum > bannerView.b_moveNum) {
+         moveDirection = 'DOWN';
+      }
+
+      if (moveDirection === 'UP') {
+         await i_banner.update(
+            {
+               b_moveNum: Sequelize.literal('b_moveNum + 1'),
+            },
+            {
+               where: {
+                  b_moveNum: { [Op.gte]: moveNum, [Op.lt]: bannerView.b_moveNum },
+               },
+            }
+         );
+      }
+
+      if (moveDirection === 'DOWN') {
+         await i_banner.update(
+            {
+               b_moveNum: Sequelize.literal('b_moveNum - 1'),
+            },
+            {
+               where: {
+                  b_moveNum: { [Op.gt]: bannerView.b_moveNum, [Op.lte]: moveNum },
+               },
+            }
+         );
+      }
 
       const bannerMoves = await i_banner.update(
          {
-            b_moveNum: targetNum,
+            b_moveNum: moveNum,
          },
          {
-            where: whereCondition,
+            where: { idx: idx },
          }
       );
 

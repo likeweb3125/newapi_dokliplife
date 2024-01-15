@@ -316,7 +316,7 @@ exports.deleteCommentDestroy = async (req, res, next) => {
       });
 
       if (!commentViews || commentViews.length === 0) {
-        errorHandler.errorThrow(404, '');
+         errorHandler.errorThrow(404, '');
       }
 
       for (const commentView of commentViews) {
