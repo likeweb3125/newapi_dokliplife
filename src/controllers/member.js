@@ -225,9 +225,18 @@ exports.getMemberView = async (req, res, next) => {
 					? enumConfig.receiptType.N
 					: null,
 			//m_menu_auth: memberView.m_menu_auth.split(',').map(Number),
-			m_menu_auth: memberView.m_menu_auth
-				.split(',')
-				.map((key) => enumConfig.adminMenu[`M${key}`]),
+			m_menu_auth:
+				memberView.m_level === '9'
+					? memberView.m_menu_auth
+							.split(',')
+							.map(
+								(key) =>
+									enumConfig
+										.adminMenu[
+										`M${key}`
+									]
+							)
+					: null,
 			m_memo: memberView.m_memo,
 			reg_date: moment
 				.utc(memberView.reg_date)
