@@ -5,7 +5,7 @@ const memberController = require('../controllers/member');
 const isAuthMiddleware = require('../middleware/is-auth');
 
 router.get(
-   '/list/:m_level',
+   '/list',
    isAuthMiddleware.isAuthAdmin,
    memberController.getMemberList
 ); //관리자 페이지 회원 리스트

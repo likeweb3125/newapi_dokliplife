@@ -17,19 +17,22 @@ const db = require('../models');
 // 회원 리스트
 // 2023.09.11 ash
 exports.getMemberList = async (req, res, next) => {
-   const { m_level } = req.params;
+   const m_level = req.query.m_level;
    const page = parseInt(req.query.page) || 1;
 
-   const currentDate = new Date();
-   const lastMonth = new Date(currentDate);
+   const m_mail_yn = req.query.m_mail_yn;
+   const m_sms_yn = req.query.m_sms_yn;
 
-   const startDate =
-      parseInt(req.query.sdate) ||
-      moment
-         .utc(lastMonth.setMonth(currentDate.getMonth() - 1))
-         .format('YYYY.MM.DD');
-   const endDate =
-      parseInt(req.query.edate) || moment.utc(currentDate).format('YYYY.MM.DD');
+   //const currentDate = new Date();
+   //const lastMonth = new Date(currentDate);
+
+   const startDate = req.query.sdate;
+      //parseInt(req.query.sdate) ||
+      //moment
+      //   .utc(lastMonth.setMonth(currentDate.getMonth() - 1))
+      //   .format('YYYY.MM.DD');
+   const endDate = req.query.edate;
+      //parseInt(req.query.edate) || moment.utc(currentDate).format('YYYY.MM.DD');
 
    const limit = parseInt(req.query.limit) || 10;
    const offset = (page - 1) * limit;
@@ -41,8 +44,22 @@ exports.getMemberList = async (req, res, next) => {
 
    try {
       const whereCondition = {
-         m_level: m_level,
+         idx: {
+            [Op.not]: null,
+         },
       };
+
+      if (m_level) {
+         if (parseInt(m_level) === enumConfig.userLevel.USER_LV9) {
+            whereCondition.m_level = {
+               [Op.eq]: enumConfig.userLevel.USER_LV9,
+            };
+         } else {
+            whereCondition.m_level = {
+               [Op.ne]: enumConfig.userLevel.USER_LV9,
+            };
+         }
+      }
 
       if (searchQuery && searchTxtQuery) {
          if (searchQuery === 'email') {
@@ -62,6 +79,18 @@ exports.getMemberList = async (req, res, next) => {
                [Op.like]: `%${searchTxtQuery}%`,
             };
          }
+      }
+
+      if (m_mail_yn) {
+         whereCondition.m_mail_yn = {
+            [Op.eq]: enumConfig.receiptType.Y,
+         };
+      }
+
+      if (m_sms_yn) {
+         whereCondition.m_sms_yn = {
+            [Op.eq]: enumConfig.receiptType.Y,
+         };
       }
 
       if (startDate && endDate) {
