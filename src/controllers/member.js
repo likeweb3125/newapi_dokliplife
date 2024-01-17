@@ -226,7 +226,7 @@ exports.getMemberView = async (req, res, next) => {
 					: null,
 			//m_menu_auth: memberView.m_menu_auth.split(',').map(Number),
 			m_menu_auth:
-				memberView.m_level === '9'
+				memberView.m_level === 9
 					? memberView.m_menu_auth
 							.split(',')
 							.map(
@@ -307,7 +307,7 @@ exports.deleteMemberDestroy = async (req, res, next) => {
 	let transaction;
 
 	try {
-		transaction = await db.sequelize.transaction();
+		transaction = await db.mariaDBSequelize.transaction();
 
 		const whereCondition = {
 			idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
@@ -564,7 +564,7 @@ exports.postSecessionDestroy = async (req, res, next) => {
 	let transaction;
 
 	try {
-		transaction = await db.sequelize.transaction();
+		transaction = await db.mariaDBSequelize.transaction();
 
 		const whereCondition = {
 			id: Array.isArray(id) ? { [Op.in]: id } : id,
