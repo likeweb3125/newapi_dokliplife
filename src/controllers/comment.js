@@ -38,6 +38,7 @@ exports.getCommentListAdmin = async (req, res, next) => {
 
 		const subQuery = `(SELECT b_title FROM i_board WHERE i_board.idx = i_board_comment.board_idx)`;
 		const subQuery2 = `(SELECT c_name FROM i_category WHERE id = (SELECT category FROM i_board WHERE i_board.idx = i_board_comment.board_idx))`;
+		const subQuery3 = `(SELECT category FROM i_board WHERE i_board.idx = i_board_comment.board_idx)`;
 
 		const limit = parseInt(getLimit) || 10;
 
@@ -49,12 +50,14 @@ exports.getCommentListAdmin = async (req, res, next) => {
 			where: whereCondition,
 			order: orderField,
 			attributes: [
+				'board_idx',
 				'idx',
 				'c_contents',
 				'm_name',
 				'c_reg_date',
 				[Sequelize.literal(subQuery), 'boardTitle'],
 				[Sequelize.literal(subQuery2), 'boardName'],
+				[Sequelize.literal(subQuery3), 'boardCategory'],
 			],
 		});
 
@@ -67,6 +70,8 @@ exports.getCommentListAdmin = async (req, res, next) => {
 		const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
 		const listResult = commentList.rows.map((list) => ({
+			category: list.getDataValue('boardCategory'),
+			board_idx: list.board_idx,
 			idx: list.idx,
 			c_contents: list.c_contents,
 			boardName: list.getDataValue('boardName'),
