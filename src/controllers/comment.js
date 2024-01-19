@@ -340,7 +340,7 @@ exports.deleteCommentDestroy = async (req, res, next) => {
 		if (!commentViews || commentViews.length === 0) {
 			errorHandler.errorThrow(404, '');
 		}
-
+		console.log(req.level);
 		for (const commentView of commentViews) {
 			if (
 				req.user !== commentView.m_email &&
