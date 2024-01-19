@@ -334,9 +334,7 @@ exports.deleteMemberDestroy = async (req, res, next) => {
 		}
 
 		const memberDelete = await i_member.destroy({
-			where: {
-				idx: idx,
-			},
+			where: whereCondition,
 		});
 
 		if (!memberDelete) {
@@ -346,6 +344,53 @@ exports.deleteMemberDestroy = async (req, res, next) => {
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '', '');
+	} catch (err) {
+		if (transaction) {
+			await transaction.rollback();
+		}
+
+		next(err);
+	}
+};
+
+//회원 등급 변경
+exports.putMemberLvUpdate = async (req, res, next) => {
+	const { idx, m_level } = req.body;
+
+	let transaction;
+
+	try {
+		transaction = await db.mariaDBSequelize.transaction();
+
+		const whereCondition = {
+			idx: Array.isArray(idx) ? { [Op.in]: idx } : idx,
+		};
+		//console.log(whereCondition);
+		const memberViews = await i_member.findAll({
+			where: whereCondition,
+			attributes: ['m_email'],
+		});
+
+		if (!memberViews || memberViews.length === 0) {
+			errorHandler.errorThrow(404, 'No member found');
+		}
+
+		const memberLvUpdate = await i_member.update(
+			{
+				m_level: m_level,
+			},
+			{
+				where: whereCondition,
+			}
+		);
+
+		if (!memberLvUpdate) {
+			errorHandler.errorThrow(404, '');
+		}
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '', memberLvUpdate);
 	} catch (err) {
 		if (transaction) {
 			await transaction.rollback();
