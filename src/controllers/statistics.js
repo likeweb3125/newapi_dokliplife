@@ -317,7 +317,7 @@ exports.getStatAgent = async (req, res, next) => {
 		const result = await i_logs.findAll({
 			attributes: [
 				[
-					sequelize.literal(
+					mariaDBSequelize.literal(
 						'ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC)'
 					),
 					'row_number',
