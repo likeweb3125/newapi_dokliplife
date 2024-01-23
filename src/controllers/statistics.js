@@ -296,7 +296,7 @@ exports.getStatUrl = async (req, res, next) => {
 			group: ['previousUrl'],
 			order: [
 				[
-					sequelize.fn(
+					mariaDBSequelize.fn(
 						'COUNT',
 						mariaDBSequelize.col('*')
 					),
