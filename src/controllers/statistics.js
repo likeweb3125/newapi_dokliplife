@@ -174,6 +174,145 @@ exports.getPeriodStatCnt = async (req, res, next) => {
 	}
 };
 
+// chart 통계
+exports.getPeriodStatChart = async (req, res, next) => {
+	try {
+		const { start, end } = req.query;
+		const currentDate = new Date();
+		const startDate =
+			moment(start).add(0, 'day').format('YYYY-MM-DD') ||
+			moment(currentDate).add(-7, 'day').format('YYYY-MM-DD');
+		const endDate =
+			moment(end).add(0, 'day').format('YYYY-MM-DD') ||
+			moment(currentDate).format('YYYY-MM-DD');
+
+		const dateRange = generateDateRange(startDate, endDate);
+
+		const logsCounts = await getCounts(
+			i_logs,
+			'id',
+			'reg_date',
+			dateRange
+		);
+		const memberCounts = await getCounts(
+			i_member,
+			'idx',
+			'reg_date',
+			dateRange
+		);
+		const boardCounts = await getCounts(
+			i_board,
+			'idx',
+			'b_reg_date',
+			dateRange
+		);
+		const commentCounts = await getCounts(
+			i_board_comment,
+			'idx',
+			'c_reg_date',
+			dateRange
+		);
+
+		const maxCount = Math.max(
+			getMaxCount(logsCounts),
+			getMaxCount(memberCounts),
+			getMaxCount(boardCounts),
+			getMaxCount(commentCounts)
+		);
+
+		const chartObj = {
+			type: 'line',
+			scales: `{y: {max: '${maxCount}'}}`,
+			legendPosition: 'top',
+			label: 'true',
+			labels: dateRange,
+			datasets: [
+				{
+					label: '방문',
+					data: getChartData(dateRange, logsCounts),
+				},
+				{
+					label: '가입회원',
+					data: getChartData(dateRange, memberCounts),
+				},
+				{
+					label: '게시글',
+					data: getChartData(dateRange, boardCounts),
+				},
+				{
+					label: '댓글',
+					data: getChartData(dateRange, commentCounts),
+				},
+			],
+		};
+
+		errorHandler.successThrow(res, '', chartObj);
+	} catch (err) {
+		next(err);
+	}
+};
+
+//chart 통계 날짜 배열
+function generateDateRange(startDate, endDate) {
+	const dateRange = [];
+	let currentDate = new Date(startDate);
+	while (currentDate <= new Date(endDate)) {
+		dateRange.push(currentDate.toISOString().split('T')[0]);
+		currentDate.setDate(currentDate.getDate() + 1);
+	}
+	return dateRange;
+}
+
+//chart 통계 갯수 불러오기
+async function getCounts(model, idColumn, dateColumn, dateRange) {
+	return await model.findAll({
+		attributes: [
+			[
+				mariaDBSequelize.fn(
+					'DATE_FORMAT',
+					mariaDBSequelize.col(dateColumn),
+					'%Y-%m-%d'
+				),
+				'date',
+			],
+			[
+				mariaDBSequelize.fn(
+					'COUNT',
+					mariaDBSequelize.col(idColumn)
+				),
+				'count',
+			],
+		],
+		where: {
+			[dateColumn]: {
+				[Op.between]: [
+					dateRange[0],
+					dateRange[dateRange.length - 1],
+				],
+			},
+		},
+		group: [
+			mariaDBSequelize.fn(
+				'DATE_FORMAT',
+				mariaDBSequelize.col(dateColumn),
+				'%Y-%m-%d'
+			),
+		],
+		raw: true,
+	});
+}
+
+//chart 통계 Max 값
+function getMaxCount(counts) {
+	return Math.max(...counts.map((entry) => entry.count));
+}
+
+//chart 통계 갯수 표기
+function getChartData(dateRange, counts) {
+	const countMap = new Map(counts.map(({ date, count }) => [date, count]));
+	return dateRange.map((date) => countMap.get(date) || 0);
+}
+
 exports.getStatHistory = async (req, res, next) => {
 	const { start, end, getLimit, getPage, searchTxt } = req.query;
 
@@ -305,7 +444,7 @@ exports.getStatUrl = async (req, res, next) => {
 			],
 			limit: 20,
 		});
-		console.log(urlResult);
+		//console.log(urlResult);
 		errorHandler.successThrow(res, '', urlResult);
 	} catch (err) {
 		next(err);
