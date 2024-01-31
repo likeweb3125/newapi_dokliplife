@@ -618,9 +618,31 @@ exports.putMappingCategory = async (req, res, next) => {
 		// 	);
 		// }
 
+		const maxNumResult = await i_category.findOne({
+			attributes: [
+				[
+					Sequelize.fn('MAX', Sequelize.col('c_num')),
+					'maxNum',
+				],
+			],
+			where: [
+				{
+					c_use_yn: enumConfig.useType.Y[0],
+					c_depth_parent: c_depth_parent,
+				},
+			],
+		});
+
+		const maxNum = maxNumResult.dataValues.maxNum || 0;
+		const newNum = maxNum + 1;
+
 		const menuMapping = await i_category.update(
 			{
 				c_depth_parent: c_depth_parent,
+				c_num:
+					c_use_yn === 'Y'
+						? newNum
+						: Sequelize.literal('c_num'),
 				c_use_yn: c_use_yn,
 			},
 			{
