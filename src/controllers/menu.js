@@ -377,11 +377,11 @@ exports.deleteCategoryDestroy = async (req, res, next) => {
 	const { id } = req.body;
 
 	try {
-		const menuView = await i_category.findByPk(id);
+		// const menuView = await i_category.findByPk(id);
 
-		if (!menuView) {
-			errorHandler.errorThrow(404, '');
-		}
+		// if (!menuView) {
+		// 	errorHandler.errorThrow(404, '');
+		// }
 
 		// if (menuView.c_main_banner_file) {
 		//    multerMiddleware.clearFile(menuView.c_main_banner_file);
@@ -407,7 +407,7 @@ exports.deleteCategoryDestroy = async (req, res, next) => {
 			},
 			{
 				where: {
-					id: id,
+					id: Array.isArray(id) ? { [Op.in]: id } : id,
 				},
 			}
 		);
@@ -598,7 +598,7 @@ function mapContentType(contentType) {
 
 //카테고리 매핑
 exports.putMappingCategory = async (req, res, next) => {
-	const { id, c_use_yn } = req.body;
+	const { id, c_depth_parent, c_use_yn } = req.body;
 
 	let transaction;
 
@@ -620,14 +620,13 @@ exports.putMappingCategory = async (req, res, next) => {
 
 		const menuMapping = await i_category.update(
 			{
+				c_depth_parent: c_depth_parent,
 				c_use_yn: c_use_yn,
 			},
 			{
 				where: {
 					c_depth: { [Op.ne]: 1 },
-					id: Array.isArray(id)
-						? { [Op.in]: id }
-						: idx,
+					id: Array.isArray(id) ? { [Op.in]: id } : id,
 				},
 			}
 		);
