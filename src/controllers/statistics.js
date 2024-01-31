@@ -177,17 +177,52 @@ exports.getPeriodStatCnt = async (req, res, next) => {
 // chart 통계
 exports.getPeriodStatChart = async (req, res, next) => {
 	try {
-		const { start, end } = req.query;
+		const { start, end, type } = req.query;
 		const currentDate = new Date();
-		const startDate =
-			moment(start).add(0, 'day').format('YYYY-MM-DD') ||
-			moment(currentDate).add(-7, 'day').format('YYYY-MM-DD');
-		const endDate =
-			moment(end).add(0, 'day').format('YYYY-MM-DD') ||
-			moment(currentDate).format('YYYY-MM-DD');
+		let startDate;
+		let endDate;
 
-		const dateRange = generateDateRange(startDate, endDate);
+		if (type === 'daily') {
+			startDate =
+				moment(start).add(0, 'day').format('YYYY-MM-DD') ||
+				moment(currentDate)
+					.add(-7, 'day')
+					.format('YYYY-MM-DD');
+			endDate =
+				moment(end).add(0, 'day').format('YYYY-MM-DD') ||
+				moment(currentDate).format('YYYY-MM-DD');
+		} else if (type === 'monthly') {
+			startDate =
+				moment(start)
+					.add(0, 'month')
+					.startOf('month')
+					.format('YYYY-MM') ||
+				moment(currentDate)
+					.add(-1, 'month')
+					.startOf('month')
+					.format('YYYY-MM');
+			endDate =
+				moment(end)
+					.add(0, 'month')
+					.endOf('month')
+					.format('YYYY-MM') ||
+				moment(currentDate)
+					.endOf('month')
+					.format('YYYY-MM');
+		} else {
+			// Handle unknown type or default to daily
+			startDate =
+				moment(start).add(0, 'day').format('YYYY-MM-DD') ||
+				moment(currentDate)
+					.add(-7, 'day')
+					.format('YYYY-MM-DD');
+			endDate =
+				moment(end).add(0, 'day').format('YYYY-MM-DD') ||
+				moment(currentDate).format('YYYY-MM-DD');
+		}
 
+		const dateRange = generateDateRange(startDate, endDate, type);
+		console.log(dateRange);
 		const logsCounts = await getCounts(
 			i_logs,
 			'id',
@@ -253,13 +288,19 @@ exports.getPeriodStatChart = async (req, res, next) => {
 };
 
 //chart 통계 날짜 배열
-function generateDateRange(startDate, endDate) {
+function generateDateRange(startDate, endDate, type) {
 	const dateRange = [];
-	let currentDate = new Date(startDate);
-	while (currentDate <= new Date(endDate)) {
-		dateRange.push(currentDate.toISOString().split('T')[0]);
-		currentDate.setDate(currentDate.getDate() + 1);
+	let currentDate = moment(startDate);
+
+	while (currentDate <= moment(endDate)) {
+		dateRange.push(
+			type === 'monthly'
+				? currentDate.format('YYYY-MM')
+				: currentDate.format('YYYY-MM-DD')
+		);
+		currentDate.add(1, type === 'monthly' ? 'month' : 'day');
 	}
+
 	return dateRange;
 }
 
