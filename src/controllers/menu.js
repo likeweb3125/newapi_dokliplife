@@ -625,8 +625,8 @@ exports.putMappingCategory = async (req, res, next) => {
 			{
 				where: {
 					c_depth: { [Op.ne]: 1 },
-					id: Array.isArray(idx)
-						? { [Op.in]: idx }
+					id: Array.isArray(id)
+						? { [Op.in]: id }
 						: idx,
 				},
 			}
