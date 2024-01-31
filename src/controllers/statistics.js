@@ -222,7 +222,7 @@ exports.getPeriodStatChart = async (req, res, next) => {
 		}
 
 		const dateRange = generateDateRange(startDate, endDate, type);
-		console.log(dateRange);
+
 		const logsCounts = await getCounts(
 			i_logs,
 			'id',

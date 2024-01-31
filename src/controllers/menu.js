@@ -596,7 +596,7 @@ function mapContentType(contentType) {
 	}
 }
 
-//카테고리 맵핑
+//카테고리 매핑
 exports.putMappingCategory = async (req, res, next) => {
 	const { id, c_use_yn } = req.body;
 
@@ -605,18 +605,18 @@ exports.putMappingCategory = async (req, res, next) => {
 	try {
 		transaction = await mariaDBSequelize.transaction();
 
-		const menuView = await i_category.findByPk(id);
+		// const menuView = await i_category.findByPk(id);
 
-		if (!menuView) {
-			errorHandler.errorThrow(204, '메뉴 id 가 없습니다.');
-		}
+		// if (!menuView) {
+		// 	errorHandler.errorThrow(204, '메뉴 id 가 없습니다.');
+		// }
 
-		if (menuView.c_depth === 1) {
-			errorHandler.errorThrow(
-				404,
-				'1 depth 메뉴는 매핑이 안됩니다.'
-			);
-		}
+		// if (menuView.c_depth === 1) {
+		// 	errorHandler.errorThrow(
+		// 		404,
+		// 		'1 depth 메뉴는 매핑이 안됩니다.'
+		// 	);
+		// }
 
 		const menuMapping = await i_category.update(
 			{
@@ -625,7 +625,9 @@ exports.putMappingCategory = async (req, res, next) => {
 			{
 				where: {
 					c_depth: { [Op.ne]: 1 },
-					id: id,
+					id: Array.isArray(idx)
+						? { [Op.in]: idx }
+						: idx,
 				},
 			}
 		);
