@@ -33,18 +33,20 @@ const adminStatisticsRoutes = require('./src/routes/statistics');
 
 const adminMaintenanceRoutes = require('./src/routes/maintenance');
 
+const mailGunRoutes = require('./src/routes/mailGun');
+
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
 
 const corsOptions = {
-   origin: [
-      'http://api.likeweb.co.kr:5001/',
-      'http://api.likeweb.co.kr/',
-      'http://localhost:5001',
-      'http://localhost:3002',
-      'http://react.likeweb.co.kr',
-   ], // 리액트  localhost 3000
-   methods: ['GET', 'PUT', 'POST', 'DELETE'],
+	origin: [
+		'http://api.likeweb.co.kr:5001/',
+		'http://api.likeweb.co.kr/',
+		'http://localhost:5001',
+		'http://localhost:3002',
+		'http://react.likeweb.co.kr',
+	], // 리액트  localhost 3000
+	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
 
 app.use(cors(corsOptions));
@@ -58,8 +60,8 @@ app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
 // logs
 app.use((req, res, next) => {
-   logs(req, res, next);
-   next();
+	logs(req, res, next);
+	next();
 });
 
 // Routes
@@ -79,6 +81,9 @@ app.use('/v1/admin/stat', adminStatisticsRoutes);
 
 // 유지보수 Routes
 app.use('/v1/admin/maintenance', adminMaintenanceRoutes);
+
+// 메일 Send
+app.use('/v1/mailGun', mailGunRoutes);
 
 app.use(errorHandler.routesStatusCode);
 

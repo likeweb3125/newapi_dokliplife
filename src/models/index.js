@@ -2,15 +2,15 @@ const Sequelize = require('sequelize');
 
 // MariaDB
 const mariaDBConfig = require(__dirname + '/../config/config.js')[
-   'development'
+	'development'
 ];
 const db = {};
 
 const mariaDBSequelize = new Sequelize(
-   mariaDBConfig.database,
-   mariaDBConfig.username,
-   mariaDBConfig.password,
-   mariaDBConfig
+	mariaDBConfig.database,
+	mariaDBConfig.username,
+	mariaDBConfig.password,
+	mariaDBConfig
 );
 
 db.mariaDBSequelize = mariaDBSequelize;
@@ -22,13 +22,13 @@ db.i_category = require('./category')(mariaDBSequelize, Sequelize);
 db.i_category_html = require('./category_html')(mariaDBSequelize, Sequelize);
 db.i_category_empty = require('./category_empty')(mariaDBSequelize, Sequelize);
 db.i_category_custom = require('./category_custom')(
-   mariaDBSequelize,
-   Sequelize
+	mariaDBSequelize,
+	Sequelize
 );
 db.i_category_board = require('./category_board')(mariaDBSequelize, Sequelize);
 db.i_category_board_group = require('./category_board_group')(
-   mariaDBSequelize,
-   Sequelize
+	mariaDBSequelize,
+	Sequelize
 );
 
 db.i_board = require('./board')(mariaDBSequelize, Sequelize);
@@ -46,23 +46,24 @@ db.i_popup = require('./popup')(mariaDBSequelize, Sequelize);
 
 db.i_config = require('./config')(mariaDBSequelize, Sequelize);
 db.i_policy = require('./policy')(mariaDBSequelize, Sequelize);
+db.i_mailGun = require('./mailGun')(mariaDBSequelize, Sequelize);
 
 db.i_category.hasMany(db.i_board, { as: 'iboard' });
 db.i_board.belongsTo(db.i_category, {
-   foreignKey: 'category',
-   as: 'icategory',
+	foreignKey: 'category',
+	as: 'icategory',
 });
 
 // MSSQL
 const mssqlDBConfig = require(__dirname + '/../config/config.js')[
-   'maintenance'
+	'maintenance'
 ];
 
 const mssqlDBSequelize = new Sequelize(
-   mssqlDBConfig.database,
-   mssqlDBConfig.username,
-   mssqlDBConfig.password,
-   mssqlDBConfig
+	mssqlDBConfig.database,
+	mssqlDBConfig.username,
+	mssqlDBConfig.password,
+	mssqlDBConfig
 );
 
 db.mssqlDBSequelize = mssqlDBSequelize;
