@@ -314,7 +314,9 @@ exports.putCategoryUpdate = async (req, res, next) => {
 					mainBannerFile[0].path &&
 				menuView.c_main_banner_file !== null
 			) {
-				clearFile(menuView.c_main_banner_file);
+				multerMiddleware.clearFile(
+					menuView.c_main_banner_file
+				);
 			}
 			mainBannerFilePath = mainBannerFile[0].path;
 		} else {
@@ -326,7 +328,7 @@ exports.putCategoryUpdate = async (req, res, next) => {
 				menuView.c_menu_on_img !== menuOnImg[0].path &&
 				menuView.c_menu_on_img !== null
 			) {
-				clearFile(menuView.c_menu_on_img);
+				multerMiddleware.clearFile(menuView.c_menu_on_img);
 			}
 			menuOnImgPath = menuOnImg[0].path;
 		} else {
@@ -338,7 +340,7 @@ exports.putCategoryUpdate = async (req, res, next) => {
 				menuView.c_menu_off_img !== menuOffImg[0].path &&
 				menuView.c_menu_off_img !== null
 			) {
-				clearFile(menuView.c_menu_off_img);
+				multerMiddleware.clearFile(menuView.c_menu_off_img);
 			}
 			menuOffImgPath = menuOffImg[0].path;
 		} else {
