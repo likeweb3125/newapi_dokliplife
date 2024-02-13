@@ -635,12 +635,14 @@ exports.putBoardUpdate = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 
-		// if (
-		// 	req.user !== boardView.m_email &&
-		// 	req.level !== enumConfig.userLevel.USER_LV9
-		// ) {
-		// 	errorHandler.errorThrow(403, '');
-		// }
+		if (req.user !== undefined) {
+			if (
+				req.user !== boardView.m_email &&
+				req.level !== enumConfig.userLevel.USER_LV9
+			) {
+				errorHandler.errorThrow(403, '');
+			}
+		}
 
 		const board_b_file = req.files['b_file'];
 		const board_b_img = req.files['b_img'];
