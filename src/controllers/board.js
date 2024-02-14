@@ -615,6 +615,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 		b_notice,
 		b_img,
 		b_file,
+		b_secret,
 		b_sms_yn,
 		b_sms_phone,
 		b_email_yn,
@@ -726,6 +727,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 					: boardView
 					? boardView.b_img
 					: null,
+				b_secret: b_secret,
 				b_sms_yn: b_sms_yn,
 				b_sms_phone: b_sms_phone,
 				b_email_yn: b_email_yn,
