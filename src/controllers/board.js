@@ -67,6 +67,7 @@ exports.getBoardList = async (req, res, next) => {
 	const page = parseInt(req.query.page) || 1;
 	const searchQuery = req.query.search;
 	const searchTxtQuery = req.query.searchtxt;
+	const group_id = req.query.group_id;
 
 	const orderBy = req.query.orderBy;
 
@@ -102,6 +103,12 @@ exports.getBoardList = async (req, res, next) => {
 					[Op.like]: `%${searchTxtQuery}%`,
 				};
 			}
+		}
+
+		if (group_id !== '') {
+			whereCondition.group_id = {
+				[Op.eq]: group_id,
+			};
 		}
 
 		let orderField;
@@ -152,7 +159,7 @@ exports.getBoardList = async (req, res, next) => {
 		const limit = parseInt(getLimit) || boardItemResult.b_list_cnt;
 
 		const offset = (page - 1) * limit;
-
+		console.log(whereCondition);
 		const boardList = await i_board.findAndCountAll({
 			offset: offset,
 			limit: limit,
