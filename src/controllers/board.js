@@ -440,6 +440,7 @@ exports.getBoardView = async (req, res, next) => {
 exports.postBoardCreate = async (req, res, next) => {
 	const {
 		category,
+		m_email,
 		m_name,
 		m_pwd,
 		b_title,
@@ -474,7 +475,7 @@ exports.postBoardCreate = async (req, res, next) => {
 
 		const boardCreate = await i_board.create({
 			category: category,
-			m_email: req.user,
+			m_email: m_email ? m_email : req.user,
 			m_name: m_name,
 			m_pwd: hashedPw,
 			b_title: b_title,
