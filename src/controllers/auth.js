@@ -90,7 +90,7 @@ exports.postLogin = async (req, res, next) => {
 		const emailResult = await i_member.findOne({
 			where: {
 				m_email: m_email,
-				m_level: m_level,
+				//m_level: m_level,
 			},
 		});
 
