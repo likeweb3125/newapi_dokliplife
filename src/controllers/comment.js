@@ -279,7 +279,7 @@ exports.postCommentCreate = async (req, res, next) => {
 
 // 댓글 수정
 exports.postCommentUpdate = async (req, res, next) => {
-	const { idx, c_contents } = req.body;
+	const { idx, c_contents, pass } = req.body;
 
 	try {
 		const commentView = await i_board_comment.findOne({
@@ -293,8 +293,10 @@ exports.postCommentUpdate = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 
-		if (req.user !== commentView.m_email) {
-			errorHandler.errorThrow(403, '');
+		if (pass !== 'T') {
+			if (req.user !== commentView.m_email) {
+				errorHandler.errorThrow(403, '');
+			}
 		}
 
 		const commentUpdate = await i_board_comment.update(
@@ -321,7 +323,7 @@ exports.postCommentUpdate = async (req, res, next) => {
 
 // 댓글 삭제
 exports.deleteCommentDestroy = async (req, res, next) => {
-	const { idx } = req.body;
+	const { idx, pass } = req.body;
 
 	let transaction;
 
@@ -340,16 +342,18 @@ exports.deleteCommentDestroy = async (req, res, next) => {
 		if (!commentViews || commentViews.length === 0) {
 			errorHandler.errorThrow(404, '');
 		}
-		console.log(req.level);
-		for (const commentView of commentViews) {
-			if (
-				req.user !== commentView.m_email &&
-				req.level !== enumConfig.userLevel.USER_LV9
-			) {
-				errorHandler.errorThrow(
-					403,
-					'삭제 권한이 없습니다.'
-				);
+		//console.log(req.level);
+		if (pass !== 'T') {
+			for (const commentView of commentViews) {
+				if (
+					req.user !== commentView.m_email &&
+					req.level !== enumConfig.userLevel.USER_LV9
+				) {
+					errorHandler.errorThrow(
+						403,
+						'삭제 권한이 없습니다.'
+					);
+				}
 			}
 		}
 
