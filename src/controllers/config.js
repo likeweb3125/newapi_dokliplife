@@ -1,12 +1,18 @@
 const moment = require('moment');
 const { Op } = require('sequelize');
-const { i_config, i_member_level, i_policy } = require('../models');
+const {
+	i_config,
+	i_member_level,
+	i_policy,
+	i_config_lang,
+} = require('../models');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const utilMiddleware = require('../middleware/util');
 
 exports.getConfigSite = async (req, res, next) => {
-	const site_id = req.params;
+	const site_id = req.params.site_id;
+	const c_lang = req.params.c_lang;
 
 	try {
 		const configView = await i_config.findOne(
@@ -26,11 +32,13 @@ exports.getConfigSite = async (req, res, next) => {
 					'c_meta',
 					'c_meta_tag',
 					'c_meta_type',
+					'c_lang',
 				],
 			},
 			{
 				where: {
 					site_id: site_id,
+					c_lang: c_lang,
 				},
 			}
 		);
@@ -39,8 +47,17 @@ exports.getConfigSite = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 
+		const configLangView = await i_config_lang.findAll({
+			where: {
+				site_id: site_id,
+				use_yn: enumConfig.useType.Y[0],
+			},
+			attributes: ['site_lang'],
+		});
+
 		const configObj = {
 			c_site_name: configView.c_site_name,
+			c_site_lang: configLangView,
 			c_web_title: configView.c_web_title,
 			c_ceo: configView.c_ceo,
 			c_tel: configView.c_tel,
@@ -54,6 +71,7 @@ exports.getConfigSite = async (req, res, next) => {
 			c_meta: configView.c_meta,
 			c_meta_tag: configView.c_meta_tag,
 			c_meta_type: configView.c_meta_type,
+			c_lang: configView.c_lang,
 		};
 		console.log(configObj);
 		//res.status(200).json(configObj);
@@ -66,6 +84,7 @@ exports.getConfigSite = async (req, res, next) => {
 exports.putConfigSiteUpdate = async (req, res, next) => {
 	const {
 		site_id,
+		site_lang,
 		c_site_name,
 		c_web_title,
 		c_ceo,
@@ -80,9 +99,42 @@ exports.putConfigSiteUpdate = async (req, res, next) => {
 		c_meta,
 		c_meta_tag,
 		c_meta_type,
+		c_lang,
 	} = req.body;
 
 	try {
+		const configLangNUpdate = await i_config_lang.update(
+			{
+				use_yn: enumConfig.useType.N[0],
+			},
+			{
+				where: {
+					site_id: site_id,
+					site_lang: Array.isArray(site_lang)
+						? { [Op.notIn]: site_lang }
+						: { [Op.ne]: site_lang },
+				},
+			}
+		);
+
+		const configLangYUpdate = await i_config_lang.update(
+			{
+				use_yn: enumConfig.useType.Y[0],
+			},
+			{
+				where: {
+					site_id: site_id,
+					site_lang: Array.isArray(site_lang)
+						? { [Op.in]: site_lang }
+						: site_lang,
+				},
+			}
+		);
+
+		if (!configLangYUpdate) {
+			errorHandler.errorThrow(404, '');
+		}
+
 		const configUpdate = await i_config.update(
 			{
 				c_site_name: c_site_name,
@@ -99,10 +151,12 @@ exports.putConfigSiteUpdate = async (req, res, next) => {
 				c_meta: c_meta,
 				c_meta_tag: c_meta_tag,
 				c_meta_type: c_meta_type,
+				c_lang: c_lang,
 			},
 			{
 				where: {
 					site_id: site_id,
+					c_lang: c_lang,
 				},
 			}
 		);

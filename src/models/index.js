@@ -45,6 +45,7 @@ db.i_banner = require('./banner')(mariaDBSequelize, Sequelize);
 db.i_popup = require('./popup')(mariaDBSequelize, Sequelize);
 
 db.i_config = require('./config')(mariaDBSequelize, Sequelize);
+db.i_config_lang = require('./config_lang')(mariaDBSequelize, Sequelize);
 db.i_policy = require('./policy')(mariaDBSequelize, Sequelize);
 db.i_mailGun = require('./mailGun')(mariaDBSequelize, Sequelize);
 

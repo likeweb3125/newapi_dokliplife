@@ -295,6 +295,7 @@ exports.getBoardList = async (req, res, next) => {
 // 2023.08.30 ash
 exports.getBoardView = async (req, res, next) => {
 	const { category, idx } = req.params;
+	const pass = req.query.pass || 'F';
 
 	try {
 		//게시판 보기 권한 확인
@@ -358,11 +359,16 @@ exports.getBoardView = async (req, res, next) => {
 		}
 
 		if (boardView.b_secret) {
-			if (
-				res.user !== boardView.m_email ||
-				res.level !== enumConfig.userLevel.USER_LV9
-			) {
-				errorHandler.errorThrow(404, '비밀글 입니다.');
+			if (pass === 'F') {
+				if (
+					res.user !== boardView.m_email &&
+					res.level !== enumConfig.userLevel.USER_LV9
+				) {
+					errorHandler.errorThrow(
+						404,
+						'비밀글 입니다.'
+					);
+				}
 			}
 		}
 
