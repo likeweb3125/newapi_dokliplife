@@ -45,6 +45,6 @@ router.post(
 	'/password',
 	isAuthMiddleware.isAuthAdmin,
 	commentController.postCommentPassword
-); //댓글 관리자 선택 삭제
+); //댓글 비밀번호 확인
 
 module.exports = router;
