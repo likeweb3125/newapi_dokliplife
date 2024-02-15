@@ -652,12 +652,14 @@ exports.putBoardUpdate = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 
-		if (req.user !== undefined) {
-			if (
-				req.user !== boardView.m_email &&
-				req.level !== enumConfig.userLevel.USER_LV9
-			) {
-				errorHandler.errorThrow(403, '');
+		if (pass !== 'T') {
+			if (req.user !== undefined) {
+				if (
+					req.user !== boardView.m_email &&
+					req.level !== enumConfig.userLevel.USER_LV9
+				) {
+					errorHandler.errorThrow(403, '');
+				}
 			}
 		}
 
@@ -767,7 +769,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 //게시글 삭제
 // 2023.09.08 ash
 exports.deleteBoardDestroy = async (req, res, next) => {
-	const { idx, category } = req.body;
+	const { idx, category, pass } = req.body;
 
 	let transaction;
 
@@ -794,20 +796,25 @@ exports.deleteBoardDestroy = async (req, res, next) => {
 			errorHandler.errorThrow(404, 'No boards found');
 		}
 
-		for (const boardView of boardViews) {
-			if (
-				req.user !== boardView.m_email &&
-				req.level !== enumConfig.userLevel.USER_LV9
-			) {
-				errorHandler.errorThrow(403, 'No authorization');
-			}
+		if (pass !== 'T') {
+			for (const boardView of boardViews) {
+				if (
+					req.user !== boardView.m_email &&
+					req.level !== enumConfig.userLevel.USER_LV9
+				) {
+					errorHandler.errorThrow(
+						403,
+						'No authorization'
+					);
+				}
 
-			//if (boardView.b_file) {
-			//   multerMiddleware.clearFile(boardView.b_file);
-			//}
+				//if (boardView.b_file) {
+				//   multerMiddleware.clearFile(boardView.b_file);
+				//}
 
-			if (boardView.b_img) {
-				multerMiddleware.clearFile(boardView.b_img);
+				if (boardView.b_img) {
+					multerMiddleware.clearFile(boardView.b_img);
+				}
 			}
 		}
 
