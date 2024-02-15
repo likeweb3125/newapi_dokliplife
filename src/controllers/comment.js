@@ -372,3 +372,32 @@ exports.deleteCommentDestroy = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 댓글 비밀번호 확인
+exports.postCommentPassword = async (req, res, next) => {
+	const { idx, password } = req.body;
+
+	try {
+		const commentView = await i_board_comment.findOne({
+			where: {
+				idx: idx,
+			},
+			attributes: ['idx', 'm_pwd'],
+		});
+
+		if (!commentView) {
+			errorHandler.errorThrow(404, '');
+		}
+
+		if (password !== commentView.m_pwd) {
+			errorHandler.errorThrow(
+				enumConfig.statusErrorCode._404_ERROR[0],
+				'비밀번호가 다릅니다.'
+			);
+		}
+
+		errorHandler.successThrow(res, '', '');
+	} catch (err) {
+		next(err);
+	}
+};

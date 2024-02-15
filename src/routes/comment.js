@@ -41,4 +41,10 @@ router.delete(
 	commentController.deleteCommentDestroy
 ); //댓글 관리자 선택 삭제
 
+router.post(
+	'/password',
+	isAuthMiddleware.isAuthAdmin,
+	commentController.postCommentPassword
+); //댓글 관리자 선택 삭제
+
 module.exports = router;
