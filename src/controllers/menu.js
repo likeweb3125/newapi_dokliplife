@@ -8,9 +8,14 @@ const multerMiddleware = require('../middleware/multer');
 // Get Menu List
 // 2023.08.31 ash
 exports.getCategoryList = async (req, res, next) => {
+	const c_lang = req.params.c_lang || enumConfig.langType.KR[0];
+
 	try {
 		const categoryListY = await i_category.findAll({
-			where: [{ c_use_yn: enumConfig.useType.Y[0] }],
+			where: [
+				{ c_use_yn: enumConfig.useType.Y[0] },
+				{ c_lang: c_lang },
+			],
 			order: [
 				['c_depth', 'ASC'],
 				['c_num', 'ASC'],
@@ -28,6 +33,7 @@ exports.getCategoryList = async (req, res, next) => {
 				'c_menu_on_img',
 				'c_menu_off_img',
 				'c_content_type',
+				'c_lang',
 			],
 		});
 
@@ -36,7 +42,10 @@ exports.getCategoryList = async (req, res, next) => {
 		}
 
 		const categoryListN = await i_category.findAll({
-			where: [{ c_use_yn: enumConfig.useType.N[0] }],
+			where: [
+				{ c_use_yn: enumConfig.useType.N[0] },
+				{ c_lang: c_lang },
+			],
 			order: [
 				['c_depth', 'ASC'],
 				['c_num', 'ASC'],
@@ -54,6 +63,7 @@ exports.getCategoryList = async (req, res, next) => {
 				'c_menu_on_img',
 				'c_menu_off_img',
 				'c_content_type',
+				'c_lang',
 			],
 		});
 
@@ -70,6 +80,7 @@ exports.getCategoryList = async (req, res, next) => {
 				c_menu_on_img: list.c_menu_on_img,
 				c_menu_off_img: list.c_menu_off_img,
 				c_content_type: mapContentType(list.c_content_type),
+				c_lang: list.c_lang,
 			};
 			return listObj;
 		});
@@ -103,6 +114,7 @@ exports.getCategoryList = async (req, res, next) => {
 							c_content_type: mapContentType(
 								item.c_content_type
 							),
+							c_lang: item.c_lang,
 							submenu,
 						};
 					} else {
@@ -125,6 +137,7 @@ exports.getCategoryList = async (req, res, next) => {
 							c_content_type: mapContentType(
 								item.c_content_type
 							),
+							c_lang: item.c_lang,
 						};
 					}
 				});
@@ -163,6 +176,7 @@ exports.postCategoryCreate = async (req, res, next) => {
 		c_menu_off_img,
 		c_contents_type,
 		c_use_yn,
+		c_lang,
 	} = req.body;
 
 	try {
@@ -178,6 +192,7 @@ exports.postCategoryCreate = async (req, res, next) => {
 					c_depth_parent: c_depth_parent,
 					c_use_yn:
 						c_use_yn || enumConfig.useType.Y[0],
+					c_lang: c_lang || enumConfig.langType.KR[0],
 				},
 			});
 
@@ -216,6 +231,7 @@ exports.postCategoryCreate = async (req, res, next) => {
 			c_menu_off_img: menuOffImgPath,
 			c_contents_type: c_contents_type,
 			c_use_yn: c_use_yn || enumConfig.useType.Y[0],
+			c_lang: c_lang || enumConfig.langType.KR[0],
 		});
 
 		if (!categoryCreate) {
@@ -265,7 +281,8 @@ exports.getCategoryView = async (req, res, next) => {
 			c_menu_on_img: menuView.c_menu_on_img,
 			c_menu_off_img: menuView.c_menu_off_img,
 			c_content_type: menuView.c_content_type,
-			c_use_yn: menuView.c_nuc_use_ynm,
+			c_use_yn: menuView.c_use_yn,
+			c_lang: menuView.c_lang,
 		};
 
 		//res.status(200).json(menuObj);
@@ -291,6 +308,7 @@ exports.putCategoryUpdate = async (req, res, next) => {
 		c_menu_off_img,
 		c_contents_type,
 		c_use_yn,
+		c_lang,
 	} = req.body;
 
 	try {

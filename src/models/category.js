@@ -55,6 +55,10 @@ module.exports = (sequelize, DataTypes) => {
 			c_reg_date: {
 				type: DataTypes.DATE,
 			},
+			c_lang: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+			},
 		},
 		{
 			timestamps: false,

@@ -113,3 +113,7 @@ exports.adminMenu = {
 	M6: ['6', '통계관리'],
 	M7: ['7', '유지보수 게시판'],
 };
+
+exports.langType = {
+	KR: ['KR', '한국어'],
+};
