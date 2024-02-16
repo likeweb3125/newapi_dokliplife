@@ -292,7 +292,7 @@ exports.postCommentUpdate = async (req, res, next) => {
 		if (!commentView) {
 			errorHandler.errorThrow(404, '');
 		}
-
+		console.log(pass);
 		if (pass !== 'T') {
 			if (req.user !== commentView.m_email) {
 				errorHandler.errorThrow(403, '');
