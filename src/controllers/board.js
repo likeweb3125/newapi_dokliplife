@@ -627,6 +627,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 		b_email_yn,
 		b_status,
 		group_id,
+		pass,
 	} = req.body;
 
 	let transaction;
