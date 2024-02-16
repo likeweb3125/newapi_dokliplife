@@ -292,8 +292,8 @@ exports.postCommentUpdate = async (req, res, next) => {
 		if (!commentView) {
 			errorHandler.errorThrow(404, '');
 		}
-		console.log(pass);
-		if (pass !== 'T') {
+
+		if (pass !== enumConfig.passTrueFalse.T[0]) {
 			if (req.user !== commentView.m_email) {
 				errorHandler.errorThrow(403, '');
 			}
@@ -343,7 +343,7 @@ exports.deleteCommentDestroy = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 		//console.log(req.level);
-		if (pass !== 'T') {
+		if (pass !== enumConfig.passTrueFalse.T[0]) {
 			for (const commentView of commentViews) {
 				if (
 					req.user !== commentView.m_email &&

@@ -116,4 +116,12 @@ exports.adminMenu = {
 
 exports.langType = {
 	KR: ['KR', '한국어'],
+	EN: ['EN', '영어'],
+	CH: ['CH', '중국어'],
+	JP: ['JP', '일본어'],
+};
+
+exports.passTrueFalse = {
+	T: ['T', '성공'],
+	F: ['F', '실패'],
 };

@@ -295,7 +295,7 @@ exports.getBoardList = async (req, res, next) => {
 // 2023.08.30 ash
 exports.getBoardView = async (req, res, next) => {
 	const { category, idx } = req.params;
-	const pass = req.query.pass || 'F';
+	const pass = req.query.pass || enumConfig.passTrueFalse.F[0];
 
 	try {
 		//게시판 보기 권한 확인
@@ -359,7 +359,7 @@ exports.getBoardView = async (req, res, next) => {
 		}
 
 		if (boardView.b_secret) {
-			if (pass === 'F') {
+			if (pass !== enumConfig.passTrueFalse.T[0]) {
 				if (
 					res.user !== boardView.m_email &&
 					res.level !== enumConfig.userLevel.USER_LV9
@@ -539,7 +539,7 @@ exports.postBoardCreate = async (req, res, next) => {
 
 		//console.log(boardItem);
 		//게시판 등록 알림 일 경우 등록된 번호로 SMS 발송
-		if (boardItem.b_alarm === 'Y') {
+		if (boardItem.b_alarm === enumConfig.receiptType.Y[0]) {
 			if (boardItem.b_alarm_phone !== '') {
 			} else {
 				const mailSendresult =
@@ -555,7 +555,7 @@ exports.postBoardCreate = async (req, res, next) => {
 		}
 
 		//답변 게시물
-		if (boardItem.b_write_alarm === 'Y') {
+		if (boardItem.b_write_alarm === enumConfig.receiptType.Y[0]) {
 			if (b_depth > 0) {
 				// boardItem.b_write_send 작성자 이메일 or 문자 발송
 			}
@@ -653,7 +653,7 @@ exports.putBoardUpdate = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 
-		if (pass !== 'T') {
+		if (pass !== enumConfig.passTrueFalse.T[0]) {
 			if (req.user !== undefined) {
 				if (
 					req.user !== boardView.m_email &&
@@ -797,7 +797,7 @@ exports.deleteBoardDestroy = async (req, res, next) => {
 			errorHandler.errorThrow(404, 'No boards found');
 		}
 
-		if (pass !== 'T') {
+		if (pass !== enumConfig.passTrueFalse.T[0]) {
 			for (const boardView of boardViews) {
 				if (
 					req.user !== boardView.m_email &&
