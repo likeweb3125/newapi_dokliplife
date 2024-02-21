@@ -52,7 +52,7 @@ exports.getConfigSite = async (req, res, next) => {
 				site_id: site_id,
 				use_yn: enumConfig.useType.Y[0],
 			},
-			attributes: ['site_lang'],
+			attributes: ['site_lang_hangul', 'site_lang'],
 		});
 
 		const configObj = {
