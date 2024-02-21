@@ -602,6 +602,8 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
 						defaults: {
 							parent_id: id,
 							content: processedHtmlContents.temp_contents,
+							use_yn: enumConfig.useType
+								.Y[0],
 						},
 					}
 				);
@@ -625,9 +627,13 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
 					await i_category_empty.findOrCreate({
 						where: {
 							parent_id: id,
+							use_yn: enumConfig.useType
+								.Y[0],
 						},
 						defaults: {
 							parent_id: id,
+							use_yn: enumConfig.useType
+								.Y[0],
 						},
 					});
 
@@ -661,6 +667,8 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
 								admin_file_path,
 							sms: sms,
 							email: email,
+							use_yn: enumConfig.useType
+								.Y[0],
 						},
 					});
 
@@ -734,6 +742,8 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
 							b_template: b_template,
 							b_template_text:
 								b_template_text,
+							use_yn: enumConfig.useType
+								.Y[0],
 						},
 					});
 
