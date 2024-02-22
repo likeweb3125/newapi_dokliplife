@@ -13,35 +13,31 @@ const utilMiddleware = require('../middleware/util');
 exports.getConfigSite = async (req, res, next) => {
 	const site_id = req.params.site_id;
 	const c_lang = req.params.c_lang;
-
+	console.log(c_lang);
 	try {
-		const configView = await i_config.findOne(
-			{
-				attributes: [
-					'c_site_name',
-					'c_web_title',
-					'c_ceo',
-					'c_tel',
-					'c_num',
-					'c_num2',
-					'c_email',
-					'c_address',
-					'c_fax',
-					'c_manager',
-					'c_b_title',
-					'c_meta',
-					'c_meta_tag',
-					'c_meta_type',
-					'c_lang',
-				],
+		const configView = await i_config.findOne({
+			attributes: [
+				'c_site_name',
+				'c_web_title',
+				'c_ceo',
+				'c_tel',
+				'c_num',
+				'c_num2',
+				'c_email',
+				'c_address',
+				'c_fax',
+				'c_manager',
+				'c_b_title',
+				'c_meta',
+				'c_meta_tag',
+				'c_meta_type',
+				'c_lang',
+			],
+			where: {
+				site_id: site_id,
+				c_lang: c_lang,
 			},
-			{
-				where: {
-					site_id: site_id,
-					c_lang: c_lang,
-				},
-			}
-		);
+		});
 
 		if (!configView) {
 			errorHandler.errorThrow(404, '');
@@ -73,7 +69,7 @@ exports.getConfigSite = async (req, res, next) => {
 			c_meta_type: configView.c_meta_type,
 			c_lang: configView.c_lang,
 		};
-		console.log(configObj);
+		//console.log(configObj);
 		//res.status(200).json(configObj);
 		errorHandler.successThrow(res, '', configObj);
 	} catch (err) {
