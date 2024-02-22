@@ -655,12 +655,12 @@ exports.putSubCategoryUpdate = async (req, res, next) => {
 				const customView =
 					await i_category_custom.findOrCreate({
 						where: {
-							parent_id: newCategory.id,
+							parent_id: id,
 							use_yn: enumConfig.useType
 								.Y[0],
 						},
 						defaults: {
-							parent_id: newCategory.id,
+							parent_id: id,
 							c_type: c_type,
 							file_path: file_path,
 							admin_file_path:
