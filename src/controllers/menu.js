@@ -8,7 +8,7 @@ const multerMiddleware = require('../middleware/multer');
 // Get Menu List
 // 2023.08.31 ash
 exports.getCategoryList = async (req, res, next) => {
-	const c_lang = req.params.c_lang || enumConfig.langType.KR[0];
+	const c_lang = req.query.c_lang || enumConfig.langType.KR[0];
 
 	try {
 		const categoryListY = await i_category.findAll({
