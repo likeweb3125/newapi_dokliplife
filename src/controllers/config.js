@@ -254,7 +254,7 @@ exports.getConfigPolicy = async (req, res, next) => {
 };
 
 exports.postConfigPolicyCreate = async (req, res, next) => {
-	const { p_title, p_contents, p_use_yn } = req.body;
+	const { p_title, p_contents, p_use_yn, p_lang } = req.body;
 
 	try {
 		const processedContents = await utilMiddleware.base64ToImagesPath(
@@ -265,6 +265,7 @@ exports.postConfigPolicyCreate = async (req, res, next) => {
 			p_title: p_title,
 			p_contents: processedContents.temp_contents,
 			p_use_yn: p_use_yn,
+			p_lang: p_lang,
 		});
 
 		if (!policyCreate) {
@@ -293,6 +294,7 @@ exports.postConfigPolicyView = async (req, res, next) => {
 				'p_use_yn',
 				'policy_type',
 				'constraint_type',
+				'p_lang',
 			],
 		});
 
