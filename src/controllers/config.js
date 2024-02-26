@@ -171,13 +171,15 @@ exports.getConfigPolicy = async (req, res, next) => {
 	const page = parseInt(req.query.page) || 1;
 	const limit = parseInt(req.query.limit) || 10;
 	const offset = (page - 1) * limit;
+	const p_lang = req.query.p_lang || 'KR';
 
 	const searchQuery = req.query.search;
 	const searchTxtQuery = req.query.searchtxt;
-
+	console.log(p_lang);
 	try {
 		const whereCondition = {
 			idx: { [Op.gt]: 0 },
+			p_lang: p_lang,
 		};
 
 		if (searchQuery && searchTxtQuery) {
@@ -207,6 +209,7 @@ exports.getConfigPolicy = async (req, res, next) => {
 				'p_use_yn',
 				'policy_type',
 				'constraint_type',
+				'p_lang',
 			],
 		});
 
@@ -230,6 +233,7 @@ exports.getConfigPolicy = async (req, res, next) => {
 				p_use_yn: list.p_use_yn,
 				policy_type: list.policy_type,
 				constraint_type: list.constraint_type,
+				p_lang: list.p_lang,
 			};
 			return listObj;
 		});
@@ -274,12 +278,13 @@ exports.postConfigPolicyCreate = async (req, res, next) => {
 };
 
 exports.postConfigPolicyView = async (req, res, next) => {
-	const { idx } = req.params;
+	const { idx, p_lang } = req.params;
 
 	try {
 		const policyView = await i_policy.findOne({
 			where: {
 				idx: idx,
+				p_lang: p_lang,
 			},
 			attributes: [
 				'idx',
@@ -302,6 +307,7 @@ exports.postConfigPolicyView = async (req, res, next) => {
 			p_use_yn: policyView.p_use_yn,
 			policy_type: policyView.policy_type,
 			constraint_type: policyView.constraint_type,
+			p_lang: policyView.p_lang,
 		};
 
 		//res.status(200).json(policyObj);

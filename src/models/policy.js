@@ -31,6 +31,10 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.STRING(1),
 				allowNull: true,
 			},
+			p_lang: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+			},
 		},
 		{
 			timestamps: false,
