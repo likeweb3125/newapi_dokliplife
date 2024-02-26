@@ -279,7 +279,8 @@ exports.postConfigPolicyCreate = async (req, res, next) => {
 };
 
 exports.postConfigPolicyView = async (req, res, next) => {
-	const { idx, p_lang } = req.params;
+	const { idx } = req.params;
+	const p_lang = req.query.p_lang || 'KR';
 
 	try {
 		const policyView = await i_policy.findOne({
