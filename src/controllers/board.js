@@ -68,6 +68,7 @@ exports.getBoardList = async (req, res, next) => {
 	const searchQuery = req.query.search;
 	const searchTxtQuery = req.query.searchtxt;
 	const group_id = req.query.group_id;
+	const m_email = req.query.m_email;
 
 	const orderBy = req.query.orderBy;
 
@@ -108,6 +109,12 @@ exports.getBoardList = async (req, res, next) => {
 		if (group_id !== '') {
 			whereCondition.group_id = {
 				[Op.eq]: group_id,
+			};
+		}
+
+		if (m_email !== '') {
+			whereCondition.m_email = {
+				[Op.eq]: m_email,
 			};
 		}
 
