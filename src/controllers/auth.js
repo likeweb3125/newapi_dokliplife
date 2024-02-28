@@ -387,33 +387,53 @@ exports.getUserView = async (req, res, next) => {
 			errorHandler.errorThrow(404, '');
 		}
 
-		const qnaBoardIdResults = await i_category.findAll({
-			attributes: ['id'],
-			where: {
-				c_content_type: enumConfig.contentType.QNA[0],
-				c_use_yn: enumConfig.useType.Y[0],
-			},
-		});
+		// qna 게시판 id
+		const qnaBoardIds = (
+			await i_category.findAll({
+				attributes: ['id'],
+				where: {
+					c_content_type:
+						enumConfig.contentType.QNA[0],
+					c_use_yn: enumConfig.useType.Y[0],
+				},
+			})
+		).map((result) => result.id);
 
-		const qnaBoardIds = qnaBoardIdResults.map((result) => result.id);
+		const BoardIds = (
+			await i_category.findAll({
+				attributes: ['id'],
+				where: {
+					c_content_type: {
+						[Op.In]: [
+							enumConfig.contentType
+								.BOARD[0],
+							enumConfig.contentType
+								.GALLERY[0],
+							enumConfig.contentType.FAQ[0],
+						],
+					},
+					c_use_yn: enumConfig.useType.Y[0],
+				},
+			})
+		).map((result) => result.id);
 
-		const boardCnt = await i_board.count({
-			where: {
-				m_email: req.user,
-				category: { [Op.notIn]: qnaBoardIds },
-			},
-		});
-
-		const commentCnt = await i_board_comment.count({
-			where: { m_email: req.user },
-		});
-
-		const qnaCnt = await i_board.count({
-			where: {
-				m_email: req.user,
-				category: { [Op.In]: qnaBoardIds },
-			},
-		});
+		const [boardCnt, commentCnt, qnaCnt] = await Promise.all([
+			i_board.count({
+				where: {
+					m_email: req.user,
+					category: { [Op.In]: BoardIds }, // QNA 카테고리를 제외한 게시글 수
+				},
+			}),
+			i_board_comment.count({
+				where: { m_email: req.user }, // 댓글 수
+			}),
+			i_board.count({
+				where: {
+					m_email: req.user,
+					category: { [Op.in]: qnaBoardIds }, // QNA 카테고리에 해당하는 게시글 수
+				},
+			}),
+		]);
 
 		const objResult = {
 			boardCnt: boardCnt,
