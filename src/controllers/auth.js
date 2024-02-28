@@ -372,6 +372,22 @@ exports.postResetPassword = async (req, res, next) => {
 	}
 };
 
+// 회원 정보 조회
+exports.getUserView = async (req, res, next) => {
+	try {
+		const memberView = await i_member.findOne({
+			where: { m_email: req.user },
+		});
+
+		if (!memberView) {
+			errorHandler.errorThrow(404, '');
+		}
+		errorHandler.successThrow(res, '', memberView);
+	} catch (err) {
+		next(err);
+	}
+};
+
 // 회원 정보 수정
 exports.putUserUpdate = async (req, res, next) => {
 	const { m_mobile, m_sms_yn, m_mail_yn } = req.body;
