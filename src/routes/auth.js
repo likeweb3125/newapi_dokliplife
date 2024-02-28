@@ -22,7 +22,7 @@ router.post(
 	authController.postResetPassword
 ); // 비밀번호 재설정
 
-router.get('/view', isAuthMiddleware.isAuth, authController.getUserView); // 회원정보 조회
+router.get('/view', isAuthMiddleware.isAuth, authController.getUserView); // 회원정보 조회//
 router.put('/user', isAuthMiddleware.isAuth, authController.putUserUpdate); // 회원정보 수정
 router.delete(
 	'/user',
