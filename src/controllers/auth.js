@@ -1,8 +1,12 @@
+const { Op } = require('sequelize');
 const {
 	i_member,
 	i_member_level,
 	i_member_login,
 	i_member_sec,
+	i_category,
+	i_board,
+	i_board_comment,
 } = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('../middleware/jwt');
@@ -382,7 +386,43 @@ exports.getUserView = async (req, res, next) => {
 		if (!memberView) {
 			errorHandler.errorThrow(404, '');
 		}
-		errorHandler.successThrow(res, '', memberView);
+
+		const qnaBoardIdResults = await i_category.findAll({
+			attributes: ['id'],
+			where: {
+				c_content_type: enumConfig.contentType.QNA[0],
+				c_use_yn: enumConfig.useType.Y[0],
+			},
+		});
+
+		const qnaBoardIds = qnaBoardIdResults.map((result) => result.id);
+
+		const boardCnt = await i_board.count({
+			where: {
+				m_email: req.user,
+				category: { [Op.notIn]: qnaBoardIds },
+			},
+		});
+
+		const commentCnt = await i_board_comment.count({
+			where: { m_email: req.user },
+		});
+
+		const qnaCnt = await i_board.count({
+			where: {
+				m_email: req.user,
+				category: { [Op.In]: qnaBoardIds },
+			},
+		});
+
+		const objResult = {
+			boardCnt: boardCnt,
+			commentCnt: commentCnt,
+			qnaCnt: qnaCnt,
+			member: memberView,
+		};
+
+		errorHandler.successThrow(res, '', objResult);
 	} catch (err) {
 		next(err);
 	}
