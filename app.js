@@ -45,6 +45,8 @@ const corsOptions = {
 		'http://localhost:5001',
 		'http://localhost:3002',
 		'http://react.likeweb.co.kr',
+		'http://likeweb.co.kr',
+		'http://www.likeweb.co.kr',
 	], // 리액트  localhost 3000
 	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
