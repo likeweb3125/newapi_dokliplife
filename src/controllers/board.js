@@ -114,7 +114,7 @@ exports.getBoardList = async (req, res, next) => {
 
 		if (m_email !== '') {
 			whereCondition.m_email = {
-				[Op.eq]: m_email,
+				[Op.eq]: req.user,
 			};
 		}
 
