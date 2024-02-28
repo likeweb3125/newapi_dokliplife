@@ -421,7 +421,7 @@ exports.getUserView = async (req, res, next) => {
 			i_board.count({
 				where: {
 					m_email: req.user,
-					category: { [Op.In]: BoardIds }, // QNA 카테고리를 제외한 게시글 수
+					category: { [Op.in]: BoardIds }, // QNA 카테고리를 제외한 게시글 수
 				},
 			}),
 			i_board_comment.count({
