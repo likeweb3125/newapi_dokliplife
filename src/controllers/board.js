@@ -114,10 +114,10 @@ exports.getBoardList = async (req, res, next) => {
 
 		if (m_email !== '') {
 			whereCondition.m_email = {
-				[Op.eq]: req.user,
+				[Op.eq]: m_email,
 			};
 		}
-
+		console.log(req.user + '1tesr');
 		let orderField;
 		if (orderBy === 'title') {
 			orderField = [['b_title', 'ASC']];
