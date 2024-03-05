@@ -292,7 +292,7 @@ exports.getBoardList = async (req, res, next) => {
 };
 
 // 본인 게시물 리스트
-exports.getMyBoardList = async (req, res, next) => {
+exports.postMyBoardList = async (req, res, next) => {
 	const { category, getLimit, m_email } = req.body;
 	const page = parseInt(req.query.page) || 1;
 	const searchQuery = req.query.search;
