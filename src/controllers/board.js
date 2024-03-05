@@ -96,12 +96,18 @@ exports.getBoardList = async (req, res, next) => {
 			}
 
 			if (searchQuery === 'titlecontents') {
-				whereCondition.b_title = {
-					[Op.like]: `%${searchTxtQuery}%`,
-				};
-				whereCondition.b_contents = {
-					[Op.like]: `%${searchTxtQuery}%`,
-				};
+				whereCondition[Op.or] = [
+					{
+						b_title: {
+							[Op.like]: `%${searchTxtQuery}%`,
+						},
+					},
+					{
+						b_contents: {
+							[Op.like]: `%${searchTxtQuery}%`,
+						},
+					},
+				];
 			}
 		}
 
