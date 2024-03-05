@@ -8,11 +8,8 @@ const isAuthMiddleware = require('../middleware/is-auth');
 //const category = require('../models/category');
 
 router.get('/main/:category/:limit', boardController.getBoardMain); //게시글 메인 공지
-router.get(
-	'/:category/:getLimit',
-	isAuthMiddleware.isAuth,
-	boardController.getBoardList
-); //게시글 리스트
+router.get('/:category/:getLimit', boardController.getBoardList); //게시글 리스트
+router.post('/myList', isAuthMiddleware.isAuth, boardController.getMyBoardList); //본인 게시글 리스트
 router.get(
 	'/view/:category/:idx',
 	isAuthMiddleware.isAuthBoard,

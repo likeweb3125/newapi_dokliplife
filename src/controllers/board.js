@@ -68,7 +68,6 @@ exports.getBoardList = async (req, res, next) => {
 	const searchQuery = req.query.search;
 	const searchTxtQuery = req.query.searchtxt;
 	const group_id = req.query.group_id;
-	const m_email = req.query.m_email || '';
 
 	const orderBy = req.query.orderBy;
 
@@ -112,10 +111,249 @@ exports.getBoardList = async (req, res, next) => {
 			};
 		}
 
-		if (m_email !== '') {
-			whereCondition.m_email = {
-				[Op.eq]: req.user,
+		let orderField;
+		if (orderBy === 'title') {
+			orderField = [['b_title', 'ASC']];
+		} else if (orderBy === 'view') {
+			orderField = [['b_view', 'ASC']];
+		} else {
+			orderField = [
+				['b_notice', 'DESC'],
+				[
+					Sequelize.fn(
+						'IFNULL',
+						Sequelize.col('parent_id'),
+						Sequelize.col('idx')
+					),
+					'DESC',
+				],
+				['parent_id', 'ASC'],
+				['idx', 'DESC'],
+			];
+		}
+
+		const subQuery = `(SELECT COUNT(*) FROM i_board_comment WHERE i_board_comment.board_idx = i_board.idx)`;
+		const subQuery2 = `(SELECT c_content_type FROM i_category WHERE i_category.id = i_board.category)`;
+		const subQuery3 =
+			`(SELECT COUNT(*) FROM i_board_file WHERE i_board_file.parent_idx = i_board.idx and i_board_file.kind = '` +
+			enumConfig.boardFileType.B[0] +
+			`')`;
+		const subQuery4 = `(SELECT g_name FROM i_category_board_group WHERE i_category_board_group.id = i_board.group_id)`;
+
+		// const subQuery2 = Sequelize.literal(`
+		//    (SELECT c_name FROM i_category WHERE i_category.id = i_board.category)
+		// `);
+
+		const boardItemResult = await boardAuth.boardListItem(category);
+
+		if (boardItemResult) {
+			if (boardItemResult.statusCode) {
+				return errorHandler.errorThrow(
+					boardItemResult.statusCode,
+					boardItemResult.message
+				);
+			}
+		}
+		//console.log(boardItemResult);
+
+		const limit = parseInt(getLimit) || boardItemResult.b_list_cnt;
+
+		const offset = (page - 1) * limit;
+		console.log(whereCondition);
+		const boardList = await i_board.findAndCountAll({
+			offset: offset,
+			limit: limit,
+			where: whereCondition,
+			order: orderField,
+			attributes: [
+				'idx',
+				'category',
+				'b_depth',
+				'b_notice',
+				'b_secret',
+				'b_title',
+				'm_email',
+				'm_name',
+				'b_reply',
+				'b_img',
+				[Sequelize.literal(subQuery), 'comment_count'],
+				[Sequelize.literal(subQuery2), 'c_content_type'],
+				[Sequelize.literal(subQuery3), 'file_count'],
+				[Sequelize.literal(subQuery4), 'g_name'],
+				...boardItemResult.boardItem,
+			],
+			include: [
+				{
+					model: i_category,
+					as: 'icategory',
+					attributes: ['c_name'],
+					required: true,
+				},
+			],
+		});
+
+		const lastPage = Math.ceil(boardList.count / limit);
+		const maxPage = 10;
+		const startPage = Math.max(
+			1,
+			Math.floor((page - 1) / maxPage) * maxPage + 1
+		);
+		const endPage = Math.min(lastPage, startPage + maxPage - 1);
+		console.log(offset);
+		const listResult = boardList.rows.map((list, index) => ({
+			idx: list.idx,
+			num:
+				list.b_notice === '1'
+					? '공지'
+					: boardList.count - (offset + index),
+			category: list.category,
+			b_depth: list.b_depth,
+			b_title: list.b_title,
+			m_email: list.m_email,
+			m_name: list.m_name,
+			b_reg_date: moment.utc(list.w_date).format('YYYY.MM.DD'),
+			b_notice: list.b_notice,
+			b_view: list.b_view,
+			b_img: list.b_img,
+			b_file: list.getDataValue('file_count'),
+			b_recom: list.b_recom,
+			b_secret: list.b_secret,
+			comment_count: list.getDataValue('comment_count'),
+			c_content_type: list.getDataValue('c_content_type'),
+			g_name: list.getDataValue('g_name'),
+			g_status: list.b_reply !== null ? '답변완료' : '답변대기',
+			c_name: list.icategory.c_name,
+		}));
+
+		const BoardName = await i_category.findAll({
+			where: {
+				id: { [Op.ne]: [category] },
+				c_use_yn: enumConfig.useType.Y[0],
+				c_content_type: boardItemResult.c_content_type,
+			},
+			attributes: [
+				'id',
+				'c_depth',
+				'c_name',
+				'c_reg_date',
+				'c_content_type',
+			],
+			order: [['id', 'ASC']],
+		});
+
+		const boardNameResult = BoardName.map((main) => {
+			const listObj = {
+				category: main.id,
+				c_depth: main.c_depth,
+				c_name: main.c_name,
+				c_content_type: main.c_content_type,
 			};
+			return listObj;
+		});
+
+		errorHandler.successThrow(res, '', {
+			limit: limit,
+			current_page: page,
+			start_page: startPage,
+			max_page: maxPage,
+			last_page: lastPage,
+			end_page: endPage,
+			total_count: boardList.count,
+			c_content_type: boardItemResult.c_content_type, //게시판 유형
+			b_column_title: boardItemResult.b_column_title, //제목 노출 여부
+			b_column_date: boardItemResult.b_column_date, //등록일자 노출 여부
+			b_column_view: boardItemResult.b_column_view, //조회수 노출 여부
+			b_column_recom: boardItemResult.b_column_recom, //추천수 노출 여부
+			b_column_file: boardItemResult.b_column_file, //파일 노출 여부
+			b_thumbnail_with: boardItemResult.b_thumbnail_with, //갤러리 게시판 썸네일 가로 사이즈
+			b_thumbnail_height: boardItemResult.b_thumbnail_height, // 썸네일 세로 사이즈
+			b_read_lv: boardItemResult.b_read_lv, //읽기권한
+			b_write_lv: boardItemResult.b_write_lv, //쓰기권한
+			b_group: boardItemResult.b_group, //게시판 분류 사용 여부
+			b_secret: boardItemResult.b_secret, //비밀글 설정
+			b_reply: boardItemResult.b_reply, //답변사용 여부
+			b_reply_lv: boardItemResult.b_reply_lv, //답변사용권한
+			b_comment: boardItemResult.b_comment, //댓글사용 여부
+			b_comment_lv: boardItemResult.b_comment_lv, //댓글사용권한
+			b_write_alarm: boardItemResult.b_write_alarm, //작성자 답변 알림 여부
+			b_write_send: boardItemResult.b_write_send, //작성자 답변 알림 전송 구분 (이메일, 문자)
+			b_write_sms: boardItemResult.b_write_sms,
+			b_alarm: boardItemResult.b_alarm, //게시 알림 여부
+			b_alarm_phone: boardItemResult.b_alarm_phone, //게시 알림 전송 휴대폰 번호
+			b_top_html: boardItemResult.b_top_html, //게시판 상단 HTML 내용
+			b_template: boardItemResult.b_template, // 게시글 템플릿 적용
+			b_template_text: boardItemResult.b_template_text, //템플릿 내용
+			board_Name: boardNameResult,
+			board_list: listResult,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+// 본인 게시물 리스트
+exports.getMyBoardList = async (req, res, next) => {
+	const { category, getLimit, m_email } = req.body;
+	const page = parseInt(req.query.page) || 1;
+	const searchQuery = req.query.search;
+	const searchTxtQuery = req.query.searchtxt;
+	//const group_id = req.query.group_id;
+
+	const orderBy = req.query.orderBy;
+
+	try {
+		const whereCondition = {
+			category: category,
+		};
+
+		if (searchQuery && searchTxtQuery) {
+			if (searchQuery === 'title') {
+				whereCondition.b_title = {
+					[Op.like]: `%${searchTxtQuery}%`,
+				};
+			}
+
+			if (searchQuery === 'contents') {
+				whereCondition.b_contents = {
+					[Op.like]: `%${searchTxtQuery}%`,
+				};
+			}
+
+			if (searchQuery === 'name') {
+				whereCondition.m_name = {
+					[Op.like]: `%${searchTxtQuery}%`,
+				};
+			}
+
+			if (searchQuery === 'titlecontents') {
+				whereCondition.b_title = {
+					[Op.like]: `%${searchTxtQuery}%`,
+				};
+				whereCondition.b_contents = {
+					[Op.like]: `%${searchTxtQuery}%`,
+				};
+			}
+		}
+
+		// if (group_id !== '') {
+		// 	whereCondition.group_id = {
+		// 		[Op.eq]: group_id,
+		// 	};
+		// }
+
+		if (m_email !== '') {
+			if (req.user === '') {
+				errorHandler.errorThrow(
+					404,
+					'토큰 정보가 없습니다.'
+				);
+			} else {
+				whereCondition.m_email = {
+					[Op.eq]: req.user,
+				};
+			}
+		} else {
+			errorHandler.errorThrow(404, '');
 		}
 
 		let orderField;
