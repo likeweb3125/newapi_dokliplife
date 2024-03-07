@@ -47,6 +47,7 @@ const corsOptions = {
 		'http://react.likeweb.co.kr',
 		'http://likeweb.co.kr',
 		'http://www.likeweb.co.kr',
+		'http://woodism.likeweb.kr',
 	], // 리액트  localhost 3000
 	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
