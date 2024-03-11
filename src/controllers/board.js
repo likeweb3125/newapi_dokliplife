@@ -66,7 +66,9 @@ exports.getBoardList = async (req, res, next) => {
 	const { category, getLimit } = req.params;
 	const page = parseInt(req.query.page) || 1;
 	const searchQuery = req.query.search;
-	const searchTxtQuery = req.query.searchtxt;
+	const searchTxtQuery = req.query.searchtxt
+		? req.query.searchtxt.trim()
+		: '';
 	const group_id = req.query.group_id;
 
 	const orderBy = req.query.orderBy;
