@@ -273,6 +273,13 @@ exports.postCommentCreate = async (req, res, next) => {
 			await transaction.rollback();
 		}
 
+		if (err instanceof Sequelize.ValidationError) {
+			return res.status(400).json({
+				error: 'Validation error',
+				details: err.errors,
+			});
+		}
+
 		next(err);
 	}
 };
