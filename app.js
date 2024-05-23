@@ -90,6 +90,10 @@ app.use('/v1/admin/maintenance', adminMaintenanceRoutes);
 // 메일 Send
 app.use('/v1/mailGun', mailGunRoutes);
 
+app.get('/', (req, res) => {
+	res.send('Welcome to LIKE WEB BASIC REST API');
+}); 
+
 app.use(errorHandler.routesStatusCode);
 
 app.use(errorHandler.statusCodeReturn);
