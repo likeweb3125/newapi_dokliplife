@@ -92,7 +92,7 @@ app.use('/v1/mailGun', mailGunRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to LIKE WEB BASIC REST API');
-}); 
+});
 
 app.use(errorHandler.routesStatusCode);
 
