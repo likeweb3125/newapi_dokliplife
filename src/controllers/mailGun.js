@@ -14,6 +14,8 @@ const formData = require('form-data');
 const Mailgun = require('mailgun.js');
 const mailgun = new Mailgun(formData);
 
+const axios = require('axios');
+
 //이메일 전송 계정 생성
 exports.postMailGunSingUp = async (req, res, next) => {
 	const { user_id, user_pw, user_name } = req.body;
@@ -97,7 +99,7 @@ exports.postMailGunToken = async (req, res, next) => {
 
 //이메일 전송 mailGun
 exports.postMailGunSend = async (req, res, next) => {
-	const { from_email, to_email, subject, content } = req.body;
+	const { from_email, to_email, subject, content, attachFile } = req.body;
 
 	try {
 		const authHeader = req.get('Authorization');
@@ -137,11 +139,16 @@ exports.postMailGunSend = async (req, res, next) => {
 			key: process.env.MAILGUN_API_KEY,
 		});
 
+		const response = await axios.get(attachFile, {
+			responseType: 'stream',
+		});
+
 		const data = {
 			from: from_email,
 			to: to_email,
 			subject: subject,
 			html: content,
+			attachment: response.data,
 		};
 
 		const email_result = await mg.messages
