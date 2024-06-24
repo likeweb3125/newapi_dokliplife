@@ -144,7 +144,6 @@ exports.postMailGunSend = async (req, res, next) => {
 			to: to_email,
 			subject: subject,
 			html: content,
-			attachment: response.data,
 		};
 
 		if (attachFile) {
