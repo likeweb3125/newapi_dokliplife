@@ -139,10 +139,6 @@ exports.postMailGunSend = async (req, res, next) => {
 			key: process.env.MAILGUN_API_KEY,
 		});
 
-		const response = await axios.get(attachFile, {
-			responseType: 'stream',
-		});
-
 		const data = {
 			from: from_email,
 			to: to_email,
@@ -150,6 +146,13 @@ exports.postMailGunSend = async (req, res, next) => {
 			html: content,
 			attachment: response.data,
 		};
+
+		if (attachFile) {
+			const response = await axios.get(attachFile, {
+				responseType: 'stream',
+			});
+			data.attachment = response.data;
+		}
 
 		const email_result = await mg.messages
 			.create(process.env.MAILER_HOST, data)
