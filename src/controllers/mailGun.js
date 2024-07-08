@@ -181,6 +181,13 @@ exports.postMailGunSend = async (req, res, next) => {
 				);
 			});
 	} catch (err) {
-		next(err);
+		if (err instanceof RateLimiterRes) {
+			errorHandler.errorThrow(
+				enumConfig.statusErrorCode._401_ERROR[0],
+				'Too many requests, please try again later.'
+			);
+		} else {
+			next(err);
+		}
 	}
 };
