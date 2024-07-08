@@ -10,6 +10,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 
 dotenv.config({ path: path.join(__dirname, '/config/env/.env') });
+const { RateLimiterMemory } = require('rate-limiter-flexible');
 const formData = require('form-data');
 const Mailgun = require('mailgun.js');
 const mailgun = new Mailgun(formData);
@@ -97,6 +98,12 @@ exports.postMailGunToken = async (req, res, next) => {
 	}
 };
 
+// 1분당 5건의 이메일 전송을 허용하는 레이트 리미터 설정
+const rateLimiter = new RateLimiterMemory({
+	points: 5, // 5 requests
+	duration: 60, // per 60 seconds by IP
+});
+
 //이메일 전송 mailGun
 exports.postMailGunSend = async (req, res, next) => {
 	const { from_email, to_email, subject, content, attachFile } = req.body;
@@ -133,6 +140,9 @@ exports.postMailGunSend = async (req, res, next) => {
 				);
 			}
 		}
+
+		// IP 기반으로 rate limit 적용
+		await rateLimiter.consume(req.ip);
 
 		const mg = mailgun.client({
 			username: 'api',
