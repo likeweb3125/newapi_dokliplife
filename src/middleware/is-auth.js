@@ -87,6 +87,9 @@ exports.isAuthBoard = async (req, res, next) => {
 			);
 		}
 
+		// 회원인증
+		authenticate(req);
+
 		const authorizationResult = await boardAuth.authorizeUser(
 			category,
 			boardAuthType,
@@ -98,9 +101,6 @@ exports.isAuthBoard = async (req, res, next) => {
 				authorizationResult.statusCode,
 				authorizationResult.message
 			);
-
-			// 회원인증
-			authenticate(req);
 		}
 
 		next();
