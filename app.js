@@ -44,6 +44,7 @@ const corsOptions = {
 		'http://api.likeweb.co.kr/',
 		'http://localhost:5001',
 		'http://localhost:3002',
+		'http://localhost:3007',
 		'http://react.likeweb.co.kr',
 		'http://likeweb.co.kr',
 		'http://www.likeweb.co.kr',
