@@ -54,7 +54,7 @@ const corsOptions = {
 		'http://www.woodismcity.org',
 		'http://cielodoor.com',
 		'http://www.cielodoor.com',
-		'http://official.likeweb.co.kr/',
+		'http://official.likeweb.co.kr',
 	], // 리액트  localhost 3000
 	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
