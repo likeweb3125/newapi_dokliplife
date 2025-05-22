@@ -63,10 +63,7 @@ exports.getCommentListAdmin = async (req, res, next) => {
 
 		const lastPage = Math.ceil(commentList.count / limit);
 		const maxPage = 10;
-		const startPage = Math.max(
-			1,
-			Math.floor((page - 1) / maxPage) * maxPage + 1
-		);
+		const startPage = Math.max(1, Math.floor((page - 1) / maxPage) * maxPage + 1);
 		const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
 		const listResult = commentList.rows.map((list) => ({
@@ -77,9 +74,7 @@ exports.getCommentListAdmin = async (req, res, next) => {
 			boardName: list.getDataValue('boardName'),
 			boardTitle: list.getDataValue('boardTitle'),
 			m_name: list.m_name,
-			c_reg_date: moment
-				.utc(list.c_reg_date)
-				.format('YYYY.MM.DD hh:mm'),
+			c_reg_date: moment.utc(list.c_reg_date).format('YYYY.MM.DD HH:mm'),
 		}));
 
 		errorHandler.successThrow(res, '', {
@@ -141,7 +136,7 @@ exports.getCommentListAdmin = async (req, res, next) => {
 //          m_email: main.m_email,
 //          m_name: main.m_name,
 //          c_contents: main.c_contents,
-//          c_reg_date: moment.utc(main.c_reg_date).format('YYYY.MM.DD hh:mm:ss'),
+//          c_reg_date: moment.utc(main.c_reg_date).format('YYYY.MM.DD HH:mm:ss'),
 //       }));
 
 //       errorHandler.successThrow(res, '', parentResult);
@@ -201,10 +196,7 @@ function buildCommentTree(allComments, parentIdx = 0) {
 
 	for (const comment of allComments) {
 		if (comment.parent_idx === parentIdx) {
-			const children = buildCommentTree(
-				allComments,
-				comment.idx
-			);
+			const children = buildCommentTree(allComments, comment.idx);
 
 			result.push({
 				idx: comment.idx,
@@ -225,15 +217,7 @@ function buildCommentTree(allComments, parentIdx = 0) {
 
 // 댓글 등록
 exports.postCommentCreate = async (req, res, next) => {
-	const {
-		board_idx,
-		parent_idx,
-		depth,
-		m_email,
-		m_name,
-		m_pwd,
-		c_contents,
-	} = req.body;
+	const { board_idx, parent_idx, depth, m_email, m_name, m_pwd, c_contents } = req.body;
 
 	let transaction;
 
@@ -352,14 +336,8 @@ exports.deleteCommentDestroy = async (req, res, next) => {
 		//console.log(req.level);
 		if (pass !== enumConfig.passTrueFalse.T[0]) {
 			for (const commentView of commentViews) {
-				if (
-					req.user !== commentView.m_email &&
-					req.level !== enumConfig.userLevel.USER_LV9
-				) {
-					errorHandler.errorThrow(
-						403,
-						'삭제 권한이 없습니다.'
-					);
+				if (req.user !== commentView.m_email && req.level !== enumConfig.userLevel.USER_LV9) {
+					errorHandler.errorThrow(403, '삭제 권한이 없습니다.');
 				}
 			}
 		}
@@ -401,10 +379,7 @@ exports.postCommentPassword = async (req, res, next) => {
 		}
 
 		if (password !== commentView.m_pwd) {
-			errorHandler.errorThrow(
-				enumConfig.statusErrorCode._404_ERROR[0],
-				'비밀번호가 다릅니다.'
-			);
+			errorHandler.errorThrow(enumConfig.statusErrorCode._404_ERROR[0], '비밀번호가 다릅니다.');
 		}
 
 		errorHandler.successThrow(res, '', '');

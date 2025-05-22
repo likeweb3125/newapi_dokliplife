@@ -1,13 +1,6 @@
 const moment = require('moment');
 const { Op, Sequelize } = require('sequelize');
-const {
-	i_member,
-	i_member_level,
-	i_board,
-	i_board_comment,
-	i_member_login,
-	i_member_sec,
-} = require('../models');
+const { i_member, i_member_level, i_board, i_board_comment, i_member_login, i_member_sec } = require('../models');
 
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
@@ -132,10 +125,7 @@ exports.getMemberList = async (req, res, next) => {
 
 		const lastPage = Math.ceil(memberList.count / limit);
 		const maxPage = 10;
-		const startPage = Math.max(
-			1,
-			Math.floor((page - 1) / maxPage) * maxPage + 1
-		);
+		const startPage = Math.max(1, Math.floor((page - 1) / maxPage) * maxPage + 1);
 		const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
 		const memberResult = memberList.rows.map((list) => ({
@@ -143,9 +133,7 @@ exports.getMemberList = async (req, res, next) => {
 			m_email: list.m_email,
 			m_name: list.m_name,
 			m_level: list.m_level,
-			reg_date: moment
-				.utc(list.reg_date)
-				.format('YYYY.MM.DD hh:mm'),
+			reg_date: moment.utc(list.reg_date).format('YYYY.MM.DD HH:mm'),
 			m_mobile: list.m_mobile,
 			log_cnt: list.getDataValue('log_cnt'),
 			board_cnt: list.getDataValue('board_cnt'),
@@ -213,33 +201,21 @@ exports.getMemberView = async (req, res, next) => {
 			m_sms_yn:
 				memberView.m_sms_yn === enumConfig.receiptType.Y[0]
 					? enumConfig.receiptType.Y
-					: memberView.m_sms_yn ===
-					  enumConfig.receiptType.N[0]
+					: memberView.m_sms_yn === enumConfig.receiptType.N[0]
 					? enumConfig.receiptType.N
 					: null,
 			m_mail_yn:
 				memberView.m_mail_yn === enumConfig.receiptType.Y[0]
 					? enumConfig.receiptType.Y
-					: memberView.m_mail_yn ===
-					  enumConfig.receiptType.N[0]
+					: memberView.m_mail_yn === enumConfig.receiptType.N[0]
 					? enumConfig.receiptType.N
 					: null,
 			m_menu_auth:
 				memberView.m_level === 9
-					? memberView.m_menu_auth
-							.split(',')
-							.map(
-								(key) =>
-									enumConfig
-										.adminMenu[
-										`M${key}`
-									]
-							)
+					? memberView.m_menu_auth.split(',').map((key) => enumConfig.adminMenu[`M${key}`])
 					: null,
 			m_memo: memberView.m_memo,
-			reg_date: moment
-				.utc(memberView.reg_date)
-				.format('YYYY.MM.DD hh:mm'),
+			reg_date: moment.utc(memberView.reg_date).format('YYYY.MM.DD HH:mm'),
 		};
 
 		errorHandler.successThrow(res, '', memberObj);
@@ -251,16 +227,7 @@ exports.getMemberView = async (req, res, next) => {
 //회원 수정
 // 2023.09.11 ash
 exports.putMemberUpdate = async (req, res, next) => {
-	const {
-		m_email,
-		m_name,
-		m_mobile,
-		m_level,
-		m_menu_auth,
-		m_memo,
-		m_sms_yn,
-		m_mail_yn,
-	} = req.body;
+	const { m_email, m_name, m_mobile, m_level, m_menu_auth, m_memo, m_sms_yn, m_mail_yn } = req.body;
 
 	try {
 		const memberView = await i_member.findOne({
@@ -451,22 +418,12 @@ exports.getSmsList = async (req, res, next) => {
 			limit: limit,
 			where: whereCondition,
 			order: orderField,
-			attributes: [
-				'idx',
-				'm_email',
-				'm_name',
-				'm_level',
-				'reg_date',
-				'm_mobile',
-			],
+			attributes: ['idx', 'm_email', 'm_name', 'm_level', 'reg_date', 'm_mobile'],
 		});
 
 		const lastPage = Math.ceil(memberList.count / limit);
 		const maxPage = 10;
-		const startPage = Math.max(
-			1,
-			Math.floor((page - 1) / maxPage) * maxPage + 1
-		);
+		const startPage = Math.max(1, Math.floor((page - 1) / maxPage) * maxPage + 1);
 		const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
 		const memberResult = memberList.rows.map((list) => ({
@@ -474,9 +431,7 @@ exports.getSmsList = async (req, res, next) => {
 			m_email: list.m_email,
 			m_name: list.m_name,
 			m_level: list.m_level,
-			reg_date: moment
-				.utc(list.reg_date)
-				.format('YYYY.MM.DD hh:mm'),
+			reg_date: moment.utc(list.reg_date).format('YYYY.MM.DD HH:mm'),
 			m_mobile: list.m_mobile,
 		}));
 
@@ -571,18 +526,13 @@ exports.getSecessionList = async (req, res, next) => {
 
 		const lastPage = Math.ceil(secessionList.count / limit);
 		const maxPage = 10;
-		const startPage = Math.max(
-			1,
-			Math.floor((page - 1) / maxPage) * maxPage + 1
-		);
+		const startPage = Math.max(1, Math.floor((page - 1) / maxPage) * maxPage + 1);
 		const endPage = Math.min(lastPage, startPage + maxPage - 1);
 
 		const secessionResult = secessionList.rows.map((list) => ({
 			id: list.id,
 			m_email: list.m_email,
-			sec_date: moment
-				.utc(list.sec_date)
-				.format('YYYY.MM.DD hh:mm'),
+			sec_date: moment.utc(list.sec_date).format('YYYY.MM.DD HH:mm'),
 		}));
 
 		errorHandler.successThrow(res, '', {
@@ -632,10 +582,7 @@ exports.postSecessionDestroy = async (req, res, next) => {
 			});
 
 			if (!secessionDelete) {
-				errorHandler.errorThrow(
-					404,
-					'탈퇴 로그 삭제 실패.'
-				);
+				errorHandler.errorThrow(404, '탈퇴 로그 삭제 실패.');
 			}
 		}
 
