@@ -42,6 +42,7 @@ const corsOptions = {
 	origin: [
 		'http://api.likeweb.co.kr:5001/',
 		'http://api.likeweb.co.kr/',
+		'https://api.likeweb.co.kr/',
 		'http://localhost:5001',
 		'http://localhost:3002',
 		'http://localhost:3007',
