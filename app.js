@@ -60,6 +60,8 @@ const corsOptions = {
 		'http://cielodoor.com',
 		'http://www.cielodoor.com',
 		'http://official.likeweb.co.kr',
+		'http://skytofamily.com/',
+		'http://www.skytofamily.com/',
 	], // 리액트  localhost 3000
 	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
