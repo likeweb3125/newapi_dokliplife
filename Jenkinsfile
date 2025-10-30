@@ -4,8 +4,8 @@ pipeline {
     environment {
         REPO_URL   = 'https://github.com/likeweb3125/basic_sobasic_solution_apilution.git'
         APP_DIR    = '//home/likeweb/basic/api.likeweb.co.kr'
-        // RECIPIENTS = 'ohsjwe@likeweb.co.kr,shan@likeweb.co.kr,crazin@likeweb.co.kr'
-        RECIPIENTS = 'crazin@likeweb.co.kr'
+        RECIPIENTS = 'ohsjwe@likeweb.co.kr,shan@likeweb.co.kr,crazin@likeweb.co.kr'
+        // RECIPIENTS = 'crazin@likeweb.co.kr'
     }
 
     stages {
@@ -34,7 +34,7 @@ pipeline {
             }
         }
 
-        stage('Rolling Deploy v1 -> v2') {
+        stage('Deploy2') {
             steps {
                 script {
                     // v1 배포 및 헬스체크
