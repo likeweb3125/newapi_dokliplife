@@ -7,6 +7,9 @@
 //                베이직 솔루션
 */
 
+// 환경 변수 로드 (가장 먼저 실행)
+require('dotenv').config();
+
 const http = require('http');
 const express = require('express');
 const app = express();
@@ -34,34 +37,15 @@ const adminStatisticsRoutes = require('./src/routes/statistics');
 const adminMaintenanceRoutes = require('./src/routes/maintenance');
 
 const mailGunRoutes = require('./src/routes/mailGun');
+const gosiwonRoutes = require('./src/routes/gosiwon');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
 
 const corsOptions = {
 	origin: [
-		'http://api.likeweb.co.kr:5001/',
-		'http://api.likeweb.co.kr/',
-		'https://api.likeweb.co.kr/',
-		'http://localhost:5001',
-		'http://localhost:3002',
-		'http://localhost:3007',
-		'http://localhost:3000',
-		'http://localhost:3021',
-		'http://react.likeweb.co.kr',
-		'https://react.likeweb.co.kr',
-		'http://likeweb.co.kr',
-		'https://likeweb.co.kr',
-		'http://www.likeweb.co.kr',
-		'https://www.likeweb.co.kr',
-		'http://woodism.likeweb.kr',
-		'http://woodismcity.org',
-		'http://www.woodismcity.org',
-		'http://cielodoor.com',
-		'http://www.cielodoor.com',
-		'http://official.likeweb.co.kr',
-		'http://skytofamily.com',
-		'http://www.skytofamily.com',
+		'http://localhost:3050/',
+		'https://dokliplife.likeweb.co.kr/',
 	], // 리액트  localhost 3000
 	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
@@ -76,9 +60,8 @@ app.use(bodyParser.json());
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
 // logs
-app.use((req, res, next) => {
-	logs(req, res, next);
-	next();
+app.use(async (req, res, next) => {
+	await logs(req, res, next);
 });
 
 // Routes
@@ -101,6 +84,9 @@ app.use('/v1/admin/maintenance', adminMaintenanceRoutes);
 
 // 메일 Send
 app.use('/v1/mailGun', mailGunRoutes);
+
+// 고시원 Routes
+app.use('/v1/gosiwon', gosiwonRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to LIKE WEB BASIC REST API');

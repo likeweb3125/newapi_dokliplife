@@ -1,6 +1,11 @@
 const enumConfig = require('./enum');
 
 exports.statusCodeReturn = (err, req, res, next) => {
+   // 이미 응답이 전송되었는지 확인
+   if (res.headersSent) {
+      return;
+   }
+   
    console.error(err); // Log the error for debugging (you can customize this)
 
    const statusCode =
@@ -16,6 +21,11 @@ exports.statusCodeReturn = (err, req, res, next) => {
 };
 
 exports.routesStatusCode = (req, res, next) => {
+   // 이미 응답이 전송되었는지 확인
+   if (res.headersSent) {
+      return;
+   }
+   
    const statusCode = enumConfig.statusErrorCode._404_ERROR[0];
    const message = enumConfig.statusErrorCode._404_ERROR[1];
 

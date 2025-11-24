@@ -1,48 +1,37 @@
 const requestIp = require('request-ip');
 const parseurl = require('parseurl');
 
-const { Op } = require('sequelize');
-const { i_logs } = require('../models');
-const { accessVerify } = require('../middleware/jwt');
+// i_logs 테이블 저장 기능 제거
+// const { Op } = require('sequelize');
+// const { i_logs } = require('../models');
+// const { accessVerify } = require('../middleware/jwt');
 
 exports.logs = async (req, res, next) => {
-   const authHeader = req.get('Authorization') || ' ';
-
-   let decodedTokenUser = null;
-   if (!authHeader) {
-      const token = authHeader.split(' ')[1];
-      let decodedToken = null;
-      decodedToken = accessVerify(token);
-      if (decodedToken.decoded !== null) {
-         decodedTokenUser = decodedToken.decoded.user;
-      }
-   }
-
-   //const previousUrl = req.headers.referer;
+   // 로그 정보 수집 (DB 저장 없이 콘솔만 출력)
    const previousUrl = parseurl(req).path;
    const clientIp = requestIp.getClientIp(req);
    const userAgent = req.get('user-agent');
 
-   //const normalizedClientIp = clientIp.substring(clientIp.lastIndexOf(':') + 1);
    const normalizedClientIp = clientIp.includes(':')
       ? clientIp.split(':').pop()
       : clientIp;
 
+   // 콘솔 로그만 출력 (DB 저장 제거)
    console.log('previousUrl:', clientIp);
    console.log('clientIp:', normalizedClientIp);
-   //    console.log('userAgent:', userAgent);
+   // console.log('userAgent:', userAgent);
 
-   try {
-      const log = await i_logs.create({
-         user: decodedTokenUser,
-         clientIp: normalizedClientIp,
-         userAgent: userAgent,
-         previousUrl: previousUrl,
-      });
+   // DB 저장 로직 제거
+   // try {
+   //    const log = await i_logs.create({
+   //       user: decodedTokenUser,
+   //       clientIp: normalizedClientIp,
+   //       userAgent: userAgent,
+   //       previousUrl: previousUrl,
+   //    });
+   // } catch (err) {
+   //    next(err);
+   // }
 
-      //console.log('Log inserted successfully:', log.toJSON());
-      //   res.sendStatus(200);
-   } catch (err) {
-      next(err);
-   }
+   next();
 };
