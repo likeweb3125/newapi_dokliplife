@@ -89,7 +89,7 @@ app.use('/v1/mailGun', mailGunRoutes);
 app.use('/v1/gosiwon', gosiwonRoutes);
 
 app.get('/', (req, res) => {
-	res.send('Welcome to LIKE WEB BASIC REST API');
+	res.send('Welcome to Doklip Life REST API');
 });
 
 app.use(errorHandler.routesStatusCode);

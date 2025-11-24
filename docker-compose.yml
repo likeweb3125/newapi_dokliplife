@@ -1,13 +1,13 @@
 version: '3.8'
 services:
   node-app:
-    container_name: api-likeweb-co-kr
+    container_name: new-api-dokliplife
     build:
       context: .
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "3003:5001"
+      - "3055:5001"
     volumes:
       - .:/app
       - /app/node_modules

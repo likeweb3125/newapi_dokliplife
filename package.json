@@ -1,7 +1,7 @@
 {
-  "name": "basic_solution",
+  "name": "dokliplife_api_likeweb",
   "version": "1.0.0",
-  "description": "basic solution",
+  "description": "dokliplife_api by likeweb",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
