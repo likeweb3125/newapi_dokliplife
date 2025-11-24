@@ -39,27 +39,15 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		verifyAdminToken(req);
 
 		// 요청 파라미터 확인
-		const { searchType, searchValue } = req.body;
+		const { esntID } = req.body;
 
-		if (!searchType || !searchValue) {
-			errorHandler.errorThrow(400, '검색 종류와 검색어를 입력해주세요.');
+		if (!esntID) {
+			errorHandler.errorThrow(400, 'esntID를 입력해주세요.');
 		}
 
-		// 검색 종류 검증 (esntID 또는 name만 허용)
-		if (searchType !== 'esntID' && searchType !== 'name') {
-			errorHandler.errorThrow(400, '검색 종류는 esntID 또는 name만 가능합니다.');
-		}
-
-		// 검색 조건 설정
-		let whereCondition = {};
-
-		if (searchType === 'esntID') {
-			whereCondition.esntlId = searchValue;
-		} else if (searchType === 'name') {
-			whereCondition.name = {
-				[Op.like]: `%${searchValue}%`,
-			};
-		}
+		const whereCondition = {
+			esntlId: esntID,
+		};
 
 		// 고시원 정보 조회
 		// 실제 테이블의 컬럼명을 확인하기 위해 attributes를 사용하지 않고 조회
@@ -98,13 +86,16 @@ exports.getGosiwonNames = async (req, res, next) => {
 					[Op.like]: `%${searchValue}%`,
 				},
 			},
-			attributes: ['name'],
+			attributes: ['name', 'esntlId'],
 			limit: take,
 			order: [['name', 'ASC']],
 			raw: true,
 		});
 
-		const names = gosiwonNames.map((item) => item.name);
+		const names = gosiwonNames.map((item) => ({
+			name: item.name,
+			esntID: item.esntlId,
+		}));
 
 		errorHandler.successThrow(res, '고시원 이름 목록 조회 성공', names);
 	} catch (err) {

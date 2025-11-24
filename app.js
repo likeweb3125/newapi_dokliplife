@@ -20,6 +20,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const bodyParser = require('body-parser');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./src/docs/swagger');
 
 const boardRoutes = require('./src/routes/board');
 const commentRoutes = require('./src/routes/comment');
@@ -58,6 +60,9 @@ app.use(bodyParser.urlencoded({ extended: true })); // x-www-form-urlencoded <fo
 app.use(bodyParser.json());
 
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
+
+// Swagger Docs
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // logs
 app.use(async (req, res, next) => {
