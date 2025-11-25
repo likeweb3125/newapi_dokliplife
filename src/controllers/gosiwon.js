@@ -87,7 +87,7 @@ exports.getGosiwonNames = async (req, res, next) => {
 					[Op.like]: `%${searchValue}%`,
 				},
 			},
-			attributes: ['name', 'esntlId'],
+			attributes: ['name', 'esntlId', 'address', 'is_controlled'],
 			limit: take,
 			order: [['name', 'ASC']],
 			raw: true,
@@ -96,6 +96,10 @@ exports.getGosiwonNames = async (req, res, next) => {
 		const names = gosiwonNames.map((item) => ({
 			name: item.name,
 			esntID: item.esntlId,
+			address: item.address || '',
+			isControlled: Number(item.is_controlled) === 1 ? '관제' : '',
+			deposit: '보증급 관리',
+			settle: '정산지급',
 		}));
 
 		errorHandler.successThrow(res, '고시원 이름 목록 조회 성공', names);

@@ -109,6 +109,21 @@ router.post('/info', gosiwonController.getGosiwonInfo);
  *                         type: string
  *                       esntlID:
  *                         type: string
+ *                       address:
+ *                         type: string
+ *                         description: 고시원 주소
+ *                       isControlled:
+ *                         type: string
+ *                         description: 관제 여부 (관제 또는 빈 문자열)
+ *                         example: 관제
+ *                       deposit:
+ *                         type: string
+ *                         description: 보증급 관리 여부 (하드코딩)
+ *                         example: 보증급 관리
+ *                       settle:
+ *                         type: string
+ *                         description: 정산 지급 여부 (하드코딩)
+ *                         example: 정산지급
  *       400:
  *         description: 잘못된 요청
  *         content:
