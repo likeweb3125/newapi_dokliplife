@@ -188,7 +188,7 @@ router.post('/names', gosiwonController.getGosiwonNames);
  *             schema:
  *               $ref: '#/components/schemas/StandardError'
  */
-router.post('/favorite', gosiwonController.toggleFavorite);
+// router.post('/favorite', gosiwonController.toggleFavorite);
 
 module.exports = router;
 

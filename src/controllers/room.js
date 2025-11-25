@@ -34,15 +34,15 @@ exports.getRoomList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { esntlID, roomName } = req.body;
+		const { goID, roomName, sortBy } = req.body;
 
-		if (!esntlID) {
-			errorHandler.errorThrow(400, 'esntlID를 입력해주세요.');
+		if (!goID) {
+			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
 		}
 
-		// 기본 검색 조건: esntlID
+		// 기본 검색 조건: goID
 		const whereCondition = {
-			gosiwonEsntlId: esntlID,
+			gosiwonEsntlId: goID,
 		};
 
 		// roomName이 있으면 추가 검색 조건
@@ -52,8 +52,27 @@ exports.getRoomList = async (req, res, next) => {
 			};
 		}
 
+		// 정렬 기준 설정 (기본값: orderNo)
+		let orderBy = [['orderNo', 'ASC']];
+
+		if (sortBy) {
+			const sortMap = {
+				roomName: 'roomNumber',
+				roomStatus: 'status',
+				roomType: 'roomType',
+				winType: 'window',
+				rentFee: 'monthlyRent',
+			};
+
+			const sortColumn = sortMap[sortBy];
+			if (sortColumn) {
+				orderBy = [[sortColumn, 'ASC']];
+			}
+		}
+
 		const roomList = await room.findAll({
 			where: whereCondition,
+			order: orderBy,
 			raw: true,
 			// attributes를 지정하지 않아 모든 컬럼 반환
 		});

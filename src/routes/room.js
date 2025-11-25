@@ -15,7 +15,7 @@ const roomController = require('../controllers/room');
  * /v1/room/list:
  *   post:
  *     summary: 방 목록 조회
- *     description: 고시원 ID로 방 목록을 조회합니다. roomName이 제공되면 추가 필터링됩니다.
+ *     description: 고시원 ID로 방 목록을 조회합니다. roomName이 제공되면 추가 필터링되고, sortBy로 정렬 기준을 지정할 수 있습니다.
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -26,9 +26,9 @@ const roomController = require('../controllers/room');
  *           schema:
  *             type: object
  *             required:
- *               - esntlID
+ *               - goID
  *             properties:
- *               esntlID:
+ *               goID:
  *                 type: string
  *                 description: 고시원 고유 아이디
  *                 example: GOSI0000002130
@@ -36,6 +36,11 @@ const roomController = require('../controllers/room');
  *                 type: string
  *                 description: 방이름 (선택사항, 부분 일치 검색)
  *                 example: 101
+ *               sortBy:
+ *                 type: string
+ *                 description: 정렬 기준 (선택사항, 기본값은 orderNo 오름차순)
+ *                 enum: [roomName, roomStatus, roomType, winType, rentFee]
+ *                 example: rentFee
  *     responses:
  *       200:
  *         description: 방 목록 조회 성공
