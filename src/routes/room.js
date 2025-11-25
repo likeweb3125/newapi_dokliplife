@@ -15,7 +15,7 @@ const roomController = require('../controllers/room');
  * /v1/room/list:
  *   post:
  *     summary: 방 목록 조회
- *     description: 고시원 ID로 방 목록을 조회합니다. roomName이 제공되면 추가 필터링되고, sortBy로 정렬 기준을 지정할 수 있습니다.
+ *     description: 고시원 ID로 방 목록을 조회합니다. roomName이 제공되면 추가 필터링되고, sortBy로 정렬 기준을 지정할 수 있습니다. 정렬 기준은 roomName, roomStatus, roomType, winType, rentFee입니다. 기본값은 orderNo 오름차순입니다.
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
