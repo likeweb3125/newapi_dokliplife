@@ -50,6 +50,7 @@ db.i_policy = require('./policy')(mariaDBSequelize, Sequelize);
 db.i_mailGun = require('./mailGun')(mariaDBSequelize, Sequelize);
 
 db.gosiwon = require('./gosiwon')(mariaDBSequelize, Sequelize);
+db.room = require('./room')(mariaDBSequelize, Sequelize);
 
 db.i_category.hasMany(db.i_board, { as: 'iboard' });
 db.i_board.belongsTo(db.i_category, {

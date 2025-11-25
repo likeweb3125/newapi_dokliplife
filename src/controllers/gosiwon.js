@@ -39,14 +39,14 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		verifyAdminToken(req);
 
 		// 요청 파라미터 확인
-		const { esntID } = req.body;
+		const { esntlID } = req.body;
 
-		if (!esntID) {
-			errorHandler.errorThrow(400, 'esntID를 입력해주세요.');
+		if (!esntlID) {
+			errorHandler.errorThrow(400, 'esntlID 입력해주세요.');
 		}
 
 		const whereCondition = {
-			esntlId: esntID,
+			esntlId: esntlID,
 		};
 
 		// 고시원 정보 조회
@@ -54,6 +54,7 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		const gosiwonInfo = await gosiwon.findOne({
 			where: whereCondition,
 			raw: true,
+			logging: console.log, // 실제 SQL 쿼리 확인용
 		});
 
 		if (!gosiwonInfo) {
@@ -98,6 +99,68 @@ exports.getGosiwonNames = async (req, res, next) => {
 		}));
 
 		errorHandler.successThrow(res, '고시원 이름 목록 조회 성공', names);
+	} catch (err) {
+		next(err);
+	}
+};
+
+// 고시원 즐겨찾기 토글
+exports.toggleFavorite = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { esntlID } = req.body;
+
+		if (!esntlID) {
+			errorHandler.errorThrow(400, 'esntlID 입력해주세요.');
+		}
+
+		// 고시원 정보 조회
+		const gosiwonInfo = await gosiwon.findOne({
+			where: {
+				esntlId: esntlID,
+			},
+			raw: true,
+		});
+
+		if (!gosiwonInfo) {
+			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
+		}
+
+		// 현재 즐겨찾기 상태 확인 및 토글
+		const currentFavorite = gosiwonInfo.is_favorite || 0;
+		const newFavorite = currentFavorite === 1 ? 0 : 1;
+
+		// 즐겨찾기 상태 업데이트
+		await gosiwon.update(
+			{
+				is_favorite: newFavorite,
+			},
+			{
+				where: {
+					esntlId: esntlID,
+				},
+			}
+		);
+
+		// 업데이트된 정보 반환
+		const updatedInfo = await gosiwon.findOne({
+			where: {
+				esntlId: esntlID,
+			},
+			attributes: ['esntlId', 'name', 'is_favorite'],
+			raw: true,
+		});
+
+		errorHandler.successThrow(
+			res,
+			`즐겨찾기 ${newFavorite === 1 ? '추가' : '제거'} 성공`,
+			{
+				esntlID: updatedInfo.esntlId,
+				name: updatedInfo.name,
+				isFavorite: updatedInfo.is_favorite === 1,
+			}
+		);
 	} catch (err) {
 		next(err);
 	}

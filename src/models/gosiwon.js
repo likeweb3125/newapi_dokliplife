@@ -263,6 +263,13 @@ module.exports = (sequelize, DataTypes) => {
 				defaultValue: 0,
 				comment: '관제서비스 이용 여부',
 			},
+			is_favorite: {
+				type: DataTypes.TINYINT(1),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'is_favorite',
+				comment: '즐겨찾기 여부',
+			},
 			district: {
 				type: DataTypes.STRING(50),
 				allowNull: true,

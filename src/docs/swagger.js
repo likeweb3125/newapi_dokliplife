@@ -41,6 +41,64 @@ const options = {
 					},
 				},
 			},
+			responses: {
+				BadRequest: {
+					description: '잘못된 요청',
+					content: {
+						'application/json': {
+							schema: {
+								$ref: '#/components/schemas/StandardError',
+							},
+							example: {
+								statusCode: 400,
+								message: '잘못된 요청입니다.',
+							},
+						},
+					},
+				},
+				Unauthorized: {
+					description: '인증 실패 (토큰 없음 또는 유효하지 않음)',
+					content: {
+						'application/json': {
+							schema: {
+								$ref: '#/components/schemas/StandardError',
+							},
+							example: {
+								statusCode: 401,
+								message: '토큰이 없습니다.',
+							},
+						},
+					},
+				},
+				NotFound: {
+					description: '리소스를 찾을 수 없음',
+					content: {
+						'application/json': {
+							schema: {
+								$ref: '#/components/schemas/StandardError',
+							},
+							example: {
+								statusCode: 404,
+								message: '리소스를 찾을 수 없습니다.',
+							},
+						},
+					},
+				},
+				InternalServerError: {
+					description: '서버 내부 오류',
+					content: {
+						'application/json': {
+							schema: {
+								$ref: '#/components/schemas/StandardError',
+							},
+							example: {
+								statusCode: 500,
+								message: '서버 내부 오류가 발생했습니다.',
+							},
+						},
+					},
+				},
+			},
 		},
 		security: [
 			{
