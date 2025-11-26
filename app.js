@@ -63,7 +63,12 @@ app.use(bodyParser.json());
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
 // Swagger Docs
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+const swaggerUiOptions = {
+	swaggerOptions: {
+		persistAuthorization: true,
+	},
+};
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
 // logs
 app.use(async (req, res, next) => {

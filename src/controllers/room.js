@@ -83,3 +83,31 @@ exports.getRoomList = async (req, res, next) => {
 	}
 };
 
+// 방 정보 조회
+exports.getRoomInfo = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { esntlID } = req.body;
+
+		if (!esntlID) {
+			errorHandler.errorThrow(400, 'esntlID를 입력해주세요.');
+		}
+
+		const roomInfo = await room.findOne({
+			where: {
+				esntlId: esntlID,
+			},
+			raw: true,
+		});
+
+		if (!roomInfo) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+
+		errorHandler.successThrow(res, '방 정보 조회 성공', roomInfo);
+	} catch (err) {
+		next(err);
+	}
+};
+
