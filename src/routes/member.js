@@ -4,62 +4,285 @@ const router = express.Router();
 const memberController = require('../controllers/member');
 const isAuthMiddleware = require('../middleware/is-auth');
 
-router.get(
-	'/list',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.getMemberList
-); //관리자 페이지 회원 리스트
-
-router.get(
-	'/level',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.getMemberLevel
-); //관리자 페이지 회원 레벨
-
-router.get(
-	'/view/:idx',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.getMemberView
-); //관리자 페이지 회원
-
-router.put('/', isAuthMiddleware.isAuthAdmin, memberController.putMemberUpdate); //관리자 페이지 회원 수정
-
-router.delete(
-	'/',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.deleteMemberDestroy
-); //관리자 페이지 회원 탈퇴
-
-router.put(
-	'/lvUpdate',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.putMemberLvUpdate
-); //관리자 페이지 회원 등급 변경
-
-router.get('/sms', isAuthMiddleware.isAuthAdmin, memberController.getSmsList); //관리자 페이지 SMS 전송 회원
-
-router.get(
-	'/sms-txt',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.getSmsTextList
-); //관리자 페이지 SMS 전송 문구
-
-router.put(
-	'/sms-txt',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.putSmsTextUpdate
-); //관리자 페이지 SMS 전송 문구 수정
-
-router.get(
-	'/sec',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.getSecessionList
-); //관리자 페이지 회원 탈퇴 리스트
-
+/**
+ * @swagger
+ * /v1/admin/member/customer/register:
+ *   post:
+ *     summary: 회원 등록
+ *     description: customer 테이블에 새로운 회원을 등록합니다. byAdmin이 true이면 isByAdmin이 1로 저장됩니다.
+ *     tags: [Member]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - phone
+ *               - id
+ *               - pass
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: 회원 이름
+ *                 example: 홍길동
+ *               gender:
+ *                 type: string
+ *                 description: 성별 (남/여/선택 안함)
+ *                 example: 남
+ *               phone:
+ *                 type: string
+ *                 description: 휴대폰 번호
+ *                 example: "01012345678"
+ *               id:
+ *                 type: string
+ *                 format: email
+ *                 description: 이메일 (로그인 시 사용)
+ *                 example: test@example.com
+ *               pass:
+ *                 type: string
+ *                 description: 비밀번호 (영문+숫자+특수문자 6자리 이상)
+ *                 example: password123!
+ *               byAdmin:
+ *                 type: boolean
+ *                 description: 관리자 등록 여부 (true이면 isByAdmin이 1로 저장)
+ *                 example: true
+ *               cusCollectYn:
+ *                 type: string
+ *                 description: 개인정보 수집 및 이용 동의 (Y/N, 기본 N)
+ *                 example: Y
+ *               cusLocationYn:
+ *                 type: string
+ *                 description: 위치정보 이용 약관 동의 (Y/N, 기본 N)
+ *                 example: N
+ *               cusPromotionYn:
+ *                 type: string
+ *                 description: 프로모션 정보 수신 동의 (Y/N, 기본 N)
+ *                 example: Y
+ *           example:
+ *             name: 홍길동
+ *             gender: 남
+ *             phone: "01012345678"
+ *             id: test@example.com
+ *             pass: password123!
+ *             byAdmin: true
+ *             cusCollectYn: Y
+ *             cusLocationYn: N
+ *             cusPromotionYn: Y
+ *     responses:
+ *       200:
+ *         description: 회원 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 회원 등록 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 고유 아이디
+ *                       example: 550e8400-e29b-41d4-a716-446655440000
+ *                     id:
+ *                       type: string
+ *                       description: 이메일
+ *                       example: test@example.com
+ *                     name:
+ *                       type: string
+ *                       description: 회원 이름
+ *                       example: 홍길동
+ *       400:
+ *         description: 잘못된 요청 (필수 필드 누락 또는 이메일 중복)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ *             examples:
+ *               missingField:
+ *                 value:
+ *                   statusCode: 400
+ *                   message: 이름을 입력해주세요.
+ *               duplicateEmail:
+ *                 value:
+ *                   statusCode: 400
+ *                   message: 이미 등록된 이메일입니다.
+ *       500:
+ *         description: 서버 내부 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ */
 router.post(
-	'/sec',
-	isAuthMiddleware.isAuthAdmin,
-	memberController.postSecessionDestroy
-); //관리자 페이지 회원 탈퇴 정보 영구 삭제
+	'/customer/register',
+	memberController.postCustomerRegister
+); //회원 등록 (customer 테이블)
+
+/**
+ * @swagger
+ * /v1/admin/member/customer/login:
+ *   post:
+ *     summary: 회원 로그인
+ *     description: customer 테이블의 id와 비밀번호로 로그인합니다.
+ *     tags: [Member]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *               - pass
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 format: email
+ *                 description: 회원 아이디(이메일)
+ *                 example: test@example.com
+ *               pass:
+ *                 type: string
+ *                 description: 로그인 비밀번호
+ *                 example: password123!
+ *     responses:
+ *       200:
+ *         description: 로그인 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *       400:
+ *         description: 필수 값 누락
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ *       401:
+ *         description: 비밀번호 불일치
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ *       404:
+ *         description: 회원 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ */
+router.post('/customer/login', memberController.postCustomerLogin); //회원 로그인
+
+/**
+ * @swagger
+ * /v1/admin/member/customer:
+ *   put:
+ *     summary: 회원 정보 수정
+ *     description: esntlId를 기준으로 customer 정보를 수정합니다. 전달한 필드만 업데이트됩니다.
+ *     tags: [Member]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - esntlId
+ *             properties:
+ *               esntlId:
+ *                 type: string
+ *                 description: "회원 고유 아이디 (예: CUTR0000000001)"
+ *               name:
+ *                 type: string
+ *               gender:
+ *                 type: string
+ *                 description: M/F 로 저장됩니다.
+ *               phone:
+ *                 type: string
+ *               id:
+ *                 type: string
+ *                 format: email
+ *               pass:
+ *                 type: string
+ *                 description: 새 비밀번호
+ *               cusCollectYn:
+ *                 type: string
+ *                 description: 개인정보 수집 동의 (Y/N)
+ *               cusLocationYn:
+ *                 type: string
+ *                 description: 위치정보 동의 (Y/N)
+ *               cusPromotionYn:
+ *                 type: string
+ *                 description: 프로모션 수신 동의 (Y/N)
+ *           example:
+ *             esntlId: CUTR0000000001
+ *             name: 수정된 이름
+ *             gender: F
+ *             phone: 01099998888
+ *             cusCollectYn: Y
+ *             cusLocationYn: Y
+ *             cusPromotionYn: Y
+ *     responses:
+ *       200:
+ *         description: 회원 정보 수정 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                     updatedFields:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *       400:
+ *         description: 잘못된 요청
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ *       404:
+ *         description: 회원을 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ *       500:
+ *         description: 서버 내부 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ */
+router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (customer 테이블)
 
 module.exports = router;
