@@ -80,7 +80,7 @@ exports.getCategoryList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { goID } = req.body;
+		const { goID } = req.query;
 
 		if (!goID) {
 			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
@@ -277,7 +277,7 @@ exports.deleteCategory = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { categoryID } = req.body;
+		const { categoryID } = req.query;
 
 		if (!categoryID) {
 			errorHandler.errorThrow(400, 'categoryID를 입력해주세요.');

@@ -6,26 +6,20 @@ const gosiwonController = require('../controllers/gosiwon');
 /**
  * @swagger
  * /v1/gosiwon/info:
- *   post:
+ *   get:
  *     summary: 고시원 상세 정보 조회
- *     description: searchType과 searchValue로 고시원 정보를 조회합니다.
+ *     description: esntlId로 고시원 정보를 조회합니다.
  *     tags: [Gosiwon]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - esntlID
- *             properties:
- *               esntlID:
- *                 type: string
- *                 description: 고시원 고유아이디
- *             example:
- *               esntlID: GOSI0000002130
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유아이디
+ *         example: GOSI0000002130
  *     responses:
  *       200:
  *         description: 고시원 정보 조회 성공
@@ -59,35 +53,32 @@ const gosiwonController = require('../controllers/gosiwon');
  *             schema:
  *               $ref: '#/components/schemas/StandardError'
  */
-router.post('/info', gosiwonController.getGosiwonInfo);
+router.get('/info', gosiwonController.getGosiwonInfo);
 
 /**
  * @swagger
  * /v1/gosiwon/names:
- *   post:
+ *   get:
  *     summary: 고시원 이름 검색
  *     description: 검색어를 포함한 고시원 이름 목록을 반환합니다.
  *     tags: [Gosiwon]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - searchValue
- *             properties:
- *               searchValue:
- *                 type: string
- *                 description: 검색할 이름
- *               limit:
- *                 type: integer
- *                 description: 최대 반환 개수 (기본 10)
- *             example:
- *               searchValue: 성수
- *               limit: 5
+ *     parameters:
+ *       - in: query
+ *         name: searchValue
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 검색할 이름
+ *         example: 성수
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: 최대 반환 개수 (기본 10)
+ *         example: 5
  *     responses:
  *       200:
  *         description: 고시원 이름 목록 조회 성공
@@ -107,7 +98,7 @@ router.post('/info', gosiwonController.getGosiwonInfo);
  *                     properties:
  *                       name:
  *                         type: string
- *                       esntlID:
+ *                       esntlId:
  *                         type: string
  *                       address:
  *                         type: string
@@ -137,12 +128,12 @@ router.post('/info', gosiwonController.getGosiwonInfo);
  *             schema:
  *               $ref: '#/components/schemas/StandardError'
  */
-router.post('/names', gosiwonController.getGosiwonNames);
+router.get('/names', gosiwonController.getGosiwonNames);
 
 /**
  * @swagger
  * /v1/gosiwon/favorite:
- *   post:
+ *   patch:
  *     summary: 고시원 즐겨찾기 토글
  *     description: 고시원의 즐겨찾기 상태를 토글합니다. 체크박스 방식으로 사용됩니다.
  *     tags: [Gosiwon]
@@ -155,13 +146,13 @@ router.post('/names', gosiwonController.getGosiwonNames);
  *           schema:
  *             type: object
  *             required:
- *               - esntlID
+ *               - esntlId
  *             properties:
- *               esntlID:
+ *               esntlId:
  *                 type: string
  *                 description: 고시원 고유아이디
  *             example:
- *               esntlID: GOSI0000002130
+ *               esntlId: GOSI0000002130
  *     responses:
  *       200:
  *         description: 즐겨찾기 토글 성공
@@ -177,7 +168,7 @@ router.post('/names', gosiwonController.getGosiwonNames);
  *                 data:
  *                   type: object
  *                   properties:
- *                     esntlID:
+ *                     esntlId:
  *                       type: string
  *                     name:
  *                       type: string
@@ -203,7 +194,7 @@ router.post('/names', gosiwonController.getGosiwonNames);
  *             schema:
  *               $ref: '#/components/schemas/StandardError'
  */
-// router.post('/favorite', gosiwonController.toggleFavorite);
+router.patch('/favorite', gosiwonController.toggleFavorite);
 
 module.exports = router;
 

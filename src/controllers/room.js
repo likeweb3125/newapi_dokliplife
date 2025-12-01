@@ -34,7 +34,7 @@ exports.getRoomList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { goID, roomName, sortBy } = req.body;
+		const { goID, roomName, sortBy } = req.query;
 
 		if (!goID) {
 			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
@@ -88,7 +88,7 @@ exports.getRoomInfo = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { esntlID } = req.body;
+		const { esntlID } = req.query;
 
 		if (!esntlID) {
 			errorHandler.errorThrow(400, 'esntlID를 입력해주세요.');

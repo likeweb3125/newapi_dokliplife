@@ -39,14 +39,14 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		verifyAdminToken(req);
 
 		// 요청 파라미터 확인
-		const { esntlID } = req.body;
+		const { esntlId } = req.query;
 
-		if (!esntlID) {
-			errorHandler.errorThrow(400, 'esntlID 입력해주세요.');
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId 입력해주세요.');
 		}
 
 		const whereCondition = {
-			esntlId: esntlID,
+			esntlId: esntlId,
 		};
 
 		// 고시원 정보 조회
@@ -73,7 +73,7 @@ exports.getGosiwonNames = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { searchValue, limit } = req.body;
+		const { searchValue, limit } = req.query;
 
 		if (!searchValue) {
 			errorHandler.errorThrow(400, '검색어를 입력해주세요.');
@@ -113,16 +113,16 @@ exports.toggleFavorite = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { esntlID } = req.body;
+		const { esntlId } = req.body;
 
-		if (!esntlID) {
-			errorHandler.errorThrow(400, 'esntlID 입력해주세요.');
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId 입력해주세요.');
 		}
 
 		// 고시원 정보 조회
 		const gosiwonInfo = await gosiwon.findOne({
 			where: {
-				esntlId: esntlID,
+				esntlId: esntlId,
 			},
 			raw: true,
 		});
@@ -142,7 +142,7 @@ exports.toggleFavorite = async (req, res, next) => {
 			},
 			{
 				where: {
-					esntlId: esntlID,
+					esntlId: esntlId,
 				},
 			}
 		);
@@ -150,7 +150,7 @@ exports.toggleFavorite = async (req, res, next) => {
 		// 업데이트된 정보 반환
 		const updatedInfo = await gosiwon.findOne({
 			where: {
-				esntlId: esntlID,
+				esntlId: esntlId,
 			},
 			attributes: ['esntlId', 'name', 'is_favorite'],
 			raw: true,
@@ -160,7 +160,7 @@ exports.toggleFavorite = async (req, res, next) => {
 			res,
 			`즐겨찾기 ${newFavorite === 1 ? '추가' : '제거'} 성공`,
 			{
-				esntlID: updatedInfo.esntlId,
+				esntlId: updatedInfo.esntlId,
 				name: updatedInfo.name,
 				isFavorite: updatedInfo.is_favorite === 1,
 			}
