@@ -3,6 +3,7 @@ const router = express.Router();
 
 const roomController = require('../controllers/room');
 const roomCategoryController = require('../controllers/roomCategory');
+const roomMemoController = require('../controllers/roomMemo');
 
 /**
  * @swagger
@@ -303,6 +304,264 @@ router.patch('/category/update', roomCategoryController.updateCategory);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.delete('/category/delete', roomCategoryController.deleteCategory);
+
+/**
+ * @swagger
+ * /v1/room/memo/list:
+ *   get:
+ *     summary: 방 메모 목록 조회
+ *     description: 방 ID로 해당 방의 메모 목록을 조회합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디
+ *         example: ROOM0000022725
+ *     responses:
+ *       200:
+ *         description: 방 메모 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 메모 목록 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       memoID:
+ *                         type: string
+ *                         example: RMEM000000001
+ *                       roomEsntlId:
+ *                         type: string
+ *                         example: ROOM0000022725
+ *                       memo:
+ *                         type: string
+ *                         example: 방 상태 양호
+ *                       publicRange:
+ *                         type: integer
+ *                         example: 0
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/memo/list', roomMemoController.getRoomMemoList);
+
+/**
+ * @swagger
+ * /v1/room/memo/info:
+ *   get:
+ *     summary: 방 메모 상세 조회
+ *     description: 메모 ID로 방 메모 상세 정보를 조회합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: memoID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 메모 고유 아이디
+ *         example: RMEM000000001
+ *     responses:
+ *       200:
+ *         description: 방 메모 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 메모 정보 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     memoID:
+ *                       type: string
+ *                       example: RMEM000000001
+ *                     roomEsntlId:
+ *                       type: string
+ *                       example: ROOM0000022725
+ *                     memo:
+ *                       type: string
+ *                       example: 방 상태 양호
+ *                     publicRange:
+ *                       type: integer
+ *                       example: 0
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/memo/info', roomMemoController.getRoomMemoInfo);
+
+/**
+ * @swagger
+ * /v1/room/memo/create:
+ *   post:
+ *     summary: 방 메모 등록
+ *     description: 방에 메모를 등록합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomEsntlId
+ *             properties:
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *                 example: ROOM0000022725
+ *               memo:
+ *                 type: string
+ *                 description: 메모내용
+ *                 example: 방 상태 양호, 청소 완료
+ *               publicRange:
+ *                 type: integer
+ *                 description: '공개범위 (0: 비공개, 1: 공개)'
+ *                 example: 0
+ *     responses:
+ *       200:
+ *         description: 방 메모 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 메모 등록 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     memoID:
+ *                       type: string
+ *                       example: RMEM000000001
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/memo/create', roomMemoController.createRoomMemo);
+
+/**
+ * @swagger
+ * /v1/room/memo/update:
+ *   patch:
+ *     summary: 방 메모 수정
+ *     description: 방 메모 정보를 수정합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - memoID
+ *             properties:
+ *               memoID:
+ *                 type: string
+ *                 description: 방 메모 고유 아이디
+ *                 example: RMEM000000001
+ *               memo:
+ *                 type: string
+ *                 description: 메모내용
+ *                 example: 방 상태 양호, 청소 완료
+ *               publicRange:
+ *                 type: integer
+ *                 description: '공개범위 (0: 비공개, 1: 공개)'
+ *                 example: 0
+ *     responses:
+ *       200:
+ *         description: 방 메모 수정 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.patch('/memo/update', roomMemoController.updateRoomMemo);
+
+/**
+ * @swagger
+ * /v1/room/memo/delete:
+ *   delete:
+ *     summary: 방 메모 삭제
+ *     description: 방 메모를 삭제합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: memoID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 삭제할 방 메모 고유 아이디
+ *         example: RMEM000000001
+ *     responses:
+ *       200:
+ *         description: 방 메모 삭제 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/memo/delete', roomMemoController.deleteRoomMemo);
 
 module.exports = router;
 

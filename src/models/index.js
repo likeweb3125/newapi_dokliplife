@@ -55,6 +55,7 @@ db.roomCategory = require('./roomCategory')(mariaDBSequelize, Sequelize);
 db.roomCategoryOption = require('./roomCategoryOption')(mariaDBSequelize, Sequelize);
 db.customer = require('./customer')(mariaDBSequelize, Sequelize);
 db.parking = require('./parking')(mariaDBSequelize, Sequelize);
+db.roomMemo = require('./roomMemo')(mariaDBSequelize, Sequelize);
 
 db.i_category.hasMany(db.i_board, { as: 'iboard' });
 db.i_board.belongsTo(db.i_category, {
@@ -70,6 +71,17 @@ db.roomCategory.hasMany(db.roomCategoryOption, {
 db.roomCategoryOption.belongsTo(db.roomCategory, {
 	as: 'category',
 	foreignKey: 'categoryEsntlId',
+	targetKey: 'esntlId',
+});
+
+db.room.hasMany(db.roomMemo, {
+	as: 'memos',
+	foreignKey: 'roomEsntlId',
+	sourceKey: 'esntlId',
+});
+db.roomMemo.belongsTo(db.room, {
+	as: 'room',
+	foreignKey: 'roomEsntlId',
 	targetKey: 'esntlId',
 });
 
