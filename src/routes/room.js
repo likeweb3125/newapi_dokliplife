@@ -119,6 +119,244 @@ router.get('/info', roomController.getRoomInfo);
 
 /**
  * @swagger
+ * /v1/room/create:
+ *   post:
+ *     summary: 방 정보 등록
+ *     description: 새로운 방 정보를 등록합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - goID
+ *             properties:
+ *               goID:
+ *                 type: string
+ *                 description: 고시원 고유 아이디
+ *                 example: GOSI0000002130
+ *               roomNumber:
+ *                 type: string
+ *                 description: 방번호(이름)
+ *                 example: 101
+ *               roomType:
+ *                 type: string
+ *                 description: 방타입
+ *                 example: 원룸
+ *               deposit:
+ *                 type: integer
+ *                 description: 보증금
+ *                 example: 500000
+ *               monthlyRent:
+ *                 type: string
+ *                 description: 입실료
+ *                 example: 500000
+ *               startDate:
+ *                 type: string
+ *                 description: 입실일
+ *                 example: 2024-01-01
+ *               endDate:
+ *                 type: string
+ *                 description: 퇴실일
+ *                 example: 2024-12-31
+ *               window:
+ *                 type: string
+ *                 description: 창타입
+ *                 example: 남향
+ *               option:
+ *                 type: string
+ *                 description: 방옵션
+ *                 example: 에어컨, 냉장고
+ *               floor:
+ *                 type: string
+ *                 description: 층수
+ *                 example: 3층
+ *               intro:
+ *                 type: string
+ *                 description: 소개
+ *               status:
+ *                 type: string
+ *                 description: '방상태 (기본값: EMPTY)'
+ *                 example: EMPTY
+ *               month:
+ *                 type: string
+ *                 description: 월
+ *               description:
+ *                 type: string
+ *                 description: 방설명
+ *                 example: 깨끗하고 조용한 방입니다
+ *               youtube:
+ *                 type: string
+ *                 description: VR룸투어 URL
+ *                 example: https://youtube.com/watch?v=xxx
+ *               orderNo:
+ *                 type: integer
+ *                 description: '정렬순서 (기본값: 1)'
+ *                 example: 1
+ *               empty:
+ *                 type: string
+ *                 description: '빈방 여부 (기본값: 1)'
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: 방 정보 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 정보 등록 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlID:
+ *                       type: string
+ *                       example: ROOM0000022725
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/create', roomController.createRoom);
+
+/**
+ * @swagger
+ * /v1/room/update:
+ *   patch:
+ *     summary: 방 정보 수정
+ *     description: 방 정보를 수정합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - esntlID
+ *             properties:
+ *               esntlID:
+ *                 type: string
+ *                 description: 수정할 방 고유 아이디
+ *                 example: ROOM0000022725
+ *               roomNumber:
+ *                 type: string
+ *                 description: 방번호(이름)
+ *                 example: 101
+ *               roomType:
+ *                 type: string
+ *                 description: 방타입
+ *                 example: 원룸
+ *               deposit:
+ *                 type: integer
+ *                 description: 보증금
+ *                 example: 500000
+ *               monthlyRent:
+ *                 type: string
+ *                 description: 입실료
+ *                 example: 500000
+ *               startDate:
+ *                 type: string
+ *                 description: 입실일
+ *                 example: 2024-01-01
+ *               endDate:
+ *                 type: string
+ *                 description: 퇴실일
+ *                 example: 2024-12-31
+ *               window:
+ *                 type: string
+ *                 description: 창타입
+ *                 example: 남향
+ *               option:
+ *                 type: string
+ *                 description: 방옵션
+ *                 example: 에어컨, 냉장고
+ *               floor:
+ *                 type: string
+ *                 description: 층수
+ *                 example: 3층
+ *               intro:
+ *                 type: string
+ *                 description: 소개
+ *               status:
+ *                 type: string
+ *                 description: 방상태
+ *                 example: EMPTY
+ *               month:
+ *                 type: string
+ *                 description: 월
+ *               description:
+ *                 type: string
+ *                 description: 방설명
+ *                 example: 깨끗하고 조용한 방입니다
+ *               youtube:
+ *                 type: string
+ *                 description: VR룸투어 URL
+ *                 example: https://youtube.com/watch?v=xxx
+ *               orderNo:
+ *                 type: integer
+ *                 description: 정렬순서
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: 방 정보 수정 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.patch('/update', roomController.updateRoom);
+
+/**
+ * @swagger
+ * /v1/room/delete:
+ *   delete:
+ *     summary: 방 정보 삭제
+ *     description: 방 정보를 삭제합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 삭제할 방 고유 아이디
+ *         example: ROOM0000022725
+ *     responses:
+ *       200:
+ *         description: 방 정보 삭제 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/delete', roomController.deleteRoom);
+
+/**
+ * @swagger
  * /v1/room/category/list:
  *   get:
  *     summary: 방 카테고리 목록 조회
