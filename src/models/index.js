@@ -85,6 +85,12 @@ db.roomMemo.belongsTo(db.room, {
 	targetKey: 'esntlId',
 });
 
+db.parking.belongsTo(db.gosiwon, {
+	as: 'gosiwon',
+	foreignKey: 'gosiwonEsntlId',
+	targetKey: 'esntlId',
+});
+
 // MSSQL
 const mssqlDBConfig = require(__dirname + '/../config/config.js')[
 	'maintenance'

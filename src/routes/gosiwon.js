@@ -268,6 +268,119 @@ router.get('/parking/info', parkingController.getParkingInfo);
 
 /**
  * @swagger
+ * /v1/gosiwon/parking/list:
+ *   get:
+ *     summary: 주차장 목록 조회
+ *     description: 전체 주차장 목록을 조회합니다. 고시원 이름 또는 주차장 구조로 검색 가능합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: 한 페이지당 항목 수
+ *         example: 10
+ *       - in: query
+ *         name: gosiwonName
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 고시원 이름 검색어 (부분 일치)
+ *         example: 성수
+ *       - in: query
+ *         name: structure
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 주차장 구조 검색어 (부분 일치)
+ *         example: 필로티
+ *     responses:
+ *       200:
+ *         description: 주차장 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 주차장 목록 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     currentPage:
+ *                       type: integer
+ *                       example: 1
+ *                     lastPage:
+ *                       type: integer
+ *                       example: 5
+ *                     totalCount:
+ *                       type: integer
+ *                       example: 50
+ *                     parkingList:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           parkingID:
+ *                             type: string
+ *                             example: PARK0000000001
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             example: GOSI0000002130
+ *                           gosiwonName:
+ *                             type: string
+ *                             example: 성수 고시원
+ *                           gosiwonAddress:
+ *                             type: string
+ *                             example: 서울시 성동구 성수동
+ *                           structure:
+ *                             type: string
+ *                             example: 필로티 구조
+ *                           auto:
+ *                             type: integer
+ *                             example: 10
+ *                           autoPrice:
+ *                             type: integer
+ *                             example: 50000
+ *                           bike:
+ *                             type: integer
+ *                             example: 5
+ *                           bikePrice:
+ *                             type: integer
+ *                             example: 30000
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/parking/list', parkingController.getParkingList);
+
+/**
+ * @swagger
  * /v1/gosiwon/parking/create:
  *   post:
  *     summary: 주차장 정보 등록

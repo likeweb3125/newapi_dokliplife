@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { parking, gosiwon, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
@@ -240,6 +241,101 @@ exports.deleteParking = async (req, res, next) => {
 		errorHandler.successThrow(res, '주차장 정보 삭제 성공');
 	} catch (err) {
 		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 주차장 목록 조회 (GET) - 검색 및 페이지네이션 지원
+exports.getParkingList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 10;
+		const gosiwonName = req.query.gosiwonName || ''; // 고시원 이름 검색
+		const structure = req.query.structure || ''; // 주차장 구조 검색
+
+		const offset = (page - 1) * limit;
+
+		// 검색 조건 구성
+		const whereCondition = {};
+		const includeWhereCondition = {};
+
+		// 주차장 구조 검색
+		if (structure) {
+			whereCondition.structure = {
+				[Op.like]: `%${structure}%`,
+			};
+		}
+
+		// 고시원 이름 검색
+		if (gosiwonName) {
+			includeWhereCondition.name = {
+				[Op.like]: `%${gosiwonName}%`,
+			};
+		}
+
+		// include 조건 구성
+		const includeOptions = {
+			model: gosiwon,
+			as: 'gosiwon',
+			attributes: ['esntlId', 'name', 'address'],
+			required: false, // LEFT JOIN으로 고시원 정보가 없는 주차장도 포함
+		};
+
+		// 고시원 이름 검색 시 where 조건 추가
+		if (Object.keys(includeWhereCondition).length > 0) {
+			includeOptions.where = includeWhereCondition;
+			includeOptions.required = true; // 고시원 이름 검색 시 INNER JOIN
+		}
+
+		// 주차장 목록 조회 (고시원 정보 포함)
+		const parkingList = await parking.findAndCountAll({
+			where: whereCondition,
+			include: [includeOptions],
+			limit: limit,
+			offset: offset,
+			order: [['created_at', 'DESC']],
+			attributes: [
+				'esntlId',
+				'gosiwonEsntlId',
+				'structure',
+				'auto',
+				'autoPrice',
+				'bike',
+				'bikePrice',
+				'created_at',
+			],
+		});
+
+		// 결과 포맷팅
+		const lastPage = Math.ceil(parkingList.count / limit);
+		const parkingItems = parkingList.rows.map((item) => {
+			const parkingData = item.get({ plain: true });
+			return {
+				parkingID: parkingData.esntlId,
+				gosiwonEsntlId: parkingData.gosiwonEsntlId,
+				gosiwonName: parkingData.gosiwon ? parkingData.gosiwon.name : null,
+				gosiwonAddress: parkingData.gosiwon ? parkingData.gosiwon.address : null,
+				structure: parkingData.structure || '',
+				auto: parkingData.auto || 0,
+				autoPrice: parkingData.autoPrice || 0,
+				bike: parkingData.bike || 0,
+				bikePrice: parkingData.bikePrice || 0,
+				createdAt: parkingData.created_at,
+			};
+		});
+
+		const response = {
+			limit: limit,
+			currentPage: page,
+			lastPage: lastPage,
+			totalCount: parkingList.count,
+			parkingList: parkingItems,
+		};
+
+		errorHandler.successThrow(res, '주차장 목록 조회 성공', response);
+	} catch (err) {
 		next(err);
 	}
 };
