@@ -4,7 +4,6 @@ const router = express.Router();
 const roomController = require('../controllers/room');
 const roomCategoryController = require('../controllers/roomCategory');
 const roomMemoController = require('../controllers/roomMemo');
-const roomSpecialAgreementController = require('../controllers/roomSpecialAgreement');
 
 /**
  * @swagger
@@ -202,6 +201,19 @@ router.get('/info', roomController.getRoomInfo);
  *                 type: string
  *                 description: '빈방 여부 (기본값: 1)'
  *                 example: 1
+ *               agreementType:
+ *                 type: string
+ *                 enum: [GENERAL, GOSIWON, ROOM]
+ *                 description: |
+ *                   특약타입
+ *                   - GENERAL: 독립생활 일반 규정 11항 적용
+ *                   - GOSIWON: 현재 고시원 특약사항 적용
+ *                   - ROOM: 해당 방만 특약사항 수정
+ *                 example: ROOM
+ *               agreementContent:
+ *                 type: string
+ *                 description: 특약내용 (리치 텍스트)
+ *                 example: <p>특약 내용입니다.</p>
  *     responses:
  *       200:
  *         description: 방 정보 등록 성공
@@ -311,6 +323,19 @@ router.post('/create', roomController.createRoom);
  *                 type: integer
  *                 description: 정렬순서
  *                 example: 1
+ *               agreementType:
+ *                 type: string
+ *                 enum: [GENERAL, GOSIWON, ROOM]
+ *                 description: |
+ *                   특약타입
+ *                   - GENERAL: 독립생활 일반 규정 11항 적용
+ *                   - GOSIWON: 현재 고시원 특약사항 적용
+ *                   - ROOM: 해당 방만 특약사항 수정
+ *                 example: ROOM
+ *               agreementContent:
+ *                 type: string
+ *                 description: 특약내용 (리치 텍스트)
+ *                 example: <p>수정된 특약 내용입니다.</p>
  *     responses:
  *       200:
  *         description: 방 정보 수정 성공
@@ -801,279 +826,6 @@ router.patch('/memo/update', roomMemoController.updateRoomMemo);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.delete('/memo/delete', roomMemoController.deleteRoomMemo);
-
-/**
- * @swagger
- * /v1/room/special-agreement/list:
- *   get:
- *     summary: 방 특약 목록 조회
- *     description: 방 ID로 특약 목록을 조회합니다.
- *     tags: [Room]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: roomEsntlId
- *         required: true
- *         schema:
- *           type: string
- *         description: 방 고유 아이디
- *         example: ROOM0000022725
- *     responses:
- *       200:
- *         description: 방 특약 목록 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 statusCode:
- *                   type: integer
- *                   example: 200
- *                 message:
- *                   type: string
- *                   example: 방 특약 목록 조회 성공
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       agreementID:
- *                         type: string
- *                         example: SPCL0000000001
- *                       roomEsntlId:
- *                         type: string
- *                         example: ROOM0000022725
- *                       agreementType:
- *                         type: string
- *                         enum: [GENERAL, GOSIWON, ROOM]
- *                         example: ROOM
- *                       agreementContent:
- *                         type: string
- *                         example: 해당 방만 특약사항 수정 내용
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.get('/special-agreement/list', roomSpecialAgreementController.getRoomSpecialAgreementList);
-
-/**
- * @swagger
- * /v1/room/special-agreement/info:
- *   get:
- *     summary: 방 특약 상세 정보 조회
- *     description: 특약 아이디로 특약 정보를 조회합니다.
- *     tags: [Room]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: agreementID
- *         required: true
- *         schema:
- *           type: string
- *         description: 특약 고유 아이디
- *         example: SPCL0000000001
- *     responses:
- *       200:
- *         description: 방 특약 정보 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 statusCode:
- *                   type: integer
- *                   example: 200
- *                 message:
- *                   type: string
- *                   example: 방 특약 정보 조회 성공
- *                 data:
- *                   type: object
- *                   properties:
- *                     agreementID:
- *                       type: string
- *                       example: SPCL0000000001
- *                     roomEsntlId:
- *                       type: string
- *                       example: ROOM0000022725
- *                     agreementType:
- *                       type: string
- *                       enum: [GENERAL, GOSIWON, ROOM]
- *                       example: ROOM
- *                     agreementContent:
- *                       type: string
- *                       example: 해당 방만 특약사항 수정 내용
- *                     createdAt:
- *                       type: string
- *                       format: date-time
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.get('/special-agreement/info', roomSpecialAgreementController.getRoomSpecialAgreementInfo);
-
-/**
- * @swagger
- * /v1/room/special-agreement/create:
- *   post:
- *     summary: 방 특약 등록
- *     description: |
- *       방에 특약을 등록합니다.
- *       
- *       **특약타입 설명 (agreementType):**
- *       - GENERAL: 독립생활 일반 규정 11항 적용
- *       - GOSIWON: 현재 고시원 특약사항 적용
- *       - ROOM: 해당 방만 특약사항 수정
- *     tags: [Room]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - roomEsntlId
- *               - agreementType
- *             properties:
- *               roomEsntlId:
- *                 type: string
- *                 description: 방 고유 아이디
- *                 example: ROOM0000022725
- *               agreementType:
- *                 type: string
- *                 enum: [GENERAL, GOSIWON, ROOM]
- *                 description: |
- *                   특약타입
- *                   - GENERAL: 독립생활 일반 규정 11항 적용
- *                   - GOSIWON: 현재 고시원 특약사항 적용
- *                   - ROOM: 해당 방만 특약사항 수정
- *                 example: ROOM
- *               agreementContent:
- *                 type: string
- *                 description: 특약내용 (리치 텍스트)
- *                 example: <p>특약 내용입니다.</p>
- *     responses:
- *       200:
- *         description: 방 특약 등록 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 statusCode:
- *                   type: integer
- *                   example: 200
- *                 message:
- *                   type: string
- *                   example: 방 특약 등록 성공
- *                 data:
- *                   type: object
- *                   properties:
- *                     agreementID:
- *                       type: string
- *                       example: SPCL0000000001
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.post('/special-agreement/create', roomSpecialAgreementController.createRoomSpecialAgreement);
-
-/**
- * @swagger
- * /v1/room/special-agreement/update:
- *   patch:
- *     summary: 방 특약 수정
- *     description: 방 특약 정보를 수정합니다.
- *     tags: [Room]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - agreementID
- *             properties:
- *               agreementID:
- *                 type: string
- *                 description: 특약 고유 아이디
- *                 example: SPCL0000000001
- *               agreementType:
- *                 type: string
- *                 enum: [GENERAL, GOSIWON, ROOM]
- *                 description: '특약타입 (GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)'
- *                 example: ROOM
- *               agreementContent:
- *                 type: string
- *                 description: 특약내용 (리치 텍스트)
- *                 example: <p>수정된 특약 내용입니다.</p>
- *     responses:
- *       200:
- *         description: 방 특약 수정 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.patch('/special-agreement/update', roomSpecialAgreementController.updateRoomSpecialAgreement);
-
-/**
- * @swagger
- * /v1/room/special-agreement/delete:
- *   delete:
- *     summary: 방 특약 삭제
- *     description: 방 특약을 삭제합니다.
- *     tags: [Room]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: agreementID
- *         required: true
- *         schema:
- *           type: string
- *         description: 삭제할 특약 고유 아이디
- *         example: SPCL0000000001
- *     responses:
- *       200:
- *         description: 방 특약 삭제 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.delete('/special-agreement/delete', roomSpecialAgreementController.deleteRoomSpecialAgreement);
 
 module.exports = router;
 

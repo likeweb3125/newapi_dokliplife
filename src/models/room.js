@@ -141,6 +141,18 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'org_rom_eid',
 				comment: '이전방고유아이디',
 			},
+			agreementType: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'agreementType',
+				comment: '특약타입 (GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)',
+			},
+			agreementContent: {
+				type: DataTypes.TEXT,
+				allowNull: true,
+				field: 'agreementContent',
+				comment: '특약내용',
+			},
 		},
 		{
 			timestamps: false,

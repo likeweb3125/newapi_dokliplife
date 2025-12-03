@@ -161,6 +161,8 @@ exports.createRoom = async (req, res, next) => {
 			youtube,
 			orderNo,
 			empty,
+			agreementType,
+			agreementContent,
 		} = req.body;
 
 		if (!goID) {
@@ -168,6 +170,17 @@ exports.createRoom = async (req, res, next) => {
 		}
 
 		const roomId = await generateRoomId(transaction);
+
+		// 특약 타입 유효성 검사
+		if (agreementType) {
+			const validTypes = ['GENERAL', 'GOSIWON', 'ROOM'];
+			if (!validTypes.includes(agreementType)) {
+				errorHandler.errorThrow(
+					400,
+					'agreementType은 GENERAL, GOSIWON, ROOM 중 하나여야 합니다.'
+				);
+			}
+		}
 
 		await room.create(
 			{
@@ -189,6 +202,8 @@ exports.createRoom = async (req, res, next) => {
 				youtube: youtube || null,
 				orderNo: orderNo !== undefined ? parseInt(orderNo, 10) : 1,
 				empty: empty || '1',
+				agreementType: agreementType || null,
+				agreementContent: agreementContent || null,
 			},
 			{ transaction }
 		);
@@ -225,6 +240,8 @@ exports.updateRoom = async (req, res, next) => {
 			description,
 			youtube,
 			orderNo,
+			agreementType,
+			agreementContent,
 		} = req.body;
 
 		if (!esntlID) {
@@ -234,6 +251,17 @@ exports.updateRoom = async (req, res, next) => {
 		const roomInfo = await room.findByPk(esntlID);
 		if (!roomInfo) {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+
+		// 특약 타입 유효성 검사
+		if (agreementType !== undefined) {
+			const validTypes = ['GENERAL', 'GOSIWON', 'ROOM'];
+			if (agreementType && !validTypes.includes(agreementType)) {
+				errorHandler.errorThrow(
+					400,
+					'agreementType은 GENERAL, GOSIWON, ROOM 중 하나여야 합니다.'
+				);
+			}
 		}
 
 		const updateData = {};
@@ -253,6 +281,8 @@ exports.updateRoom = async (req, res, next) => {
 		if (description !== undefined) updateData.description = description;
 		if (youtube !== undefined) updateData.youtube = youtube;
 		if (orderNo !== undefined) updateData.orderNo = parseInt(orderNo, 10);
+		if (agreementType !== undefined) updateData.agreementType = agreementType;
+		if (agreementContent !== undefined) updateData.agreementContent = agreementContent;
 
 		await room.update(updateData, {
 			where: { esntlId: esntlID },
