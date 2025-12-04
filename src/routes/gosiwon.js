@@ -58,6 +58,405 @@ router.get('/info', gosiwonController.getGosiwonInfo);
 
 /**
  * @swagger
+ * /v1/gosiwon/info:
+ *   post:
+ *     summary: 고시원 정보 등록
+ *     description: 새로운 고시원 정보를 등록합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: 고시원 이름
+ *                 example: 성수 고시원
+ *               address:
+ *                 type: string
+ *                 description: 주소
+ *                 example: 서울시 성동구 성수동
+ *               address2:
+ *                 type: string
+ *                 description: 상세주소
+ *               address3:
+ *                 type: string
+ *                 description: 참고주소
+ *               longitude:
+ *                 type: string
+ *                 description: 경도
+ *               latitude:
+ *                 type: string
+ *                 description: 위도
+ *               gsw_grade:
+ *                 type: string
+ *                 description: 등급
+ *               numOfRooms:
+ *                 type: string
+ *                 description: 보유방수
+ *               homepage:
+ *                 type: string
+ *                 description: 홈페이지주소
+ *               blog:
+ *                 type: string
+ *                 description: 블로그주소
+ *               youtube:
+ *                 type: string
+ *                 description: 유튜브주소
+ *               gsw_metaport:
+ *                 type: string
+ *                 description: 룸투어URL
+ *               keeperName:
+ *                 type: string
+ *                 description: 총무이름
+ *               keeperHp:
+ *                 type: string
+ *                 description: 총무연락처
+ *               phone:
+ *                 type: string
+ *                 description: 고시원연락처
+ *               tag:
+ *                 type: string
+ *                 description: 검색태그
+ *               email:
+ *                 type: string
+ *                 description: 이메일주소
+ *               subway:
+ *                 type: string
+ *                 description: 주변지하철
+ *               college:
+ *                 type: string
+ *                 description: 주변대학
+ *               corpNumber:
+ *                 type: string
+ *                 description: 사업자번호
+ *               bank:
+ *                 type: string
+ *                 description: 은행명
+ *               bankAccount:
+ *                 type: string
+ *                 description: 계좌번호
+ *               commision:
+ *                 type: string
+ *                 description: 수수료율, 기본값 7
+ *                 example: 7
+ *               description:
+ *                 type: string
+ *                 description: 고시원설명
+ *               manager:
+ *                 type: string
+ *                 description: 영업담당자
+ *               point:
+ *                 type: integer
+ *                 description: 포인트, 기본값 0
+ *                 example: 0
+ *               acceptDate:
+ *                 type: string
+ *                 description: 가입일시
+ *               gsw_signup_path_cd:
+ *                 type: string
+ *                 description: 가입경로코드
+ *               gsw_signup_path_etc:
+ *                 type: string
+ *                 description: 가입경로 기타
+ *               alarmTalk:
+ *                 type: string
+ *                 description: 알림톡 설정
+ *               alarmEmail:
+ *                 type: string
+ *                 description: 알림이메일 설정
+ *               status:
+ *                 type: string
+ *                 description: 고시원상태
+ *               process:
+ *                 type: string
+ *                 description: 운영여부
+ *               rejectText:
+ *                 type: string
+ *                 description: 거절사유
+ *               contractText:
+ *                 type: string
+ *                 description: 계약서 텍스트
+ *               monthCalculate:
+ *                 type: string
+ *                 description: 월정산 여부
+ *               accountHolder:
+ *                 type: string
+ *                 description: 예금주명
+ *               contract:
+ *                 type: string
+ *                 description: 계약서일반
+ *               contractFile:
+ *                 type: string
+ *                 description: 계약서 파일 경로
+ *               contractFileOrgName:
+ *                 type: string
+ *                 description: 계약서 원본 파일명
+ *               serviceNumber:
+ *                 type: string
+ *                 description: 050번호
+ *               district:
+ *                 type: string
+ *                 description: 지역
+ *               is_controlled:
+ *                 type: boolean
+ *                 description: 관제서비스 이용 여부
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: 고시원 정보 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 고시원 정보 등록 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       example: GOSI0000002131
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/info', gosiwonController.createGosiwon);
+
+/**
+ * @swagger
+ * /v1/gosiwon/info:
+ *   patch:
+ *     summary: 고시원 정보 수정
+ *     description: 고시원 정보를 수정합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - esntlId
+ *             properties:
+ *               esntlId:
+ *                 type: string
+ *                 description: 고시원 고유아이디
+ *                 example: GOSI0000002130
+ *               name:
+ *                 type: string
+ *                 description: 고시원 이름
+ *               address:
+ *                 type: string
+ *                 description: 주소
+ *               address2:
+ *                 type: string
+ *                 description: 상세주소
+ *               address3:
+ *                 type: string
+ *                 description: 참고주소
+ *               longitude:
+ *                 type: string
+ *                 description: 경도
+ *               latitude:
+ *                 type: string
+ *                 description: 위도
+ *               gsw_grade:
+ *                 type: string
+ *                 description: 등급
+ *               numOfRooms:
+ *                 type: string
+ *                 description: 보유방수
+ *               homepage:
+ *                 type: string
+ *                 description: 홈페이지주소
+ *               blog:
+ *                 type: string
+ *                 description: 블로그주소
+ *               youtube:
+ *                 type: string
+ *                 description: 유튜브주소
+ *               gsw_metaport:
+ *                 type: string
+ *                 description: 룸투어URL
+ *               keeperName:
+ *                 type: string
+ *                 description: 총무이름
+ *               keeperHp:
+ *                 type: string
+ *                 description: 총무연락처
+ *               phone:
+ *                 type: string
+ *                 description: 고시원연락처
+ *               tag:
+ *                 type: string
+ *                 description: 검색태그
+ *               email:
+ *                 type: string
+ *                 description: 이메일주소
+ *               subway:
+ *                 type: string
+ *                 description: 주변지하철
+ *               college:
+ *                 type: string
+ *                 description: 주변대학
+ *               corpNumber:
+ *                 type: string
+ *                 description: 사업자번호
+ *               bank:
+ *                 type: string
+ *                 description: 은행명
+ *               bankAccount:
+ *                 type: string
+ *                 description: 계좌번호
+ *               commision:
+ *                 type: string
+ *                 description: 수수료율
+ *               description:
+ *                 type: string
+ *                 description: 고시원설명
+ *               manager:
+ *                 type: string
+ *                 description: 영업담당자
+ *               point:
+ *                 type: integer
+ *                 description: 포인트
+ *               acceptDate:
+ *                 type: string
+ *                 description: 가입일시
+ *               gsw_signup_path_cd:
+ *                 type: string
+ *                 description: 가입경로코드
+ *               gsw_signup_path_etc:
+ *                 type: string
+ *                 description: 가입경로 기타
+ *               alarmTalk:
+ *                 type: string
+ *                 description: 알림톡 설정
+ *               alarmEmail:
+ *                 type: string
+ *                 description: 알림이메일 설정
+ *               status:
+ *                 type: string
+ *                 description: 고시원상태
+ *               process:
+ *                 type: string
+ *                 description: 운영여부
+ *               rejectText:
+ *                 type: string
+ *                 description: 거절사유
+ *               contractText:
+ *                 type: string
+ *                 description: 계약서 텍스트
+ *               monthCalculate:
+ *                 type: string
+ *                 description: 월정산 여부
+ *               accountHolder:
+ *                 type: string
+ *                 description: 예금주명
+ *               contract:
+ *                 type: string
+ *                 description: 계약서일반
+ *               contractFile:
+ *                 type: string
+ *                 description: 계약서 파일 경로
+ *               contractFileOrgName:
+ *                 type: string
+ *                 description: 계약서 원본 파일명
+ *               serviceNumber:
+ *                 type: string
+ *                 description: 050번호
+ *               district:
+ *                 type: string
+ *                 description: 지역
+ *               is_controlled:
+ *                 type: boolean
+ *                 description: 관제서비스 이용 여부
+ *     responses:
+ *       200:
+ *         description: 고시원 정보 수정 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 고시원 정보 수정 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.patch('/info', gosiwonController.updateGosiwon);
+
+/**
+ * @swagger
+ * /v1/gosiwon/info:
+ *   delete:
+ *     summary: 고시원 정보 삭제
+ *     description: 고시원 정보를 삭제합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유아이디
+ *         example: GOSI0000002130
+ *     responses:
+ *       200:
+ *         description: 고시원 정보 삭제 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 고시원 정보 삭제 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/info', gosiwonController.deleteGosiwon);
+
+/**
+ * @swagger
  * /v1/gosiwon/names:
  *   get:
  *     summary: 고시원 이름 검색
