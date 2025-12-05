@@ -240,7 +240,7 @@ router.post('/info', gosiwonController.createGosiwon);
 /**
  * @swagger
  * /v1/gosiwon/info:
- *   patch:
+ *   put:
  *     summary: 고시원 정보 수정
  *     description: 고시원 정보를 수정합니다.
  *     tags: [Gosiwon]
@@ -411,7 +411,7 @@ router.post('/info', gosiwonController.createGosiwon);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.patch('/info', gosiwonController.updateGosiwon);
+router.put('/info', gosiwonController.updateGosiwon);
 
 /**
  * @swagger
@@ -533,7 +533,7 @@ router.get('/names', gosiwonController.getGosiwonNames);
 /**
  * @swagger
  * /v1/gosiwon/favorite:
- *   patch:
+ *   put:
  *     summary: 고시원 즐겨찾기 토글
  *     description: 고시원의 즐겨찾기 상태를 토글합니다. 체크박스 방식으로 사용됩니다.
  *     tags: [Gosiwon]
@@ -594,7 +594,7 @@ router.get('/names', gosiwonController.getGosiwonNames);
  *             schema:
  *               $ref: '#/components/schemas/StandardError'
  */
-router.patch('/favorite', gosiwonController.toggleFavorite);
+router.put('/favorite', gosiwonController.toggleFavorite);
 
 /**
  * @swagger
@@ -854,7 +854,7 @@ router.post('/parking/create', parkingController.createParking);
 /**
  * @swagger
  * /v1/gosiwon/parking/update:
- *   patch:
+ *   put:
  *     summary: 주차장 정보 수정
  *     description: 주차장 정보를 수정합니다.
  *     tags: [Gosiwon]
@@ -905,7 +905,7 @@ router.post('/parking/create', parkingController.createParking);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.patch('/parking/update', parkingController.updateParking);
+router.put('/parking/update', parkingController.updateParking);
 
 /**
  * @swagger

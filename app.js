@@ -41,6 +41,8 @@ const adminMaintenanceRoutes = require('./src/routes/maintenance');
 const mailGunRoutes = require('./src/routes/mailGun');
 const gosiwonRoutes = require('./src/routes/gosiwon');
 const roomRoutes = require('./src/routes/room');
+const roomStatusRoutes = require('./src/routes/roomStatus');
+const roomActionRoutes = require('./src/routes/roomAction');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
@@ -101,6 +103,8 @@ app.use('/v1/gosiwon', gosiwonRoutes);
 
 // 방 Routes
 app.use('/v1/room', roomRoutes);
+app.use('/v1/room', roomStatusRoutes);
+app.use('/v1/room', roomActionRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to Doklip Life REST API');

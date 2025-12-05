@@ -182,7 +182,7 @@ exports.createRoomMemo = async (req, res, next) => {
 	}
 };
 
-// 방 메모 수정 (PATCH)
+// 방 메모 수정 (PUT)
 exports.updateRoomMemo = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {

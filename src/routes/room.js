@@ -246,7 +246,7 @@ router.post('/create', roomController.createRoom);
 /**
  * @swagger
  * /v1/room/update:
- *   patch:
+ *   put:
  *     summary: 방 정보 수정
  *     description: 방 정보를 수정합니다.
  *     tags: [Room]
@@ -348,7 +348,7 @@ router.post('/create', roomController.createRoom);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.patch('/update', roomController.updateRoom);
+router.put('/update', roomController.updateRoom);
 
 /**
  * @swagger
@@ -472,7 +472,7 @@ router.post('/category/create', roomCategoryController.createCategory);
 /**
  * @swagger
  * /v1/room/category/update:
- *   patch:
+ *   put:
  *     summary: 방 카테고리 수정
  *     description: 카테고리 정보를 수정하고 옵션을 추가/수정합니다. 옵션의 esntlId가 제공되면 수정, 제공되지 않으면 추가됩니다. isDeleted true일 경우 삭제됩니다.
  *     tags: [Room]
@@ -536,7 +536,7 @@ router.post('/category/create', roomCategoryController.createCategory);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.patch('/category/update', roomCategoryController.updateCategory);
+router.put('/category/update', roomCategoryController.updateCategory);
 
 /**
  * @swagger
@@ -755,7 +755,7 @@ router.post('/memo/create', roomMemoController.createRoomMemo);
 /**
  * @swagger
  * /v1/room/memo/update:
- *   patch:
+ *   put:
  *     summary: 방 메모 수정
  *     description: 방 메모 정보를 수정합니다.
  *     tags: [Room]
@@ -794,7 +794,7 @@ router.post('/memo/create', roomMemoController.createRoomMemo);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.patch('/memo/update', roomMemoController.updateRoomMemo);
+router.put('/memo/update', roomMemoController.updateRoomMemo);
 
 /**
  * @swagger

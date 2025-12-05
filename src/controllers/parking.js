@@ -165,7 +165,7 @@ exports.createParking = async (req, res, next) => {
 	}
 };
 
-// 주차장 정보 수정 (PATCH)
+// 주차장 정보 수정 (PUT)
 exports.updateParking = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
