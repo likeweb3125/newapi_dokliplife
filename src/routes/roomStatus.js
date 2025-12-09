@@ -134,7 +134,7 @@ router.get('/status', roomStatusController.getRoomStatus);
  *               historyStartDate:
  *                 type: string
  *                 format: date-time
- *                 description: 히스토리 시작일 (기본값: 현재 시간)
+ *                 description: "히스토리 시작일 (기본값: 현재 시간)"
  *               historyEndDate:
  *                 type: string
  *                 format: date-time

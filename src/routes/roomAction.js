@@ -32,7 +32,17 @@ const roomActionHistoryController = require('../controllers/roomActionHistory');
  *         required: false
  *         schema:
  *           type: string
- *         description: 액션 타입 필터
+ *           enum:
+ *             - PAYMENT
+ *             - RESERVATION
+ *             - STATUS_CHANGE
+ *             - DEPOSIT
+ *             - REFUND
+ *             - ROOM_MOVE
+ *             - CHECKOUT
+ *             - OVERDUE
+ *             - ETC
+ *         description: "액션 타입 필터 (PAYMENT: 결제, RESERVATION: 예약, STATUS_CHANGE: 상태변경, DEPOSIT: 보증금/예약금 처리, REFUND: 환불/반환, ROOM_MOVE: 방이동, CHECKOUT: 퇴실, OVERDUE: 체납, ETC: 기타)"
  *         example: PAYMENT
  *       - in: query
  *         name: startDate
@@ -86,6 +96,17 @@ router.get('/action/history', roomActionHistoryController.getRoomActionHistory);
  *                 example: ROOM0000022725
  *               actionType:
  *                 type: string
+ *                 enum:
+ *                   - PAYMENT
+ *                   - RESERVATION
+ *                   - STATUS_CHANGE
+ *                   - DEPOSIT
+ *                   - REFUND
+ *                   - ROOM_MOVE
+ *                   - CHECKOUT
+ *                   - OVERDUE
+ *                   - ETC
+ *                 description: "액션 타입 (PAYMENT: 결제, RESERVATION: 예약, STATUS_CHANGE: 상태변경, DEPOSIT: 보증금/예약금 처리, REFUND: 환불/반환, ROOM_MOVE: 방이동, CHECKOUT: 퇴실, OVERDUE: 체납, ETC: 기타)"
  *                 example: PAYMENT
  *               statusFrom:
  *                 type: string
@@ -153,7 +174,17 @@ router.post('/action/history', roomActionHistoryController.createRoomActionHisto
  *         required: false
  *         schema:
  *           type: string
- *         description: 액션 타입 필터
+ *           enum:
+ *             - PAYMENT
+ *             - RESERVATION
+ *             - STATUS_CHANGE
+ *             - DEPOSIT
+ *             - REFUND
+ *             - ROOM_MOVE
+ *             - CHECKOUT
+ *             - OVERDUE
+ *             - ETC
+ *         description: "액션 타입 필터 (PAYMENT: 결제, RESERVATION: 예약, STATUS_CHANGE: 상태변경, DEPOSIT: 보증금/예약금 처리, REFUND: 환불/반환, ROOM_MOVE: 방이동, CHECKOUT: 퇴실, OVERDUE: 체납, ETC: 기타)"
  *       - in: query
  *         name: startDate
  *         required: false

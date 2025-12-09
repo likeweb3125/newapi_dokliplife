@@ -33,6 +33,30 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'customerName',
 				comment: '입실자 이름',
 			},
+			reservationEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'reservationEsntlId',
+				comment: '예약자 고유아이디',
+			},
+			reservationName: {
+				type: DataTypes.STRING(100),
+				allowNull: true,
+				field: 'reservationName',
+				comment: '예약자 이름',
+			},
+			contractorEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'contractorEsntlId',
+				comment: '계약자 고유아이디',
+			},
+			contractorName: {
+				type: DataTypes.STRING(100),
+				allowNull: true,
+				field: 'contractorName',
+				comment: '계약자 이름',
+			},
 			contractStartDate: {
 				type: DataTypes.DATE,
 				allowNull: true,

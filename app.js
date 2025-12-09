@@ -43,6 +43,7 @@ const gosiwonRoutes = require('./src/routes/gosiwon');
 const roomRoutes = require('./src/routes/room');
 const roomStatusRoutes = require('./src/routes/roomStatus');
 const roomActionRoutes = require('./src/routes/roomAction');
+const depositRoutes = require('./src/routes/deposit');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
@@ -105,6 +106,9 @@ app.use('/v1/gosiwon', gosiwonRoutes);
 app.use('/v1/room', roomRoutes);
 app.use('/v1/room', roomStatusRoutes);
 app.use('/v1/room', roomActionRoutes);
+
+// 보증금 Routes
+app.use('/v1/deposit', depositRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to Doklip Life REST API');

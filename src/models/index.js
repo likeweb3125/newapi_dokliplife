@@ -59,6 +59,9 @@ db.roomMemo = require('./roomMemo')(mariaDBSequelize, Sequelize);
 db.roomStatus = require('./roomStatus')(mariaDBSequelize, Sequelize);
 db.roomStatusHistory = require('./roomStatusHistory')(mariaDBSequelize, Sequelize);
 db.roomActionHistory = require('./roomActionHistory')(mariaDBSequelize, Sequelize);
+db.deposit = require('./deposit')(mariaDBSequelize, Sequelize);
+db.depositHistory = require('./depositHistory')(mariaDBSequelize, Sequelize);
+db.depositDeduction = require('./depositDeduction')(mariaDBSequelize, Sequelize);
 
 db.i_category.hasMany(db.i_board, { as: 'iboard' });
 db.i_board.belongsTo(db.i_category, {
@@ -143,6 +146,75 @@ db.roomActionHistory.belongsTo(db.room, {
 db.roomActionHistory.belongsTo(db.customer, {
 	as: 'actorCustomer',
 	foreignKey: 'actorCustomerId',
+	targetKey: 'esntlId',
+});
+
+// Deposit 관계 설정
+db.room.hasMany(db.deposit, {
+	as: 'deposits',
+	foreignKey: 'roomEsntlId',
+	sourceKey: 'esntlId',
+});
+db.deposit.belongsTo(db.room, {
+	as: 'room',
+	foreignKey: 'roomEsntlId',
+	targetKey: 'esntlId',
+});
+
+db.gosiwon.hasMany(db.deposit, {
+	as: 'deposits',
+	foreignKey: 'gosiwonEsntlId',
+	sourceKey: 'esntlId',
+});
+db.deposit.belongsTo(db.gosiwon, {
+	as: 'gosiwon',
+	foreignKey: 'gosiwonEsntlId',
+	targetKey: 'esntlId',
+});
+
+db.deposit.belongsTo(db.customer, {
+	as: 'customer',
+	foreignKey: 'customerEsntlId',
+	targetKey: 'esntlId',
+});
+
+db.deposit.belongsTo(db.customer, {
+	as: 'contractor',
+	foreignKey: 'contractorEsntlId',
+	targetKey: 'esntlId',
+});
+
+db.deposit.hasMany(db.depositHistory, {
+	as: 'histories',
+	foreignKey: 'depositEsntlId',
+	sourceKey: 'esntlId',
+});
+db.depositHistory.belongsTo(db.deposit, {
+	as: 'deposit',
+	foreignKey: 'depositEsntlId',
+	targetKey: 'esntlId',
+});
+
+db.depositHistory.hasMany(db.depositDeduction, {
+	as: 'deductions',
+	foreignKey: 'depositHistoryEsntlId',
+	sourceKey: 'esntlId',
+});
+db.depositDeduction.belongsTo(db.depositHistory, {
+	as: 'depositHistory',
+	foreignKey: 'depositHistoryEsntlId',
+	targetKey: 'esntlId',
+});
+
+// DepositHistory와 Room 관계 설정
+db.room.hasMany(db.depositHistory, {
+	as: 'depositHistories',
+	foreignKey: 'roomEsntlId',
+	sourceKey: 'esntlId',
+});
+db.depositHistory.belongsTo(db.room, {
+	as: 'room',
+	foreignKey: 'roomEsntlId',
 	targetKey: 'esntlId',
 });
 
