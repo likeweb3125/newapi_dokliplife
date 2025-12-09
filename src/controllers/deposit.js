@@ -1069,32 +1069,56 @@ exports.getDepositHistory = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { depositEsntlId, type, page = 1, limit = 20 } = req.query;
+		const {
+			depositEsntlId,
+			roomEsntlId,
+			type, // DEPOSIT | RETURN
+			page = 1,
+			limit = 50,
+		} = req.query;
 
-		if (!depositEsntlId) {
-			errorHandler.errorThrow(400, 'depositEsntlId를 입력해주세요.');
+		if (!depositEsntlId && !roomEsntlId) {
+			errorHandler.errorThrow(
+				400,
+				'depositEsntlId 또는 roomEsntlId 중 하나는 필수입니다.'
+			);
 		}
 
-		const whereCondition = {
-			depositEsntlId: depositEsntlId,
-		};
-
+		const whereCondition = {};
+		if (depositEsntlId) {
+			whereCondition.depositEsntlId = depositEsntlId;
+		}
 		if (type) {
 			whereCondition.type = type;
 		}
+
+		const include = [
+			{
+				model: deposit,
+				as: 'deposit',
+				attributes: [
+					'esntlId',
+					'roomEsntlId',
+					'gosiwonEsntlId',
+					'customerEsntlId',
+					'contractorEsntlId',
+				],
+				required: !!roomEsntlId,
+				where: roomEsntlId ? { roomEsntlId } : undefined,
+			},
+			{
+				model: depositDeduction,
+				as: 'deductions',
+				attributes: ['esntlId', 'deductionName', 'deductionAmount'],
+				required: false,
+			},
+		];
 
 		const offset = (parseInt(page) - 1) * parseInt(limit);
 
 		const { count, rows } = await depositHistory.findAndCountAll({
 			where: whereCondition,
-			include: [
-				{
-					model: depositDeduction,
-					as: 'deductions',
-					attributes: ['esntlId', 'deductionName', 'deductionAmount'],
-					required: false,
-				},
-			],
+			include,
 			order: [['createdAt', 'DESC']],
 			limit: parseInt(limit),
 			offset: offset,
@@ -1109,5 +1133,17 @@ exports.getDepositHistory = async (req, res, next) => {
 	} catch (error) {
 		next(error);
 	}
+};
+
+// 입금 이력 목록 (type 고정: DEPOSIT)
+exports.getDepositHistoryDepositList = async (req, res, next) => {
+	req.query.type = 'DEPOSIT';
+	return exports.getDepositHistory(req, res, next);
+};
+
+// 반환 이력 목록 (type 고정: RETURN)
+exports.getDepositHistoryReturnList = async (req, res, next) => {
+	req.query.type = 'RETURN';
+	return exports.getDepositHistory(req, res, next);
 };
 

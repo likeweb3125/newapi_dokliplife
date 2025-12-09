@@ -441,20 +441,128 @@ router.post('/register-return', depositController.registerReturn);
 
 /**
  * @swagger
- * /v1/deposit/history:
+ * /v1/deposit/register-deposit/list:
  *   get:
- *     summary: 입금/반환 이력 조회
- *     description: 보증금의 입금 및 반환 이력을 조회합니다.
+ *     summary: 입금 등록 이력 목록
+ *     description: 방 ID 또는 보증금 ID 기준으로 입금(등록) 이력을 조회합니다.
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: depositEsntlId
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
- *         description: 보증금 고유 아이디
+ *         description: 보증금 고유 아이디 (depositEsntlId 또는 roomEsntlId 중 하나 필수)
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디 (depositEsntlId 또는 roomEsntlId 중 하나 필수)
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: 페이지당 항목 수
+ *     responses:
+ *       200:
+ *         description: 입금 이력 목록 조회 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get(
+	'/register-deposit/list',
+	depositController.getDepositHistoryDepositList
+);
+
+/**
+ * @swagger
+ * /v1/deposit/register-return/list:
+ *   get:
+ *     summary: 반환 등록 이력 목록
+ *     description: 방 ID 또는 보증금 ID 기준으로 반환(등록) 이력을 조회합니다.
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: depositEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 보증금 고유 아이디 (depositEsntlId 또는 roomEsntlId 중 하나 필수)
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디 (depositEsntlId 또는 roomEsntlId 중 하나 필수)
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: 페이지당 항목 수
+ *     responses:
+ *       200:
+ *         description: 반환 이력 목록 조회 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get(
+	'/register-return/list',
+	depositController.getDepositHistoryReturnList
+);
+
+/**
+ * @swagger
+ * /v1/deposit/history:
+ *   get:
+ *     summary: 입금/반환 이력 조회
+ *     description: 보증금 또는 방 기준으로 입금/반환 이력을 조회합니다.
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: depositEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 보증금 고유 아이디 (depositEsntlId 또는 roomEsntlId 중 하나 필수)
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디 (depositEsntlId 또는 roomEsntlId 중 하나 필수)
  *       - in: query
  *         name: type
  *         required: false
@@ -474,7 +582,7 @@ router.post('/register-return', depositController.registerReturn);
  *         required: false
  *         schema:
  *           type: integer
- *           default: 20
+ *           default: 50
  *         description: 페이지당 항목 수
  *     responses:
  *       200:
