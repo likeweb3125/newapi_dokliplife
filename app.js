@@ -48,11 +48,16 @@ const depositRoutes = require('./src/routes/deposit');
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
 
+// CORS_ORIGINS 환경 변수에서 허용할 origin 목록 가져오기
+const corsOrigins = process.env.CORS_ORIGINS
+	? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+	: [
+			'http://localhost:3050/',
+			'https://dokliplife.likeweb.co.kr/',
+	  ]; // 기본값
+
 const corsOptions = {
-	origin: [
-		'http://localhost:3050/',
-		'https://dokliplife.likeweb.co.kr/',
-	], // 리액트  localhost 3000
+	origin: corsOrigins,
 	methods: ['GET', 'PUT', 'POST', 'DELETE'],
 };
 
