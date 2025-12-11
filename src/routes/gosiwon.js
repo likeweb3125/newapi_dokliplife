@@ -9,7 +9,7 @@ const parkingController = require('../controllers/parking');
  * /v1/gosiwon/info:
  *   get:
  *     summary: 고시원 상세 정보 조회
- *     description: esntlId로 고시원 정보를 조회합니다.
+ *     description: esntlId로 고시원 정보를 조회합니다. gosiwon, room, gosiwonUse, gosiwonBuilding, gosiwonFacilities, gosiwonAdmin 테이블을 조인하여 모든 정보를 반환합니다.
  *     tags: [Gosiwon]
  *     security:
  *       - bearerAuth: []
@@ -23,7 +23,7 @@ const parkingController = require('../controllers/parking');
  *         example: GOSI0000002130
  *     responses:
  *       200:
- *         description: 고시원 정보 조회 성공
+ *         description: 고시원 정보 조회 성공 (조인된 모든 테이블 데이터 포함)
  *         content:
  *           application/json:
  *             schema:
@@ -31,28 +31,18 @@ const parkingController = require('../controllers/parking');
  *               properties:
  *                 statusCode:
  *                   type: integer
+ *                   example: 200
  *                 message:
  *                   type: string
+ *                   example: 고시원 정보 조회 성공
  *                 data:
  *                   $ref: '#/components/schemas/GosiwonInfo'
  *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/StandardError'
+ *         $ref: '#/components/responses/BadRequest'
  *       404:
- *         description: 데이터를 찾을 수 없음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/StandardError'
+ *         $ref: '#/components/responses/NotFound'
  *       401:
- *         description: 인증 실패
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/StandardError'
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/info', gosiwonController.getGosiwonInfo);
 
@@ -208,6 +198,27 @@ router.get('/info', gosiwonController.getGosiwonInfo);
  *                 type: boolean
  *                 description: 관제서비스 이용 여부
  *                 example: false
+ *               gosiwonUse:
+ *                 type: object
+ *                 description: 고시원 사용 정보 (선택사항)
+ *                 additionalProperties: true
+ *                 example:
+ *                   field1: value1
+ *                   field2: value2
+ *               gosiwonBuilding:
+ *                 type: object
+ *                 description: 고시원 건물 정보 (선택사항)
+ *                 additionalProperties: true
+ *                 example:
+ *                   field1: value1
+ *                   field2: value2
+ *               gosiwonFacilities:
+ *                 type: object
+ *                 description: 고시원 시설 정보 (선택사항)
+ *                 additionalProperties: true
+ *                 example:
+ *                   field1: value1
+ *                   field2: value2
  *     responses:
  *       200:
  *         description: 고시원 정보 등록 성공
@@ -388,9 +399,30 @@ router.post('/info', gosiwonController.createGosiwon);
  *               is_controlled:
  *                 type: boolean
  *                 description: 관제서비스 이용 여부
+ *               gosiwonUse:
+ *                 type: object
+ *                 description: 고시원 사용 정보 (선택사항, 존재하면 업데이트, 없으면 생성)
+ *                 additionalProperties: true
+ *                 example:
+ *                   field1: value1
+ *                   field2: value2
+ *               gosiwonBuilding:
+ *                 type: object
+ *                 description: 고시원 건물 정보 (선택사항, 존재하면 업데이트, 없으면 생성)
+ *                 additionalProperties: true
+ *                 example:
+ *                   field1: value1
+ *                   field2: value2
+ *               gosiwonFacilities:
+ *                 type: object
+ *                 description: 고시원 시설 정보 (선택사항, 존재하면 업데이트, 없으면 생성)
+ *                 additionalProperties: true
+ *                 example:
+ *                   field1: value1
+ *                   field2: value2
  *     responses:
  *       200:
- *         description: 고시원 정보 수정 성공
+ *         description: 고시원 정보 수정 성공 (관련 테이블도 함께 업데이트됨)
  *         content:
  *           application/json:
  *             schema:
@@ -418,7 +450,7 @@ router.put('/info', gosiwonController.updateGosiwon);
  * /v1/gosiwon/info:
  *   delete:
  *     summary: 고시원 정보 삭제
- *     description: 고시원 정보를 삭제합니다.
+ *     description: 고시원 정보를 삭제합니다. 관련 테이블(gosiwonUse, gosiwonBuilding, gosiwonFacilities)의 데이터도 함께 삭제됩니다.
  *     tags: [Gosiwon]
  *     security:
  *       - bearerAuth: []
@@ -432,7 +464,7 @@ router.put('/info', gosiwonController.updateGosiwon);
  *         example: GOSI0000002130
  *     responses:
  *       200:
- *         description: 고시원 정보 삭제 성공
+ *         description: 고시원 정보 삭제 성공 (관련 테이블 데이터도 함께 삭제됨)
  *         content:
  *           application/json:
  *             schema:

@@ -71,16 +71,31 @@ exports.getGosiwonInfo = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId 입력해주세요.');
 		}
 
-		const whereCondition = {
-			esntlId: esntlId,
-		};
+		// 여러 테이블을 조인하여 고시원 정보 조회
+		const query = `
+                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason
+                    ,GA.hp adminHP, GA.ceo admin
+                    ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
+                    ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
+                    ,GU.deposit,GU.qualified,GU.minAge,GU.maxAge,GU.minUsedDate,GU.gender,GU.foreignLanguage,GU.orderData useOrderData 
+			FROM gosiwon G 
+			LEFT OUTER JOIN room R 
+				ON G.esntlId = R.gosiwonEsntlId 
+			LEFT OUTER JOIN gosiwonUse GU 
+				ON G.esntlId = GU.esntlId 
+			LEFT OUTER JOIN gosiwonBuilding GB 
+				ON G.esntlId = GB.esntlId 
+			LEFT OUTER JOIN gosiwonFacilities GF 
+				ON G.esntlId = GF.esntlId 
+			LEFT OUTER JOIN gosiwonAdmin GA 
+				ON G.adminEsntlId = GA.esntlId 
+			WHERE G.esntlId = :esntlId 
+			GROUP BY G.esntlId
+		`;
 
-		// 고시원 정보 조회
-		// 실제 테이블의 컬럼명을 확인하기 위해 attributes를 사용하지 않고 조회
-		const gosiwonInfo = await gosiwon.findOne({
-			where: whereCondition,
-			raw: true,
-			logging: console.log, // 실제 SQL 쿼리 확인용
+		const [gosiwonInfo] = await mariaDBSequelize.query(query, {
+			replacements: { esntlId: esntlId },
+			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
 		if (!gosiwonInfo) {
@@ -246,6 +261,10 @@ exports.createGosiwon = async (req, res, next) => {
 			serviceNumber,
 			district,
 			is_controlled,
+			// 관련 테이블 데이터
+			gosiwonUse,
+			gosiwonBuilding,
+			gosiwonFacilities,
 		} = req.body;
 
 		if (!name) {
@@ -258,6 +277,7 @@ exports.createGosiwon = async (req, res, next) => {
 
 		const esntlId = await generateGosiwonId(transaction);
 
+		// gosiwon 테이블에 데이터 삽입
 		await gosiwon.create(
 			{
 				esntlId: esntlId,
@@ -309,6 +329,66 @@ exports.createGosiwon = async (req, res, next) => {
 			{ transaction }
 		);
 
+		// gosiwonUse 테이블에 데이터 삽입 (데이터가 있는 경우)
+		if (gosiwonUse) {
+			const useColumns = Object.keys(gosiwonUse)
+				.map((key) => `\`${key}\``)
+				.join(', ');
+			const useValues = Object.keys(gosiwonUse)
+				.map(() => '?')
+				.join(', ');
+			const useParams = [esntlId, ...Object.values(gosiwonUse)];
+
+			await mariaDBSequelize.query(
+				`INSERT INTO gosiwonUse (esntlId, ${useColumns}) VALUES (?, ${useValues})`,
+				{
+					replacements: useParams,
+					transaction,
+					type: mariaDBSequelize.QueryTypes.INSERT,
+				}
+			);
+		}
+
+		// gosiwonBuilding 테이블에 데이터 삽입 (데이터가 있는 경우)
+		if (gosiwonBuilding) {
+			const buildingColumns = Object.keys(gosiwonBuilding)
+				.map((key) => `\`${key}\``)
+				.join(', ');
+			const buildingValues = Object.keys(gosiwonBuilding)
+				.map(() => '?')
+				.join(', ');
+			const buildingParams = [esntlId, ...Object.values(gosiwonBuilding)];
+
+			await mariaDBSequelize.query(
+				`INSERT INTO gosiwonBuilding (esntlId, ${buildingColumns}) VALUES (?, ${buildingValues})`,
+				{
+					replacements: buildingParams,
+					transaction,
+					type: mariaDBSequelize.QueryTypes.INSERT,
+				}
+			);
+		}
+
+		// gosiwonFacilities 테이블에 데이터 삽입 (데이터가 있는 경우)
+		if (gosiwonFacilities) {
+			const facilitiesColumns = Object.keys(gosiwonFacilities)
+				.map((key) => `\`${key}\``)
+				.join(', ');
+			const facilitiesValues = Object.keys(gosiwonFacilities)
+				.map(() => '?')
+				.join(', ');
+			const facilitiesParams = [esntlId, ...Object.values(gosiwonFacilities)];
+
+			await mariaDBSequelize.query(
+				`INSERT INTO gosiwonFacilities (esntlId, ${facilitiesColumns}) VALUES (?, ${facilitiesValues})`,
+				{
+					replacements: facilitiesParams,
+					transaction,
+					type: mariaDBSequelize.QueryTypes.INSERT,
+				}
+			);
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '고시원 정보 등록 성공', { esntlId: esntlId });
@@ -324,13 +404,25 @@ exports.updateGosiwon = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { esntlId } = req.body;
+		const { esntlId, gosiwonUse, gosiwonBuilding, gosiwonFacilities } = req.body;
 
 		if (!esntlId) {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		const gosiwonInfo = await gosiwon.findByPk(esntlId);
+		// 조인 쿼리로 고시원 정보 확인
+		const checkQuery = `
+			SELECT G.esntlId
+			FROM gosiwon G 
+			WHERE G.esntlId = :esntlId
+		`;
+
+		const [gosiwonInfo] = await mariaDBSequelize.query(checkQuery, {
+			replacements: { esntlId: esntlId },
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		});
+
 		if (!gosiwonInfo) {
 			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
 		}
@@ -383,10 +475,149 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (req.body.is_controlled !== undefined) updateData.is_controlled = req.body.is_controlled ? 1 : 0;
 		if (req.body.update_dtm !== undefined) updateData.update_dtm = new Date();
 
-		await gosiwon.update(updateData, {
-			where: { esntlId: esntlId },
-			transaction,
-		});
+		// gosiwon 테이블 업데이트
+		if (Object.keys(updateData).length > 0) {
+			await gosiwon.update(updateData, {
+				where: { esntlId: esntlId },
+				transaction,
+			});
+		}
+
+		// gosiwonUse 테이블 업데이트 (데이터가 있는 경우)
+		if (gosiwonUse) {
+			const useSetClause = Object.keys(gosiwonUse)
+				.map((key) => `\`${key}\` = ?`)
+				.join(', ');
+			const useParams = [...Object.values(gosiwonUse), esntlId];
+
+			// 먼저 존재 여부 확인
+			const [existingUse] = await mariaDBSequelize.query(
+				`SELECT esntlId FROM gosiwonUse WHERE esntlId = ?`,
+				{
+					replacements: [esntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (existingUse) {
+				await mariaDBSequelize.query(
+					`UPDATE gosiwonUse SET ${useSetClause} WHERE esntlId = ?`,
+					{
+						replacements: useParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+					}
+				);
+			} else {
+				const useColumns = Object.keys(gosiwonUse)
+					.map((key) => `\`${key}\``)
+					.join(', ');
+				const useValues = Object.keys(gosiwonUse)
+					.map(() => '?')
+					.join(', ');
+				const insertParams = [esntlId, ...Object.values(gosiwonUse)];
+
+				await mariaDBSequelize.query(
+					`INSERT INTO gosiwonUse (esntlId, ${useColumns}) VALUES (?, ${useValues})`,
+					{
+						replacements: insertParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.INSERT,
+					}
+				);
+			}
+		}
+
+		// gosiwonBuilding 테이블 업데이트 (데이터가 있는 경우)
+		if (gosiwonBuilding) {
+			const buildingSetClause = Object.keys(gosiwonBuilding)
+				.map((key) => `\`${key}\` = ?`)
+				.join(', ');
+			const buildingParams = [...Object.values(gosiwonBuilding), esntlId];
+
+			const [existingBuilding] = await mariaDBSequelize.query(
+				`SELECT esntlId FROM gosiwonBuilding WHERE esntlId = ?`,
+				{
+					replacements: [esntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (existingBuilding) {
+				await mariaDBSequelize.query(
+					`UPDATE gosiwonBuilding SET ${buildingSetClause} WHERE esntlId = ?`,
+					{
+						replacements: buildingParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+					}
+				);
+			} else {
+				const buildingColumns = Object.keys(gosiwonBuilding)
+					.map((key) => `\`${key}\``)
+					.join(', ');
+				const buildingValues = Object.keys(gosiwonBuilding)
+					.map(() => '?')
+					.join(', ');
+				const insertParams = [esntlId, ...Object.values(gosiwonBuilding)];
+
+				await mariaDBSequelize.query(
+					`INSERT INTO gosiwonBuilding (esntlId, ${buildingColumns}) VALUES (?, ${buildingValues})`,
+					{
+						replacements: insertParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.INSERT,
+					}
+				);
+			}
+		}
+
+		// gosiwonFacilities 테이블 업데이트 (데이터가 있는 경우)
+		if (gosiwonFacilities) {
+			const facilitiesSetClause = Object.keys(gosiwonFacilities)
+				.map((key) => `\`${key}\` = ?`)
+				.join(', ');
+			const facilitiesParams = [...Object.values(gosiwonFacilities), esntlId];
+
+			const [existingFacilities] = await mariaDBSequelize.query(
+				`SELECT esntlId FROM gosiwonFacilities WHERE esntlId = ?`,
+				{
+					replacements: [esntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (existingFacilities) {
+				await mariaDBSequelize.query(
+					`UPDATE gosiwonFacilities SET ${facilitiesSetClause} WHERE esntlId = ?`,
+					{
+						replacements: facilitiesParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+					}
+				);
+			} else {
+				const facilitiesColumns = Object.keys(gosiwonFacilities)
+					.map((key) => `\`${key}\``)
+					.join(', ');
+				const facilitiesValues = Object.keys(gosiwonFacilities)
+					.map(() => '?')
+					.join(', ');
+				const insertParams = [esntlId, ...Object.values(gosiwonFacilities)];
+
+				await mariaDBSequelize.query(
+					`INSERT INTO gosiwonFacilities (esntlId, ${facilitiesColumns}) VALUES (?, ${facilitiesValues})`,
+					{
+						replacements: insertParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.INSERT,
+					}
+				);
+			}
+		}
 
 		await transaction.commit();
 
@@ -409,11 +640,55 @@ exports.deleteGosiwon = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		const gosiwonInfo = await gosiwon.findByPk(esntlId);
+		// 조인 쿼리로 고시원 정보 확인
+		const checkQuery = `
+			SELECT G.esntlId
+			FROM gosiwon G 
+			WHERE G.esntlId = :esntlId
+		`;
+
+		const [gosiwonInfo] = await mariaDBSequelize.query(checkQuery, {
+			replacements: { esntlId: esntlId },
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		});
+
 		if (!gosiwonInfo) {
 			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
 		}
 
+		// 관련 테이블들 삭제 (CASCADE가 설정되어 있지 않은 경우를 대비)
+		// gosiwonUse 삭제
+		await mariaDBSequelize.query(
+			`DELETE FROM gosiwonUse WHERE esntlId = ?`,
+			{
+				replacements: [esntlId],
+				transaction,
+				type: mariaDBSequelize.QueryTypes.DELETE,
+			}
+		);
+
+		// gosiwonBuilding 삭제
+		await mariaDBSequelize.query(
+			`DELETE FROM gosiwonBuilding WHERE esntlId = ?`,
+			{
+				replacements: [esntlId],
+				transaction,
+				type: mariaDBSequelize.QueryTypes.DELETE,
+			}
+		);
+
+		// gosiwonFacilities 삭제
+		await mariaDBSequelize.query(
+			`DELETE FROM gosiwonFacilities WHERE esntlId = ?`,
+			{
+				replacements: [esntlId],
+				transaction,
+				type: mariaDBSequelize.QueryTypes.DELETE,
+			}
+		);
+
+		// gosiwon 테이블 삭제 (메인 테이블은 마지막에 삭제)
 		const deleted = await gosiwon.destroy({
 			where: {
 				esntlId: esntlId,

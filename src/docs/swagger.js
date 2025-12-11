@@ -21,16 +21,45 @@ const options = {
 			schemas: {
 				GosiwonInfo: {
 					type: 'object',
+					description: '고시원 정보 (gosiwon, room, gosiwonUse, gosiwonBuilding, gosiwonFacilities, gosiwonAdmin 조인 결과)',
 					properties: {
 						esntlId: { type: 'string', description: '고유 아이디' },
 						name: { type: 'string', description: '고시원명' },
-						address: { type: 'string' },
-						address2: { type: 'string' },
-						address3: { type: 'string' },
-						longitude: { type: 'string' },
-						latitude: { type: 'string' },
-						status: { type: 'string' },
-						process: { type: 'string' },
+						address: { type: 'string', description: '주소' },
+						address2: { type: 'string', description: '상세주소' },
+						address3: { type: 'string', description: '참고주소' },
+						longitude: { type: 'string', description: '경도' },
+						latitude: { type: 'string', description: '위도' },
+						status: { type: 'string', description: '고시원상태' },
+						process: { type: 'string', description: '운영여부' },
+						// room 테이블 필드들 (예시)
+						gosiwonEsntlId: { type: 'string', description: '고시원 고유아이디 (room 테이블)' },
+						roomType: { type: 'string', description: '방타입' },
+						deposit: { type: 'integer', description: '보증금' },
+						monthlyRent: { type: 'string', description: '입실료' },
+						// gosiwonUse, gosiwonBuilding, gosiwonFacilities, gosiwonAdmin 테이블 필드들
+						// 실제 컬럼명은 동적으로 포함됨
+					},
+				},
+				GosiwonUse: {
+					type: 'object',
+					description: '고시원 사용 정보',
+					properties: {
+						esntlId: { type: 'string', description: '고시원 고유아이디' },
+					},
+				},
+				GosiwonBuilding: {
+					type: 'object',
+					description: '고시원 건물 정보',
+					properties: {
+						esntlId: { type: 'string', description: '고시원 고유아이디' },
+					},
+				},
+				GosiwonFacilities: {
+					type: 'object',
+					description: '고시원 시설 정보',
+					properties: {
+						esntlId: { type: 'string', description: '고시원 고유아이디' },
 					},
 				},
 				StandardError: {
