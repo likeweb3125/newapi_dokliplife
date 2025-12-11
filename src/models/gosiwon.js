@@ -274,6 +274,17 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.STRING(50),
 				allowNull: true,
 			},
+			penaltyRate: {
+				type: DataTypes.INTEGER(3),
+				allowNull: true,
+				comment: '위약금 비율',
+			},
+			penaltyMin: {
+				type: DataTypes.INTEGER,
+				allowNull: true,
+				defaultValue: 0,
+				comment: '최소 위약금',
+			},
 		},
 		{
 			timestamps: false,

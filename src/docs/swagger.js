@@ -32,6 +32,8 @@ const options = {
 						latitude: { type: 'string', description: '위도' },
 						status: { type: 'string', description: '고시원상태' },
 						process: { type: 'string', description: '운영여부' },
+						penaltyRate: { type: 'integer', description: '위약금 비율' },
+						penaltyMin: { type: 'integer', description: '최소 위약금' },
 						// room 테이블 필드들 (예시)
 						gosiwonEsntlId: { type: 'string', description: '고시원 고유아이디 (room 테이블)' },
 						roomType: { type: 'string', description: '방타입' },

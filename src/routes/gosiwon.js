@@ -198,6 +198,14 @@ router.get('/info', gosiwonController.getGosiwonInfo);
  *                 type: boolean
  *                 description: 관제서비스 이용 여부
  *                 example: false
+ *               penaltyRate:
+ *                 type: integer
+ *                 description: 위약금 비율
+ *                 example: 10
+ *               penaltyMin:
+ *                 type: integer
+ *                 description: 최소 위약금
+ *                 example: 50000
  *               gosiwonUse:
  *                 type: object
  *                 description: 고시원 사용 정보 (선택사항)
@@ -399,6 +407,14 @@ router.post('/info', gosiwonController.createGosiwon);
  *               is_controlled:
  *                 type: boolean
  *                 description: 관제서비스 이용 여부
+ *               penaltyRate:
+ *                 type: integer
+ *                 description: 위약금 비율
+ *                 example: 10
+ *               penaltyMin:
+ *                 type: integer
+ *                 description: 최소 위약금
+ *                 example: 50000
  *               gosiwonUse:
  *                 type: object
  *                 description: 고시원 사용 정보 (선택사항, 존재하면 업데이트, 없으면 생성)

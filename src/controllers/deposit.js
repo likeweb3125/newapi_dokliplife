@@ -588,6 +588,7 @@ exports.createDeposit = async (req, res, next) => {
 			gosiwonEsntlId,
 			customerEsntlId,
 			contractorEsntlId,
+			contractEsntlId,
 			reservationDepositAmount,
 			depositAmount,
 			accountBank,
@@ -633,6 +634,7 @@ exports.createDeposit = async (req, res, next) => {
 				gosiwonEsntlId,
 				customerEsntlId: customerEsntlId || null,
 				contractorEsntlId: contractorEsntlId || null,
+				contractEsntlId: contractEsntlId || null,
 				reservationDepositAmount: reservationDepositAmount || 0,
 				depositAmount: depositAmount || 0,
 				accountBank: accountBank || null,
@@ -656,6 +658,7 @@ exports.createDeposit = async (req, res, next) => {
 				esntlId: historyId,
 				depositEsntlId: esntlId,
 				roomEsntlId: roomEsntlId, // 방 고유아이디 저장
+					contractEsntlId: contractEsntlId || null,
 				type: 'DEPOSIT',
 				amount: 0,
 				status: 'DEPOSIT_PENDING',
@@ -686,6 +689,7 @@ exports.updateDeposit = async (req, res, next) => {
 			esntlId,
 			customerEsntlId,
 			contractorEsntlId,
+			contractEsntlId,
 			reservationDepositAmount,
 			depositAmount,
 			accountBank,
@@ -721,6 +725,10 @@ exports.updateDeposit = async (req, res, next) => {
 		if (contractorEsntlId !== undefined && contractorEsntlId !== depositInfo.contractorEsntlId) {
 			updateData.contractorEsntlId = contractorEsntlId;
 			changes.push(`계약자: ${depositInfo.contractorEsntlId || '없음'} → ${contractorEsntlId || '없음'}`);
+		}
+		if (contractEsntlId !== undefined && contractEsntlId !== depositInfo.contractEsntlId) {
+			updateData.contractEsntlId = contractEsntlId;
+			changes.push(`계약서ID: ${depositInfo.contractEsntlId || '없음'} → ${contractEsntlId || '없음'}`);
 		}
 		if (reservationDepositAmount !== undefined && reservationDepositAmount !== depositInfo.reservationDepositAmount) {
 			updateData.reservationDepositAmount = reservationDepositAmount;
@@ -777,6 +785,7 @@ exports.updateDeposit = async (req, res, next) => {
 					esntlId: historyId,
 					depositEsntlId: esntlId,
 					roomEsntlId: depositInfo.roomEsntlId, // 방 고유아이디 저장
+					contractEsntlId: contractEsntlId !== undefined ? contractEsntlId : depositInfo.contractEsntlId,
 					type: 'DEPOSIT', // 수정은 DEPOSIT 타입으로 기록 (또는 별도 타입 추가 가능)
 					amount: 0,
 					status: depositInfo.status, // 현재 상태 유지
@@ -833,6 +842,7 @@ exports.deleteDeposit = async (req, res, next) => {
 				esntlId: historyId,
 				depositEsntlId: esntlId,
 				roomEsntlId: depositInfo.roomEsntlId, // 방 고유아이디 저장
+					contractEsntlId: depositInfo.contractEsntlId || null,
 				type: 'DEPOSIT', // 삭제는 DEPOSIT 타입으로 기록
 				amount: 0,
 				status: 'DELETED',
@@ -880,6 +890,7 @@ exports.registerDeposit = async (req, res, next) => {
 		if (!finalRoomEsntlId) {
 			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
 		}
+		const finalContractEsntlId = req.body.contractEsntlId || depositInfo.contractEsntlId || null;
 
 		const targetAmount =
 			depositInfo.reservationDepositAmount || depositInfo.depositAmount;
@@ -910,6 +921,7 @@ exports.registerDeposit = async (req, res, next) => {
 				esntlId: historyId,
 				depositEsntlId: esntlId,
 				roomEsntlId: finalRoomEsntlId, // 방 고유아이디 저장
+				contractEsntlId: finalContractEsntlId,
 				type: 'DEPOSIT',
 				amount: parseInt(amount),
 				status: newStatus,
@@ -952,6 +964,7 @@ exports.registerReturn = async (req, res, next) => {
 		const {
 			esntlId,
 			roomEsntlId,
+			contractEsntlId,
 			refundDate,
 			accountBank,
 			accountNumber,
@@ -979,6 +992,7 @@ exports.registerReturn = async (req, res, next) => {
 		if (!finalRoomEsntlId) {
 			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
 		}
+		const finalContractEsntlId = contractEsntlId || depositInfo.contractEsntlId || null;
 
 		// 총 입금액 계산
 		const totalDepositAmount = await depositHistory.sum('amount', {
@@ -1010,6 +1024,7 @@ exports.registerReturn = async (req, res, next) => {
 				esntlId: historyId,
 				depositEsntlId: esntlId,
 				roomEsntlId: finalRoomEsntlId, // 방 고유아이디 저장
+				contractEsntlId: finalContractEsntlId,
 				type: 'RETURN',
 				amount: 0,
 				status: 'RETURN_COMPLETED',

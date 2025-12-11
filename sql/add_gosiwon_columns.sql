@@ -70,6 +70,18 @@ ALTER TABLE `gosiwon`
 ADD COLUMN `settlementReason` VARCHAR(100) NULL DEFAULT NULL COMMENT '정상사용유무 사유' 
 AFTER `use_settlement`;
 
+-- penaltyRate 컬럼 추가
+-- 위약금 비율을 저장하는 컬럼
+ALTER TABLE `gosiwon`
+ADD COLUMN `penaltyRate` INT(3) NULL COMMENT '위약금 비율'
+AFTER `settlementReason`;
+
+-- penaltyMin 컬럼 추가
+-- 최소 위약금을 저장하는 컬럼
+ALTER TABLE `gosiwon`
+ADD COLUMN `penaltyMin` INT NULL DEFAULT 0 COMMENT '최소 위약금'
+AFTER `penaltyRate`;
+
 -- =============================================
 -- 인덱스 추가 (성능 최적화)
 -- =============================================

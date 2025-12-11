@@ -73,11 +73,12 @@ exports.getGosiwonInfo = async (req, res, next) => {
 
 		// 여러 테이블을 조인하여 고시원 정보 조회
 		const query = `
-                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason,G.is_controlled,G.is_favorite
+                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason,G.is_controlled,G.is_favorite,G.penaltyRate,G.penaltyMin
                     ,GA.hp adminHP, GA.ceo admin
                     ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
                     ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
                     ,GU.deposit,GU.qualified,GU.minAge,GU.maxAge,GU.minUsedDate,GU.gender,GU.foreignLanguage,GU.orderData useOrderData 
+                    ,IGC.gsc_payment_able_start_date ableCheckDays, IGC.gsc_payment_able_end_date ableContractDays, IGC.gsc_checkInTimeStart checkInTimeStart, IGC.gsc_checkInTimeEnd checkInTimeEnd, IGC.gsc_checkOutTime checkOutTime
 			FROM gosiwon G 
 			LEFT OUTER JOIN room R 
 				ON G.esntlId = R.gosiwonEsntlId 
@@ -89,9 +90,23 @@ exports.getGosiwonInfo = async (req, res, next) => {
 				ON G.esntlId = GF.esntlId 
 			LEFT OUTER JOIN gosiwonAdmin GA 
 				ON G.adminEsntlId = GA.esntlId 
+			LEFT OUTER JOIN il_gosiwon_config IGC 
+				ON G.esntlId = IGC.gsw_eid 
 			WHERE G.esntlId = :esntlId 
 			GROUP BY G.esntlId
 		`;
+		//위약금비율:penaltyRate
+		//최소위약금:penaltyMin
+		//부대시설 : rest (^readingRoom^rooftop^fitness)
+		//식사제공 : meal (^rice^kimchi^noodle^coffee^)
+		//전입신고 : qualified (^T^)		//입실가능기간 : "ableCheckDays": 2,
+		//계약가능기간 : "ableContractDays": 10,
+		//입실가능시작시간 :"checkInTimeStart": null,
+		//입실가능종료시간 :"checkInTimeEnd": null,
+		//퇴실시간 :"checkOutTime": null
+
+
+
 
 		const [gosiwonInfo] = await mariaDBSequelize.query(query, {
 			replacements: { esntlId: esntlId },
@@ -261,6 +276,8 @@ exports.createGosiwon = async (req, res, next) => {
 			serviceNumber,
 			district,
 			is_controlled,
+			penaltyRate,
+			penaltyMin,
 			// 관련 테이블 데이터
 			gosiwonUse,
 			gosiwonBuilding,
@@ -325,6 +342,8 @@ exports.createGosiwon = async (req, res, next) => {
 				district: district || null,
 				adminEsntlId: decodedToken.admin,
 				is_controlled: is_controlled !== undefined ? (is_controlled ? 1 : 0) : 0,
+				penaltyRate: penaltyRate !== undefined ? penaltyRate : null,
+				penaltyMin: penaltyMin !== undefined ? penaltyMin : 0,
 			},
 			{ transaction }
 		);
@@ -473,6 +492,12 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (req.body.serviceNumber !== undefined) updateData.serviceNumber = req.body.serviceNumber;
 		if (req.body.district !== undefined) updateData.district = req.body.district;
 		if (req.body.is_controlled !== undefined) updateData.is_controlled = req.body.is_controlled ? 1 : 0;
+		if (req.body.penaltyRate !== undefined) updateData.penaltyRate = req.body.penaltyRate;
+		if (req.body.penaltyMin !== undefined)
+			updateData.penaltyMin =
+				req.body.penaltyMin !== null && req.body.penaltyMin !== undefined
+					? req.body.penaltyMin
+					: 0;
 		if (req.body.update_dtm !== undefined) updateData.update_dtm = new Date();
 
 		// gosiwon 테이블 업데이트

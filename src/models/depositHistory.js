@@ -21,6 +21,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'roomEsntlId',
 				comment: '방 고유아이디',
 			},
+			contractEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'contractEsntlId',
+				comment: '방계약 고유아이디',
+			},
 			type: {
 				type: DataTypes.STRING(50),
 				allowNull: false,

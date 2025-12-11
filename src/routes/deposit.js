@@ -159,6 +159,9 @@ router.get('/info', depositController.getDepositInfo);
  *               contractorEsntlId:
  *                 type: string
  *                 description: 계약자 고유 아이디
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 방계약 고유 아이디
  *               reservationDepositAmount:
  *                 type: integer
  *                 description: 예약금 금액
@@ -237,6 +240,9 @@ router.post('/create', depositController.createDeposit);
  *               contractorEsntlId:
  *                 type: string
  *                 description: 계약자 고유 아이디
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 방계약 고유 아이디
  *               reservationDepositAmount:
  *                 type: integer
  *                 description: 예약금 금액
@@ -341,6 +347,9 @@ router.delete('/delete', depositController.deleteDeposit);
  *                 type: string
  *                 description: 방 고유 아이디
  *                 example: ROOM0000025359
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 방계약 고유 아이디(선택)
  *               depositDate:
  *                 type: string
  *                 format: date-time
@@ -394,6 +403,9 @@ router.post('/register-deposit', depositController.registerDeposit);
  *                 type: string
  *                 description: 방 고유 아이디
  *                 example: ROOM0000025359
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 방계약 고유 아이디(선택)
  *               refundDate:
  *                 type: string
  *                 format: date-time

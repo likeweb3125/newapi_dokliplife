@@ -4,8 +4,8 @@ pipeline {
     environment {
         REPO_URL   = 'https://github.com/likeweb3125/newapi_dokliplife.git'
         APP_DIR    = '/home/dokliplife/newapi.dokliplife.co.kr'
-        // RECIPIENTS = 'ohsjwe@likeweb.co.kr,shan@likeweb.co.kr,crazin@likeweb.co.kr'
-        RECIPIENTS = 'crazin@likeweb.co.kr'
+        RECIPIENTS = 'ohsjwe@likeweb.co.kr,syeon@likeweb.co.kr,crazin@likeweb.co.kr'
+        // RECIPIENTS = 'crazin@likeweb.co.kr'
     }
 
     stages {

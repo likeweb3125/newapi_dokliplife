@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   `gosiwonEsntlId` VARCHAR(50) NOT NULL COMMENT '고시원 고유아이디',
   `customerEsntlId` VARCHAR(50) NULL COMMENT '예약자/입실자 고유아이디',
   `contractorEsntlId` VARCHAR(50) NULL COMMENT '계약자 고유아이디',
+  `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디',
   `reservationDepositAmount` INT(11) NULL DEFAULT 0 COMMENT '예약금 금액',
   `depositAmount` INT(11) NULL DEFAULT 0 COMMENT '보증금 금액',
   `accountBank` VARCHAR(50) NULL COMMENT '은행명',
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   INDEX `idx_gosiwonEsntlId` (`gosiwonEsntlId`),
   INDEX `idx_customerEsntlId` (`customerEsntlId`),
   INDEX `idx_contractorEsntlId` (`contractorEsntlId`),
+  INDEX `idx_contractEsntlId` (`contractEsntlId`),
   INDEX `idx_status` (`status`),
   INDEX `idx_contractStatus` (`contractStatus`),
   INDEX `idx_deleteYN` (`deleteYN`),
@@ -49,6 +51,10 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   CONSTRAINT `fk_deposit_contractor` FOREIGN KEY (`contractorEsntlId`) 
     REFERENCES `customer` (`esntlId`) 
     ON DELETE SET NULL 
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_deposit_roomContract` FOREIGN KEY (`contractEsntlId`) 
+    REFERENCES `roomContract` (`esntlId`) 
+    ON DELETE SET NULL 
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci COMMENT='보증금(예약금) 관리 메인 테이블';
 
@@ -58,6 +64,7 @@ CREATE TABLE IF NOT EXISTS `depositHistory` (
   `esntlId` VARCHAR(50) NOT NULL COMMENT '이력 고유아이디',
   `depositEsntlId` VARCHAR(50) NOT NULL COMMENT '보증금 고유아이디',
   `roomEsntlId` VARCHAR(50) NOT NULL COMMENT '방 고유아이디',
+  `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디',
   `type` VARCHAR(50) NOT NULL COMMENT '타입 (DEPOSIT: 입금, RETURN: 반환)',
   `amount` INT(11) NOT NULL DEFAULT 0 COMMENT '금액',
   `status` VARCHAR(50) NOT NULL COMMENT '상태 (DEPOSIT_PENDING: 입금대기, PARTIAL_DEPOSIT: 부분입금, DEPOSIT_COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DEPOSIT_RE_REQUEST: 입금재요청, VIRTUAL_ACCOUNT_ISSUED: 가상계좌 발급, VIRTUAL_ACCOUNT_EXPIRED: 가상계좌 만료)',
@@ -76,6 +83,7 @@ CREATE TABLE IF NOT EXISTS `depositHistory` (
   PRIMARY KEY (`esntlId`),
   INDEX `idx_depositEsntlId` (`depositEsntlId`),
   INDEX `idx_roomEsntlId` (`roomEsntlId`),
+  INDEX `idx_contractEsntlId` (`contractEsntlId`),
   INDEX `idx_type` (`type`),
   INDEX `idx_status` (`status`),
   INDEX `idx_depositDate` (`depositDate`),
@@ -88,6 +96,10 @@ CREATE TABLE IF NOT EXISTS `depositHistory` (
   CONSTRAINT `fk_depositHistory_room` FOREIGN KEY (`roomEsntlId`) 
     REFERENCES `room` (`esntlId`) 
     ON DELETE CASCADE 
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_depositHistory_roomContract` FOREIGN KEY (`contractEsntlId`) 
+    REFERENCES `roomContract` (`esntlId`) 
+    ON DELETE SET NULL 
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci COMMENT='입금/반환 이력 테이블';
 
@@ -119,4 +131,44 @@ CREATE INDEX `idx_deposit_customer_status` ON `deposit` (`customerEsntlId`, `sta
 
 -- depositHistory 테이블 복합 인덱스
 CREATE INDEX `idx_depositHistory_deposit_type` ON `depositHistory` (`depositEsntlId`, `type`, `createdAt`);
+
+-- =============================================
+-- 기존 테이블에 contractEsntlId 컬럼 추가 (이미 테이블이 생성된 경우)
+-- =============================================
+
+-- deposit 테이블에 contractEsntlId 컬럼 추가
+-- 주의: 이미 컬럼이 존재하는 경우 오류가 발생할 수 있습니다.
+ALTER TABLE `deposit` 
+ADD COLUMN `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디' 
+AFTER `contractorEsntlId`;
+
+-- deposit 테이블에 contractEsntlId 인덱스 추가
+-- 주의: 이미 인덱스가 존재하는 경우 오류가 발생할 수 있습니다.
+CREATE INDEX `idx_contractEsntlId` ON `deposit` (`contractEsntlId`);
+
+-- deposit 테이블에 외래키 제약조건 추가
+-- 주의: 이미 제약조건이 존재하는 경우 오류가 발생할 수 있습니다.
+ALTER TABLE `deposit` 
+ADD CONSTRAINT `fk_deposit_roomContract` FOREIGN KEY (`contractEsntlId`) 
+  REFERENCES `roomContract` (`esntlId`) 
+  ON DELETE SET NULL 
+  ON UPDATE CASCADE;
+
+-- depositHistory 테이블에 contractEsntlId 컬럼 추가
+-- 주의: 이미 컬럼이 존재하는 경우 오류가 발생할 수 있습니다.
+ALTER TABLE `depositHistory` 
+ADD COLUMN `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디' 
+AFTER `roomEsntlId`;
+
+-- depositHistory 테이블에 contractEsntlId 인덱스 추가
+-- 주의: 이미 인덱스가 존재하는 경우 오류가 발생할 수 있습니다.
+CREATE INDEX `idx_contractEsntlId` ON `depositHistory` (`contractEsntlId`);
+
+-- depositHistory 테이블에 외래키 제약조건 추가
+-- 주의: 이미 제약조건이 존재하는 경우 오류가 발생할 수 있습니다.
+ALTER TABLE `depositHistory` 
+ADD CONSTRAINT `fk_depositHistory_roomContract` FOREIGN KEY (`contractEsntlId`) 
+  REFERENCES `roomContract` (`esntlId`) 
+  ON DELETE SET NULL 
+  ON UPDATE CASCADE;
 
