@@ -130,6 +130,7 @@ exports.createRoomActionHistory = async (req, res, next) => {
 
 		const {
 			roomEsntlId,
+			contractEsntlId,
 			actionType,
 			statusFrom,
 			statusTo,
@@ -165,6 +166,7 @@ exports.createRoomActionHistory = async (req, res, next) => {
 			{
 				esntlId: actionId,
 				roomEsntlId,
+				contractEsntlId: contractEsntlId || null,
 				actionType,
 				statusFrom: statusFrom || null,
 				statusTo: statusTo || null,

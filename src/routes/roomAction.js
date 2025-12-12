@@ -94,6 +94,10 @@ router.get('/action/history', roomActionHistoryController.getRoomActionHistory);
  *               roomEsntlId:
  *                 type: string
  *                 example: ROOM0000022725
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 방계약 고유아이디
+ *                 example: RCO0000000001
  *               actionType:
  *                 type: string
  *                 enum:

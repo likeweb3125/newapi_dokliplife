@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS `roomActionHistory` (
   `esntlId` VARCHAR(50) NOT NULL COMMENT '액션 이력 고유아이디',
   `roomEsntlId` VARCHAR(50) NOT NULL COMMENT '방 고유아이디',
+  `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디',
   `actionType` VARCHAR(50) NOT NULL COMMENT '액션 타입 (RESERVE, PAYMENT, DEPOSIT, REFUND, STATUS_CHANGE, MEMO, FILE_UPLOAD, CHECKIN, CHECKOUT_REQUEST, CHECKOUT_CONFIRM 등)',
   `statusFrom` VARCHAR(50) NULL COMMENT '변경 전 상태 (상태 변경 시)',
   `statusTo` VARCHAR(50) NULL COMMENT '변경 후 상태 (상태 변경 시)',
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `roomActionHistory` (
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`esntlId`),
   INDEX `idx_roomEsntlId` (`roomEsntlId`),
+  INDEX `idx_contractEsntlId` (`contractEsntlId`),
   INDEX `idx_actionType` (`actionType`),
   INDEX `idx_createdAt` (`createdAt`),
   INDEX `idx_actorAdminId` (`actorAdminId`),
@@ -29,6 +31,10 @@ CREATE TABLE IF NOT EXISTS `roomActionHistory` (
   CONSTRAINT `fk_roomActionHistory_room` FOREIGN KEY (`roomEsntlId`)
     REFERENCES `room` (`esntlId`)
     ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_roomActionHistory_contract` FOREIGN KEY (`contractEsntlId`)
+    REFERENCES `roomContract` (`esntlId`)
+    ON DELETE SET NULL
     ON UPDATE CASCADE,
   CONSTRAINT `fk_roomActionHistory_customer` FOREIGN KEY (`actorCustomerId`)
     REFERENCES `customer` (`esntlId`)
