@@ -206,27 +206,90 @@ router.get('/info', gosiwonController.getGosiwonInfo);
  *                 type: integer
  *                 description: 최소 위약금
  *                 example: 50000
+ *               qrPoint:
+ *                 type: string
+ *                 description: QR 포인트
+ *               use_deposit:
+ *                 type: boolean
+ *                 description: 보증금 사용 여부
+ *                 example: false
+ *               use_sale_commision:
+ *                 type: boolean
+ *                 description: 할인 수수료 적용 여부
+ *                 example: false
+ *               saleCommisionStartDate:
+ *                 type: string
+ *                 description: 할인 수수료 시작일
+ *               saleCommisionEndDate:
+ *                 type: string
+ *                 description: 할인 수수료 종료일
+ *               saleCommision:
+ *                 type: integer
+ *                 description: 할인 수수료율
+ *               use_settlement:
+ *                 type: boolean
+ *                 description: 정산 사용 여부
+ *                 example: false
+ *               settlementReason:
+ *                 type: string
+ *                 description: 정산 사용 사유
+ *               ableCheckDays:
+ *                 type: integer
+ *                 description: 입실 가능 기간
+ *                 example: 2
+ *               ableContractDays:
+ *                 type: integer
+ *                 description: 계약 가능 기간
+ *                 example: 10
+ *               checkInTimeStart:
+ *                 type: string
+ *                 description: 체크인 가능 시작시간 (ex - AM|9|00)
+ *               checkInTimeEnd:
+ *                 type: string
+ *                 description: 체크인 가능 종료시간 (ex - PM|9|00)
+ *               checkOutTime:
+ *                 type: string
+ *                 description: 퇴실시간 (ex - AM|11|00)
  *               gosiwonUse:
  *                 type: object
  *                 description: 고시원 사용 정보 (선택사항)
  *                 additionalProperties: true
  *                 example:
- *                   field1: value1
- *                   field2: value2
+ *                   deposit: 500000
+ *                   qualified: "^T^"
+ *                   minAge: 18
+ *                   maxAge: 35
+ *                   minUsedDate: 30
+ *                   gender: "M"
+ *                   foreignLanguage: "Y"
+ *                   orderData: 1
  *               gosiwonBuilding:
  *                 type: object
  *                 description: 고시원 건물 정보 (선택사항)
  *                 additionalProperties: true
  *                 example:
- *                   field1: value1
- *                   field2: value2
+ *                   floorInfo: "지하1층~5층"
+ *                   useFloor: "1층~5층"
+ *                   wallMaterial: "콘크리트"
+ *                   elevator: "Y"
+ *                   parking: "Y"
  *               gosiwonFacilities:
  *                 type: object
  *                 description: 고시원 시설 정보 (선택사항)
  *                 additionalProperties: true
  *                 example:
- *                   field1: value1
- *                   field2: value2
+ *                   safety: "Y"
+ *                   fire: "Y"
+ *                   vicinity: "지하철역 도보 5분"
+ *                   temp: "개별난방"
+ *                   internet: "Y"
+ *                   meal: "^rice^kimchi^noodle^coffee^"
+ *                   equipment: "냉장고,세탁기"
+ *                   sanitation: "Y"
+ *                   kitchen: "공용주방"
+ *                   wash: "공용세탁실"
+ *                   rest: "^readingRoom^rooftop^fitness"
+ *                   orderData: 1
  *     responses:
  *       200:
  *         description: 고시원 정보 등록 성공
@@ -415,27 +478,87 @@ router.post('/info', gosiwonController.createGosiwon);
  *                 type: integer
  *                 description: 최소 위약금
  *                 example: 50000
+ *               qrPoint:
+ *                 type: string
+ *                 description: QR 포인트
+ *               use_deposit:
+ *                 type: boolean
+ *                 description: 보증금 사용 여부
+ *               use_sale_commision:
+ *                 type: boolean
+ *                 description: 할인 수수료 적용 여부
+ *               saleCommisionStartDate:
+ *                 type: string
+ *                 description: 할인 수수료 시작일
+ *               saleCommisionEndDate:
+ *                 type: string
+ *                 description: 할인 수수료 종료일
+ *               saleCommision:
+ *                 type: integer
+ *                 description: 할인 수수료율
+ *               use_settlement:
+ *                 type: boolean
+ *                 description: 정산 사용 여부
+ *               settlementReason:
+ *                 type: string
+ *                 description: 정산 사용 사유
+ *               ableCheckDays:
+ *                 type: integer
+ *                 description: 입실 가능 기간
+ *                 example: 2
+ *               ableContractDays:
+ *                 type: integer
+ *                 description: 계약 가능 기간
+ *                 example: 10
+ *               checkInTimeStart:
+ *                 type: string
+ *                 description: 체크인 가능 시작시간 (ex - AM|9|00)
+ *               checkInTimeEnd:
+ *                 type: string
+ *                 description: 체크인 가능 종료시간 (ex - PM|9|00)
+ *               checkOutTime:
+ *                 type: string
+ *                 description: 퇴실시간 (ex - AM|11|00)
  *               gosiwonUse:
  *                 type: object
  *                 description: 고시원 사용 정보 (선택사항, 존재하면 업데이트, 없으면 생성)
  *                 additionalProperties: true
  *                 example:
- *                   field1: value1
- *                   field2: value2
+ *                   deposit: 500000
+ *                   qualified: "^T^"
+ *                   minAge: 18
+ *                   maxAge: 35
+ *                   minUsedDate: 30
+ *                   gender: "M"
+ *                   foreignLanguage: "Y"
+ *                   orderData: 1
  *               gosiwonBuilding:
  *                 type: object
  *                 description: 고시원 건물 정보 (선택사항, 존재하면 업데이트, 없으면 생성)
  *                 additionalProperties: true
  *                 example:
- *                   field1: value1
- *                   field2: value2
+ *                   floorInfo: "지하1층~5층"
+ *                   useFloor: "1층~5층"
+ *                   wallMaterial: "콘크리트"
+ *                   elevator: "Y"
+ *                   parking: "Y"
  *               gosiwonFacilities:
  *                 type: object
  *                 description: 고시원 시설 정보 (선택사항, 존재하면 업데이트, 없으면 생성)
  *                 additionalProperties: true
  *                 example:
- *                   field1: value1
- *                   field2: value2
+ *                   safety: "Y"
+ *                   fire: "Y"
+ *                   vicinity: "지하철역 도보 5분"
+ *                   temp: "개별난방"
+ *                   internet: "Y"
+ *                   meal: "^rice^kimchi^noodle^coffee^"
+ *                   equipment: "냉장고,세탁기"
+ *                   sanitation: "Y"
+ *                   kitchen: "공용주방"
+ *                   wash: "공용세탁실"
+ *                   rest: "^readingRoom^rooftop^fitness"
+ *                   orderData: 1
  *     responses:
  *       200:
  *         description: 고시원 정보 수정 성공 (관련 테이블도 함께 업데이트됨)

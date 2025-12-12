@@ -278,10 +278,24 @@ exports.createGosiwon = async (req, res, next) => {
 			is_controlled,
 			penaltyRate,
 			penaltyMin,
+			qrPoint,
+			use_deposit,
+			use_sale_commision,
+			saleCommisionStartDate,
+			saleCommisionEndDate,
+			saleCommision,
+			use_settlement,
+			settlementReason,
 			// 관련 테이블 데이터
 			gosiwonUse,
 			gosiwonBuilding,
 			gosiwonFacilities,
+			// il_gosiwon_config 데이터
+			ableCheckDays,
+			ableContractDays,
+			checkInTimeStart,
+			checkInTimeEnd,
+			checkOutTime,
 		} = req.body;
 
 		if (!name) {
@@ -344,6 +358,14 @@ exports.createGosiwon = async (req, res, next) => {
 				is_controlled: is_controlled !== undefined ? (is_controlled ? 1 : 0) : 0,
 				penaltyRate: penaltyRate !== undefined ? penaltyRate : null,
 				penaltyMin: penaltyMin !== undefined ? penaltyMin : 0,
+				qrPoint: qrPoint || null,
+				use_deposit: use_deposit !== undefined ? (use_deposit ? 1 : 0) : 0,
+				use_sale_commision: use_sale_commision !== undefined ? (use_sale_commision ? 1 : 0) : 0,
+				saleCommisionStartDate: saleCommisionStartDate || null,
+				saleCommisionEndDate: saleCommisionEndDate || null,
+				saleCommision: saleCommision !== undefined ? saleCommision : null,
+				use_settlement: use_settlement !== undefined ? (use_settlement ? 1 : 0) : 0,
+				settlementReason: settlementReason || null,
 			},
 			{ transaction }
 		);
@@ -408,6 +430,59 @@ exports.createGosiwon = async (req, res, next) => {
 			);
 		}
 
+		// il_gosiwon_config 테이블에 데이터 삽입/업데이트 (데이터가 있는 경우)
+		if (ableCheckDays !== undefined || ableContractDays !== undefined || checkInTimeStart !== undefined || checkInTimeEnd !== undefined || checkOutTime !== undefined) {
+			const configData = {};
+			if (ableCheckDays !== undefined) configData.gsc_payment_able_start_date = ableCheckDays;
+			if (ableContractDays !== undefined) configData.gsc_payment_able_end_date = ableContractDays;
+			if (checkInTimeStart !== undefined) configData.gsc_checkInTimeStart = checkInTimeStart;
+			if (checkInTimeEnd !== undefined) configData.gsc_checkInTimeEnd = checkInTimeEnd;
+			if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;
+
+			// 먼저 존재 여부 확인
+			const [existingConfig] = await mariaDBSequelize.query(
+				`SELECT gsw_eid FROM il_gosiwon_config WHERE gsw_eid = ?`,
+				{
+					replacements: [esntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (existingConfig) {
+				const configSetClause = Object.keys(configData)
+					.map((key) => `\`${key}\` = ?`)
+					.join(', ');
+				const configParams = [...Object.values(configData), esntlId];
+
+				await mariaDBSequelize.query(
+					`UPDATE il_gosiwon_config SET ${configSetClause} WHERE gsw_eid = ?`,
+					{
+						replacements: configParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+					}
+				);
+			} else {
+				const configColumns = Object.keys(configData)
+					.map((key) => `\`${key}\``)
+					.join(', ');
+				const configValues = Object.keys(configData)
+					.map(() => '?')
+					.join(', ');
+				const configInsertParams = [esntlId, ...Object.values(configData)];
+
+				await mariaDBSequelize.query(
+					`INSERT INTO il_gosiwon_config (gsw_eid, ${configColumns}) VALUES (?, ${configValues})`,
+					{
+						replacements: configInsertParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.INSERT,
+					}
+				);
+			}
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '고시원 정보 등록 성공', { esntlId: esntlId });
@@ -423,7 +498,18 @@ exports.updateGosiwon = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { esntlId, gosiwonUse, gosiwonBuilding, gosiwonFacilities } = req.body;
+		const { 
+			esntlId, 
+			gosiwonUse, 
+			gosiwonBuilding, 
+			gosiwonFacilities,
+			// il_gosiwon_config 데이터
+			ableCheckDays,
+			ableContractDays,
+			checkInTimeStart,
+			checkInTimeEnd,
+			checkOutTime,
+		} = req.body;
 
 		if (!esntlId) {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
@@ -498,6 +584,14 @@ exports.updateGosiwon = async (req, res, next) => {
 				req.body.penaltyMin !== null && req.body.penaltyMin !== undefined
 					? req.body.penaltyMin
 					: 0;
+		if (req.body.qrPoint !== undefined) updateData.qrPoint = req.body.qrPoint;
+		if (req.body.use_deposit !== undefined) updateData.use_deposit = req.body.use_deposit ? 1 : 0;
+		if (req.body.use_sale_commision !== undefined) updateData.use_sale_commision = req.body.use_sale_commision ? 1 : 0;
+		if (req.body.saleCommisionStartDate !== undefined) updateData.saleCommisionStartDate = req.body.saleCommisionStartDate;
+		if (req.body.saleCommisionEndDate !== undefined) updateData.saleCommisionEndDate = req.body.saleCommisionEndDate;
+		if (req.body.saleCommision !== undefined) updateData.saleCommision = req.body.saleCommision;
+		if (req.body.use_settlement !== undefined) updateData.use_settlement = req.body.use_settlement ? 1 : 0;
+		if (req.body.settlementReason !== undefined) updateData.settlementReason = req.body.settlementReason;
 		if (req.body.update_dtm !== undefined) updateData.update_dtm = new Date();
 
 		// gosiwon 테이블 업데이트
@@ -637,6 +731,58 @@ exports.updateGosiwon = async (req, res, next) => {
 					`INSERT INTO gosiwonFacilities (esntlId, ${facilitiesColumns}) VALUES (?, ${facilitiesValues})`,
 					{
 						replacements: insertParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.INSERT,
+					}
+				);
+			}
+		}
+
+		// il_gosiwon_config 테이블 업데이트 (데이터가 있는 경우)
+		if (ableCheckDays !== undefined || ableContractDays !== undefined || checkInTimeStart !== undefined || checkInTimeEnd !== undefined || checkOutTime !== undefined) {
+			const configData = {};
+			if (ableCheckDays !== undefined) configData.gsc_payment_able_start_date = ableCheckDays;
+			if (ableContractDays !== undefined) configData.gsc_payment_able_end_date = ableContractDays;
+			if (checkInTimeStart !== undefined) configData.gsc_checkInTimeStart = checkInTimeStart;
+			if (checkInTimeEnd !== undefined) configData.gsc_checkInTimeEnd = checkInTimeEnd;
+			if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;
+
+			const [existingConfig] = await mariaDBSequelize.query(
+				`SELECT gsw_eid FROM il_gosiwon_config WHERE gsw_eid = ?`,
+				{
+					replacements: [esntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (existingConfig) {
+				const configSetClause = Object.keys(configData)
+					.map((key) => `\`${key}\` = ?`)
+					.join(', ');
+				const configParams = [...Object.values(configData), esntlId];
+
+				await mariaDBSequelize.query(
+					`UPDATE il_gosiwon_config SET ${configSetClause} WHERE gsw_eid = ?`,
+					{
+						replacements: configParams,
+						transaction,
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+					}
+				);
+			} else {
+				const configColumns = Object.keys(configData)
+					.map((key) => `\`${key}\``)
+					.join(', ');
+				const configValues = Object.keys(configData)
+					.map(() => '?')
+					.join(', ');
+				const configInsertParams = [esntlId, ...Object.values(configData)];
+
+				await mariaDBSequelize.query(
+					`INSERT INTO il_gosiwon_config (gsw_eid, ${configColumns}) VALUES (?, ${configValues})`,
+					{
+						replacements: configInsertParams,
 						transaction,
 						type: mariaDBSequelize.QueryTypes.INSERT,
 					}
