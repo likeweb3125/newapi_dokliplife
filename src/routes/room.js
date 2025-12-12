@@ -17,7 +17,7 @@ const roomMemoController = require('../controllers/roomMemo');
  * /v1/room/list:
  *   get:
  *     summary: 방 목록 조회
- *     description: 고시원 ID로 방 목록을 조회합니다. roomName이 제공되면 추가 필터링되고, sortBy로 정렬 기준을 지정할 수 있습니다. 정렬 기준은 roomName, roomStatus, roomType, winType, rentFee입니다. 기본값은 orderNo 오름차순입니다.
+ *     description: 고시원 ID로 방 목록을 조회합니다. roomContract, roomSee, roomLike, il_room_reservation 테이블을 조인하여 계약 정보, 조회수, 좋아요 수, 예약 정보를 포함합니다.
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -44,6 +44,13 @@ const roomMemoController = require('../controllers/roomMemo');
  *           enum: [roomName, roomStatus, roomType, winType, rentFee]
  *         description: 정렬 기준 (선택사항, 기본값은 orderNo 오름차순)
  *         example: rentFee
+ *       - in: query
+ *         name: contractStatus
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 계약 상태 필터 (선택사항, roomContract 테이블의 status 필터링)
+ *         example: ACTIVE
  *     responses:
  *       200:
  *         description: 방 목록 조회 성공
@@ -62,7 +69,85 @@ const roomMemoController = require('../controllers/roomMemo');
  *                   type: array
  *                   items:
  *                     type: object
- *                     description: 방 정보 전체
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 방 고유 아이디
+ *                       roomType:
+ *                         type: string
+ *                         description: 방 타입
+ *                       roomCategory:
+ *                         type: string
+ *                         description: 방 카테고리
+ *                       rom_deposit:
+ *                         type: number
+ *                         description: 보증금(만원 단위)
+ *                       monthlyRent:
+ *                         type: string
+ *                         description: 입실료
+ *                       window:
+ *                         type: string
+ *                         description: 창 타입
+ *                       option:
+ *                         type: string
+ *                         description: 방 옵션
+ *                       orderOption:
+ *                         type: string
+ *                         description: 방 옵션 정렬 값
+ *                       roomNumber:
+ *                         type: string
+ *                         description: 방번호
+ *                       floor:
+ *                         type: string
+ *                         description: 층
+ *                       intro:
+ *                         type: string
+ *                         description: 소개
+ *                       empty:
+ *                         type: string
+ *                         description: 빈방 여부
+ *                       status:
+ *                         type: string
+ *                         description: 방 상태
+ *                       description:
+ *                         type: string
+ *                         description: 방 설명
+ *                       top:
+ *                         type: string
+ *                         description: 상단 표시 여부
+ *                       rom_checkout_expected_date:
+ *                         type: string
+ *                         description: 예정 퇴실일
+ *                       startDate:
+ *                         type: string
+ *                         description: 계약 시작일 (roomContract)
+ *                       endDate:
+ *                         type: string
+ *                         description: 계약 종료일 (roomContract)
+ *                       month:
+ *                         type: string
+ *                         description: 계약 기간 (roomContract)
+ *                       customerEsntlId:
+ *                         type: string
+ *                         description: 사용자 고유아이디
+ *                       rom_successor_eid:
+ *                         type: string
+ *                         description: 승계 방 고유아이디
+ *                       rom_dp_at:
+ *                         type: string
+ *                         description: DP방 여부
+ *                       deleteYN:
+ *                         type: string
+ *                         description: 삭제 여부
+ *                       see:
+ *                         type: integer
+ *                         description: 조회수 (roomSee 카운트)
+ *                       likes:
+ *                         type: integer
+ *                         description: 좋아요 수 (roomLike 카운트)
+ *                       ror_sn:
+ *                         type: string
+ *                         description: 예약 고유번호 (il_room_reservation, WAIT 상태만)
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -105,7 +190,77 @@ router.get('/list', roomController.getRoomList);
  *                   example: 방 정보 조회 성공
  *                 data:
  *                   type: object
- *                   description: 방 정보 전체
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 방 고유 아이디
+ *                     gosiwonEsntlId:
+ *                       type: string
+ *                       description: 고시원 고유 아이디
+ *                     roomType:
+ *                       type: string
+ *                       description: 방 타입
+ *                     roomCategory:
+ *                       type: string
+ *                       description: 방 카테고리
+ *                     rom_deposit:
+ *                       type: number
+ *                       description: 보증금(만원 단위)
+ *                     monthlyRent:
+ *                       type: string
+ *                       description: 입실료
+ *                     startDate:
+ *                       type: string
+ *                       description: 계약 시작일
+ *                     endDate:
+ *                       type: string
+ *                       description: 계약 종료일
+ *                     rom_checkout_expected_date:
+ *                       type: string
+ *                       description: 예정 퇴실일
+ *                     window:
+ *                       type: string
+ *                       description: 창 타입
+ *                     option:
+ *                       type: string
+ *                       description: 방 옵션
+ *                     orderOption:
+ *                       type: string
+ *                       description: 방 옵션 정렬 값
+ *                     roomNumber:
+ *                       type: string
+ *                     floor:
+ *                       type: string
+ *                     intro:
+ *                       type: string
+ *                     empty:
+ *                       type: string
+ *                       description: 빈방 여부
+ *                     status:
+ *                       type: string
+ *                       description: 방 상태
+ *                     month:
+ *                       type: string
+ *                       description: 계약 기간
+ *                     description:
+ *                       type: string
+ *                     top:
+ *                       type: string
+ *                     youtube:
+ *                       type: string
+ *                     customerEsntlId:
+ *                       type: string
+ *                     rom_successor_eid:
+ *                       type: string
+ *                     rom_dp_at:
+ *                       type: string
+ *                     deleteYN:
+ *                       type: string
+ *                     orderNo:
+ *                       type: integer
+ *                     gsw_deposit:
+ *                       type: number
+ *                       description: 고시원 보증금
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -147,6 +302,9 @@ router.get('/info', roomController.getRoomInfo);
  *                 type: string
  *                 description: 방타입
  *                 example: 원룸
+ *               roomCategory:
+ *                 type: string
+ *                 description: 방 카테고리
  *               deposit:
  *                 type: integer
  *                 description: 보증금
@@ -163,6 +321,9 @@ router.get('/info', roomController.getRoomInfo);
  *                 type: string
  *                 description: 퇴실일
  *                 example: 2024-12-31
+ *               rom_checkout_expected_date:
+ *                 type: string
+ *                 description: 예정 퇴실일
  *               window:
  *                 type: string
  *                 description: 창타입
@@ -171,6 +332,9 @@ router.get('/info', roomController.getRoomInfo);
  *                 type: string
  *                 description: 방옵션
  *                 example: 에어컨, 냉장고
+ *               orderOption:
+ *                 type: string
+ *                 description: 방옵션 정렬값
  *               floor:
  *                 type: string
  *                 description: 층수
@@ -178,6 +342,10 @@ router.get('/info', roomController.getRoomInfo);
  *               intro:
  *                 type: string
  *                 description: 소개
+ *               empty:
+ *                 type: string
+ *                 description: '빈방 여부 (기본값: 1)'
+ *                 example: 1
  *               status:
  *                 type: string
  *                 description: '방상태 (기본값: EMPTY)'
@@ -189,17 +357,28 @@ router.get('/info', roomController.getRoomInfo);
  *                 type: string
  *                 description: 방설명
  *                 example: 깨끗하고 조용한 방입니다
+ *               top:
+ *                 type: string
+ *                 description: 상단 표시 여부
  *               youtube:
  *                 type: string
  *                 description: VR룸투어 URL
  *                 example: https://youtube.com/watch?v=xxx
+ *               customerEsntlId:
+ *                 type: string
+ *                 description: 사용자 고유아이디
+ *               rom_successor_eid:
+ *                 type: string
+ *                 description: 승계 방 고유아이디
+ *               rom_dp_at:
+ *                 type: string
+ *                 description: DP방 여부
+ *               deleteYN:
+ *                 type: string
+ *                 description: 삭제 여부
  *               orderNo:
  *                 type: integer
  *                 description: '정렬순서 (기본값: 1)'
- *                 example: 1
- *               empty:
- *                 type: string
- *                 description: '빈방 여부 (기본값: 1)'
  *                 example: 1
  *               agreementType:
  *                 type: string

@@ -20,6 +20,11 @@ module.exports = (sequelize, DataTypes) => {
 				allowNull: true,
 				comment: '방타입',
 			},
+			roomCategory: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				comment: '방 카테고리',
+			},
 			deposit: {
 				type: DataTypes.INTEGER(11),
 				allowNull: true,
@@ -39,6 +44,11 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.STRING(255),
 				allowNull: true,
 				comment: '퇴실일',
+			},
+			rom_checkout_expected_date: {
+				type: DataTypes.STRING(255),
+				allowNull: true,
+				comment: '예정 퇴실일',
 			},
 			window: {
 				type: DataTypes.STRING(255),
