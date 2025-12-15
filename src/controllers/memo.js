@@ -157,10 +157,23 @@ exports.getMemoList = async (req, res, next) => {
 			offset: offset,
 		});
 
+		// TINYINT(1) 필드를 boolean으로 변환
+		const convertMemoBoolean = (item) => {
+			if (item.publicRange !== undefined && item.publicRange !== null) {
+				item.publicRange = item.publicRange === 1 || item.publicRange === true || item.publicRange === '1';
+			}
+			if (item.isPinned !== undefined && item.isPinned !== null) {
+				item.isPinned = item.isPinned === 1 || item.isPinned === true || item.isPinned === '1';
+			}
+			return item;
+		};
+
+		const convertedRows = rows.map(convertMemoBoolean);
+
 		res.status(200).json({
 			success: true,
 			data: {
-				list: rows,
+				list: convertedRows,
 				total: count,
 				page: parseInt(page),
 				limit: parseInt(limit),
@@ -192,6 +205,14 @@ exports.getMemoDetail = async (req, res, next) => {
 
 		if (!memoData) {
 			errorHandler.errorThrow(404, '메모를 찾을 수 없습니다.');
+		}
+
+		// TINYINT(1) 필드를 boolean으로 변환
+		if (memoData.publicRange !== undefined && memoData.publicRange !== null) {
+			memoData.publicRange = memoData.publicRange === 1 || memoData.publicRange === true || memoData.publicRange === '1';
+		}
+		if (memoData.isPinned !== undefined && memoData.isPinned !== null) {
+			memoData.isPinned = memoData.isPinned === 1 || memoData.isPinned === true || memoData.isPinned === '1';
 		}
 
 		res.status(200).json({

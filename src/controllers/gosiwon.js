@@ -34,6 +34,27 @@ const verifyAdminToken = (req) => {
 const GOSIWON_PREFIX = 'GOSI';
 const GOSIWON_PADDING = 10;
 
+// TINYINT(1) 필드를 boolean으로 변환하는 공통 함수
+const convertTinyIntToBoolean = (obj) => {
+	if (!obj || typeof obj !== 'object') return obj;
+	
+	const booleanFields = [
+		'use_deposit',
+		'use_sale_commision',
+		'use_settlement',
+		'is_controlled',
+		'is_favorite',
+	];
+	
+	booleanFields.forEach((field) => {
+		if (obj[field] !== undefined && obj[field] !== null) {
+			obj[field] = obj[field] === 1 || obj[field] === true || obj[field] === '1';
+		}
+	});
+	
+	return obj;
+};
+
 const generateGosiwonId = async (transaction) => {
 	const latest = await gosiwon.findOne({
 		attributes: ['esntlId'],
@@ -116,6 +137,9 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		if (!gosiwonInfo) {
 			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
 		}
+
+		// TINYINT(1) 필드를 boolean으로 변환
+		convertTinyIntToBoolean(gosiwonInfo);
 
 		// 결과 반환
 		errorHandler.successThrow(res, '고시원 정보 조회 성공', gosiwonInfo);
@@ -212,13 +236,16 @@ exports.toggleFavorite = async (req, res, next) => {
 			raw: true,
 		});
 
+		// TINYINT(1) 필드를 boolean으로 변환
+		convertTinyIntToBoolean(updatedInfo);
+
 		errorHandler.successThrow(
 			res,
 			`즐겨찾기 ${newFavorite === 1 ? '추가' : '제거'} 성공`,
 			{
 				esntlId: updatedInfo.esntlId,
 				name: updatedInfo.name,
-				isFavorite: updatedInfo.is_favorite === 1,
+				isFavorite: updatedInfo.is_favorite,
 			}
 		);
 	} catch (err) {
@@ -355,16 +382,16 @@ exports.createGosiwon = async (req, res, next) => {
 				serviceNumber: serviceNumber || null,
 				district: district || null,
 				adminEsntlId: decodedToken.admin,
-				is_controlled: is_controlled !== undefined ? (is_controlled ? 1 : 0) : 0,
+				is_controlled: is_controlled !== undefined ? (is_controlled === true || is_controlled === 'true' || is_controlled === 1 ? 1 : 0) : 0,
 				penaltyRate: penaltyRate !== undefined ? penaltyRate : null,
 				penaltyMin: penaltyMin !== undefined ? penaltyMin : 0,
 				qrPoint: qrPoint || null,
-				use_deposit: use_deposit !== undefined ? (use_deposit ? 1 : 0) : 0,
-				use_sale_commision: use_sale_commision !== undefined ? (use_sale_commision ? 1 : 0) : 0,
+				use_deposit: use_deposit !== undefined ? (use_deposit === true || use_deposit === 'true' || use_deposit === 1 ? 1 : 0) : 0,
+				use_sale_commision: use_sale_commision !== undefined ? (use_sale_commision === true || use_sale_commision === 'true' || use_sale_commision === 1 ? 1 : 0) : 0,
 				saleCommisionStartDate: saleCommisionStartDate || null,
 				saleCommisionEndDate: saleCommisionEndDate || null,
 				saleCommision: saleCommision !== undefined ? saleCommision : null,
-				use_settlement: use_settlement !== undefined ? (use_settlement ? 1 : 0) : 0,
+				use_settlement: use_settlement !== undefined ? (use_settlement === true || use_settlement === 'true' || use_settlement === 1 ? 1 : 0) : 0,
 				settlementReason: settlementReason || null,
 			},
 			{ transaction }
@@ -577,7 +604,9 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (req.body.contractFileOrgName !== undefined) updateData.contractFileOrgName = req.body.contractFileOrgName;
 		if (req.body.serviceNumber !== undefined) updateData.serviceNumber = req.body.serviceNumber;
 		if (req.body.district !== undefined) updateData.district = req.body.district;
-		if (req.body.is_controlled !== undefined) updateData.is_controlled = req.body.is_controlled ? 1 : 0;
+		if (req.body.is_controlled !== undefined) {
+			updateData.is_controlled = req.body.is_controlled === true || req.body.is_controlled === 'true' || req.body.is_controlled === 1 ? 1 : 0;
+		}
 		if (req.body.penaltyRate !== undefined) updateData.penaltyRate = req.body.penaltyRate;
 		if (req.body.penaltyMin !== undefined)
 			updateData.penaltyMin =
@@ -585,12 +614,18 @@ exports.updateGosiwon = async (req, res, next) => {
 					? req.body.penaltyMin
 					: 0;
 		if (req.body.qrPoint !== undefined) updateData.qrPoint = req.body.qrPoint;
-		if (req.body.use_deposit !== undefined) updateData.use_deposit = req.body.use_deposit ? 1 : 0;
-		if (req.body.use_sale_commision !== undefined) updateData.use_sale_commision = req.body.use_sale_commision ? 1 : 0;
+		if (req.body.use_deposit !== undefined) {
+			updateData.use_deposit = req.body.use_deposit === true || req.body.use_deposit === 'true' || req.body.use_deposit === 1 ? 1 : 0;
+		}
+		if (req.body.use_sale_commision !== undefined) {
+			updateData.use_sale_commision = req.body.use_sale_commision === true || req.body.use_sale_commision === 'true' || req.body.use_sale_commision === 1 ? 1 : 0;
+		}
 		if (req.body.saleCommisionStartDate !== undefined) updateData.saleCommisionStartDate = req.body.saleCommisionStartDate;
 		if (req.body.saleCommisionEndDate !== undefined) updateData.saleCommisionEndDate = req.body.saleCommisionEndDate;
 		if (req.body.saleCommision !== undefined) updateData.saleCommision = req.body.saleCommision;
-		if (req.body.use_settlement !== undefined) updateData.use_settlement = req.body.use_settlement ? 1 : 0;
+		if (req.body.use_settlement !== undefined) {
+			updateData.use_settlement = req.body.use_settlement === true || req.body.use_settlement === 'true' || req.body.use_settlement === 1 ? 1 : 0;
+		}
 		if (req.body.settlementReason !== undefined) updateData.settlementReason = req.body.settlementReason;
 		if (req.body.update_dtm !== undefined) updateData.update_dtm = new Date();
 
