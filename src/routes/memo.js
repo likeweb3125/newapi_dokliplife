@@ -148,7 +148,7 @@ router.get('/list', memoController.getMemoList);
  * /v1/memo:
  *   post:
  *     summary: 메모 생성
- *     description: 새로운 메모를 생성합니다. 고시원,방 등의 id값을 정확하게 넣어줘야 이후 정확한 조회가 가능합니다.
+ *     description: '새로운 메모를 생성합니다. ID 규칙: roomEsntlId가 있으면 gosiwonEsntlId 필수. contractEsntlId가 있으면 gosiwonEsntlId, roomEsntlId 필수. depositEsntlId가 있으면 gosiwonEsntlId, roomEsntlId, contractEsntlId 필수.'
  *     tags: [Memo]
  *     security:
  *       - bearerAuth: []
@@ -256,7 +256,7 @@ router.get('/:memoId', memoController.getMemoDetail);
  * /v1/memo/{memoId}:
  *   put:
  *     summary: 메모 수정
- *     description: 메모 정보를 수정합니다.
+ *     description: '메모 정보를 수정합니다. ID 규칙: roomEsntlId가 있으면 gosiwonEsntlId 필수. contractEsntlId가 있으면 gosiwonEsntlId, roomEsntlId 필수. depositEsntlId가 있으면 gosiwonEsntlId, roomEsntlId, contractEsntlId 필수.'
  *     tags: [Memo]
  *     security:
  *       - bearerAuth: []

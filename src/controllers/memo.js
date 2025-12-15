@@ -3,6 +3,42 @@ const { memo, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 
+// 필수 연관 ID 검증
+const validateMemoLinkage = ({
+	gosiwonEsntlId,
+	roomEsntlId,
+	contractEsntlId,
+	depositEsntlId,
+}) => {
+	// roomEsntlId가 있으면 gosiwonEsntlId 필수
+	if (roomEsntlId && !gosiwonEsntlId) {
+		errorHandler.errorThrow(
+			400,
+			'roomEsntlId가 있으면 gosiwonEsntlId는 필수입니다.'
+		);
+	}
+
+	// contractEsntlId가 있으면 gosiwonEsntlId, roomEsntlId 필수
+	if (contractEsntlId) {
+		if (!gosiwonEsntlId || !roomEsntlId) {
+			errorHandler.errorThrow(
+				400,
+				'contractEsntlId가 있으면 gosiwonEsntlId, roomEsntlId는 필수입니다.'
+			);
+		}
+	}
+
+	// depositEsntlId가 있으면 gosiwonEsntlId, roomEsntlId, contractEsntlId 필수
+	if (depositEsntlId) {
+		if (!gosiwonEsntlId || !roomEsntlId || !contractEsntlId) {
+			errorHandler.errorThrow(
+				400,
+				'depositEsntlId가 있으면 gosiwonEsntlId, roomEsntlId, contractEsntlId는 필수입니다.'
+			);
+		}
+	}
+};
+
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
 	const authHeader = req.get('Authorization');
@@ -265,6 +301,14 @@ exports.createMemo = async (req, res, next) => {
 			);
 		}
 
+		// 연관 ID 규칙 검증
+		validateMemoLinkage({
+			gosiwonEsntlId,
+			roomEsntlId,
+			contractEsntlId,
+			depositEsntlId,
+		});
+
 		// 메모 ID 생성
 		const memoId = await generateMemoId(transaction);
 
@@ -321,6 +365,11 @@ exports.updateMemo = async (req, res, next) => {
 			publicRange,
 			tags,
 			isPinned,
+			gosiwonEsntlId,
+			roomEsntlId,
+			contractEsntlId,
+			depositEsntlId,
+			etcEsntlId,
 		} = req.body;
 
 		if (!memoId) {
@@ -342,6 +391,26 @@ exports.updateMemo = async (req, res, next) => {
 
 		// 업데이트할 필드 구성
 		const updateData = {};
+		const mergedLinkage = {
+			gosiwonEsntlId:
+				gosiwonEsntlId !== undefined
+					? gosiwonEsntlId
+					: existingMemo.gosiwonEsntlId,
+			roomEsntlId:
+				roomEsntlId !== undefined ? roomEsntlId : existingMemo.roomEsntlId,
+			contractEsntlId:
+				contractEsntlId !== undefined
+					? contractEsntlId
+					: existingMemo.contractEsntlId,
+			depositEsntlId:
+				depositEsntlId !== undefined
+					? depositEsntlId
+					: existingMemo.depositEsntlId,
+		};
+
+		// 연관 ID 규칙 검증
+		validateMemoLinkage(mergedLinkage);
+
 		if (memoContent !== undefined) {
 			updateData.memo = memoContent;
 		}
@@ -360,6 +429,21 @@ exports.updateMemo = async (req, res, next) => {
 		}
 		if (isPinned !== undefined) {
 			updateData.isPinned = isPinned === 1 || isPinned === '1' ? 1 : 0;
+		}
+		if (gosiwonEsntlId !== undefined) {
+			updateData.gosiwonEsntlId = gosiwonEsntlId || null;
+		}
+		if (roomEsntlId !== undefined) {
+			updateData.roomEsntlId = roomEsntlId || null;
+		}
+		if (contractEsntlId !== undefined) {
+			updateData.contractEsntlId = contractEsntlId || null;
+		}
+		if (depositEsntlId !== undefined) {
+			updateData.depositEsntlId = depositEsntlId || null;
+		}
+		if (etcEsntlId !== undefined) {
+			updateData.etcEsntlId = etcEsntlId || null;
 		}
 
 		// 메모 업데이트

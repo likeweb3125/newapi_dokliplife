@@ -438,3 +438,191 @@ exports.deleteRoom = async (req, res, next) => {
 	}
 };
 
+// 방 예약 및 결제 요청
+exports.roomReserve = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const userSn = decodedToken.admin?.id || decodedToken.adminId || decodedToken.admin;
+
+		const {
+			roomEsntlId,
+			deposit,
+			receiver,
+			checkInDate,
+			paymentType,
+		} = req.body;
+
+		// 필수 필드 검증
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
+		}
+		if (!deposit) {
+			errorHandler.errorThrow(400, 'deposit을 입력해주세요.');
+		}
+		if (!receiver) {
+			errorHandler.errorThrow(400, 'receiver를 입력해주세요.');
+		}
+		if (!checkInDate) {
+			errorHandler.errorThrow(400, 'checkInDate를 입력해주세요.');
+		}
+
+		// 오늘 날짜 확인 (YYYY-MM-DD 형식)
+		const today = new Date();
+		const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+		const isReserve = checkInDate !== todayStr;
+
+		// 1. 예약 정보 INSERT
+		const reservationIdQuery = `
+			SELECT CONCAT('ROR', LPAD(CAST(SUBSTRING(IFNULL(MAX(T.ror_sn), '0000'), 4) AS UNSIGNED) + 1, 11, '0')) AS nextId
+			FROM il_room_reservation AS T
+		`;
+
+		const [reservationIdResult] = await mariaDBSequelize.query(reservationIdQuery, {
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		});
+
+		const reservationId = reservationIdResult?.nextId || 'ROR00000000001';
+
+		const insertReservationQuery = `
+			INSERT INTO il_room_reservation (
+				ror_sn,
+				rom_sn,
+				ror_deposit,
+				ror_hp_no,
+				ror_check_in_date,
+				ror_status_cd,
+				ror_regist_dtm,
+				ror_registrant_sn,
+				ror_update_dtm,
+				ror_updater_sn
+			) VALUES (
+				?,
+				?,
+				?,
+				?,
+				?,
+				'WAIT',
+				NOW(),
+				?,
+				NOW(),
+				?
+			)
+		`;
+
+		await mariaDBSequelize.query(insertReservationQuery, {
+			replacements: [
+				reservationId,
+				roomEsntlId,
+				deposit,
+				receiver,
+				checkInDate,
+				userSn,
+				userSn,
+			],
+			type: mariaDBSequelize.QueryTypes.INSERT,
+			transaction,
+		});
+
+		// 2. 방 상태를 RESERVE로 업데이트
+		await room.update(
+			{
+				status: 'RESERVE',
+			},
+			{
+				where: {
+					esntlId: roomEsntlId,
+				},
+				transaction,
+			}
+		);
+
+		// 예약일이 오늘이 아니면 예약만 하고 종료
+		if (isReserve) {
+			await transaction.commit();
+			errorHandler.successThrow(
+				res,
+				`결제 요청 발송이 예약(${checkInDate})되었습니다.`,
+				{
+					reservationId: reservationId,
+					checkInDate: checkInDate,
+				}
+			);
+			return;
+		}
+
+		// 3. 예약이 오늘이면 방 정보 조회 및 알림톡 발송
+		const roomInfoQuery = `
+			SELECT 
+				g.name AS gsw_name,
+				r.roomNumber AS rom_name,
+				FORMAT(r.monthlyRent * 10000, 0) AS monthlyRent,
+				CONCAT(REPLACE(CURDATE(), '-', '.'), ' ', '23:59') AS contractExpDateTime,
+				IF(c.phone = ?, 'EXTENSION', 'NEW') AS req_type,
+				IF((c.name LIKE '%kakao%' OR c.name IS NULL), '입실자', c.name) AS cus_name,
+				ga.hp AS gosiwon_receiver,
+				r.esntlId AS rom_eid
+			FROM room AS r
+			JOIN gosiwon AS g ON r.gosiwonEsntlId = g.esntlId
+			JOIN gosiwonAdmin AS ga ON ga.esntlId = g.adminEsntlId
+			LEFT JOIN customer AS c ON c.esntlId = r.customerEsntlId
+			WHERE r.esntlId = ?
+		`;
+
+		const [roomInfo] = await mariaDBSequelize.query(roomInfoQuery, {
+			replacements: [receiver, roomEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		});
+
+		if (!roomInfo) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+
+		await transaction.commit();
+
+		// 알림톡 발송 데이터 준비
+		const data = {
+			...roomInfo,
+			receiver: receiver,
+			product: `${roomInfo.gsw_name} ${roomInfo.rom_name}`,
+			paymentType: paymentType || 'accountPayment',
+		};
+
+		// TODO: 알림톡 발송 로직 구현
+		// 기존 코드에서는 YawnMessage.ts 모듈을 사용했으나,
+		// 현재 프로젝트 구조에 맞게 알림톡 모듈을 연동해야 합니다.
+		/*
+		const Kakao = require('../module/message/YawnMessage');
+		
+		let templateId;
+		if (paymentType === 'accountPayment') {
+			templateId = 'AL_P_PAYMENT_REQUEST_ACCOUNT_NEW';
+			data.account_number = '기업 986-023615-04-015';
+		} else if (data.req_type === 'NEW') {
+			templateId = 'AL_U_PAYMENT_REQUEST_NEW';
+		} else {
+			templateId = 'AL_U_PAYMENT_REQUEST_EXTENSION';
+		}
+
+		data.tId = templateId;
+		const result = await Kakao.send(templateId, [data]);
+
+		if (result.sel_success_cnt === 1) {
+			data.receiver = data.gosiwon_receiver;
+			await Kakao.send('AL_P_PAYMENT_REQUEST_ALERT', [{
+				receiver: data.receiver,
+				product: data.product,
+				req_number: receiver
+			}]);
+		}
+		*/
+
+		errorHandler.successThrow(res, '결제 요청이 발송되었습니다.', data);
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
