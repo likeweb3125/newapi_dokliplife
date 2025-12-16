@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 // 필수 연관 ID 검증
 const validateHistoryLinkage = ({
@@ -313,7 +314,7 @@ exports.createHistory = async (req, res, next) => {
 		const historyId = await generateHistoryId(transaction);
 
 		// 작성자 정보 설정
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		// 히스토리 생성
 		const newHistory = await history.create(

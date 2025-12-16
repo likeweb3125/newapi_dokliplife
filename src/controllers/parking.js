@@ -1,7 +1,8 @@
 const { Op } = require('sequelize');
-const { parking, gosiwon, mariaDBSequelize } = require('../models');
+const { parking, gosiwon, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 const verifyAdminToken = (req) => {
 	const authHeader = req.get('Authorization');
@@ -29,6 +30,33 @@ const verifyAdminToken = (req) => {
 
 const PARKING_PREFIX = 'PARK';
 const PARKING_PADDING = 10;
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 const generateParkingId = async (transaction) => {
 	const latest = await parking.findOne({
@@ -107,7 +135,8 @@ exports.getParkingInfo = async (req, res, next) => {
 exports.createParking = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { esntlId, structure, auto, autoPrice, bike, bikePrice } = req.body;
 
@@ -154,6 +183,31 @@ exports.createParking = async (req, res, next) => {
 			{ transaction }
 		);
 
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `주차장 정보 생성: 구조 ${structure || '미지정'}, 자동차 ${parseInt(auto, 10) || 0}대(${parseInt(autoPrice, 10) || 0}원), 오토바이 ${parseInt(bike, 10) || 0}대(${parseInt(bikePrice, 10) || 0}원)`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: esntlId,
+					etcEsntlId: parkingId,
+					content: historyContent,
+					category: 'PARKING',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 주차장 생성 프로세스는 계속 진행
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '주차장 정보 등록 성공', {
@@ -169,7 +223,8 @@ exports.createParking = async (req, res, next) => {
 exports.updateParking = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { parkingID, structure, auto, autoPrice, bike, bikePrice } = req.body;
 
@@ -177,10 +232,21 @@ exports.updateParking = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'parkingID를 입력해주세요.');
 		}
 
-		const parkingInfo = await parking.findByPk(parkingID);
+		const parkingInfo = await parking.findByPk(parkingID, {
+			transaction,
+		});
 		if (!parkingInfo) {
 			errorHandler.errorThrow(404, '주차장 정보를 찾을 수 없습니다.');
 		}
+
+		// 수정 전 정보 저장 (변경사항 추적용)
+		const beforeParking = {
+			structure: parkingInfo.structure,
+			auto: parkingInfo.auto,
+			autoPrice: parkingInfo.autoPrice,
+			bike: parkingInfo.bike,
+			bikePrice: parkingInfo.bikePrice,
+		};
 
 		await parking.update(
 			{
@@ -203,6 +269,51 @@ exports.updateParking = async (req, res, next) => {
 			}
 		);
 
+		// History 기록 생성 (변경사항 추적)
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const changes = [];
+			
+			if (structure !== undefined && structure !== beforeParking.structure) {
+				changes.push(`구조: ${beforeParking.structure || '미지정'} → ${structure || '미지정'}`);
+			}
+			if (auto !== undefined && parseInt(auto, 10) !== beforeParking.auto) {
+				changes.push(`자동차 대수: ${beforeParking.auto}대 → ${parseInt(auto, 10)}대`);
+			}
+			if (autoPrice !== undefined && parseInt(autoPrice, 10) !== beforeParking.autoPrice) {
+				changes.push(`자동차 가격: ${beforeParking.autoPrice}원 → ${parseInt(autoPrice, 10)}원`);
+			}
+			if (bike !== undefined && parseInt(bike, 10) !== beforeParking.bike) {
+				changes.push(`오토바이 대수: ${beforeParking.bike}대 → ${parseInt(bike, 10)}대`);
+			}
+			if (bikePrice !== undefined && parseInt(bikePrice, 10) !== beforeParking.bikePrice) {
+				changes.push(`오토바이 가격: ${beforeParking.bikePrice}원 → ${parseInt(bikePrice, 10)}원`);
+			}
+
+			if (changes.length > 0) {
+				const historyContent = `주차장 정보 수정: ${changes.join(', ')}`;
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: parkingInfo.gosiwonEsntlId,
+						etcEsntlId: parkingID,
+						content: historyContent,
+						category: 'PARKING',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			}
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 주차장 수정 프로세스는 계속 진행
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '주차장 정보 수정 성공');
@@ -216,7 +327,8 @@ exports.updateParking = async (req, res, next) => {
 exports.deleteParking = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { parkingID } = req.query;
 
@@ -224,7 +336,10 @@ exports.deleteParking = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'parkingID를 입력해주세요.');
 		}
 
-		const parkingInfo = await parking.findByPk(parkingID);
+		// 삭제 전 주차장 정보 조회 (history 기록용)
+		const parkingInfo = await parking.findByPk(parkingID, {
+			transaction,
+		});
 		if (!parkingInfo) {
 			errorHandler.errorThrow(404, '주차장 정보를 찾을 수 없습니다.');
 		}
@@ -235,6 +350,31 @@ exports.deleteParking = async (req, res, next) => {
 			},
 			transaction,
 		});
+
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `주차장 정보 삭제: 구조 ${parkingInfo.structure || '미지정'}, 자동차 ${parkingInfo.auto || 0}대, 오토바이 ${parkingInfo.bike || 0}대`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: parkingInfo.gosiwonEsntlId,
+					etcEsntlId: parkingID,
+					content: historyContent,
+					category: 'PARKING',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 주차장 삭제 프로세스는 계속 진행
+		}
 
 		await transaction.commit();
 

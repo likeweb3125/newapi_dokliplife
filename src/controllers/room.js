@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { room, memo, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -263,7 +264,7 @@ exports.createRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const {
 			goID,
@@ -386,7 +387,7 @@ exports.updateRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const {
 			esntlID,
@@ -540,7 +541,7 @@ exports.deleteRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { esntlID } = req.query;
 
@@ -603,7 +604,7 @@ exports.roomReserve = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const userSn = decodedToken.admin?.id || decodedToken.adminId || decodedToken.admin;
+		const userSn = getWriterAdminId(decodedToken);
 
 		const {
 			roomEsntlId,
@@ -727,17 +728,44 @@ exports.roomReserve = async (req, res, next) => {
 			}
 		);
 
-		// 3. 메모 내용이 있으면 메모 생성
-		if (memoContent) {
-			// 방 정보 조회하여 gosiwonEsntlId 가져오기
-			const roomInfo = await room.findByPk(roomEsntlId, {
-				attributes: ['gosiwonEsntlId'],
-				transaction,
-			});
+		// 방 정보 조회하여 gosiwonEsntlId 가져오기 (메모 및 history 생성에 필요)
+		const roomInfo = await room.findByPk(roomEsntlId, {
+			attributes: ['gosiwonEsntlId'],
+			transaction,
+		});
 
-			if (!roomInfo || !roomInfo.gosiwonEsntlId) {
-				errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
-			}
+		if (!roomInfo || !roomInfo.gosiwonEsntlId) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
+		}
+
+		// 3. History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `방 예약 생성: 예약ID ${reservationId}, 입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${rorPayMethod ? `, 결제방법 ${rorPayMethod}` : ''}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					roomEsntlId: roomEsntlId,
+					etcEsntlId: reservationId,
+					content: historyContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: userSn,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 예약 프로세스는 계속 진행
+		}
+
+		// 4. 메모 내용이 있으면 메모 생성
+		if (memoContent) {
 
 			// 메모 ID 생성
 			const memoId = await generateMemoId(transaction);

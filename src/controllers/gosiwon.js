@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
-const { gosiwon, mariaDBSequelize } = require('../models');
+const { gosiwon, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
+const { getWriterAdminId } = require('../utils/auth');
 
 const verifyAdminToken = (req) => {
 	const authHeader = req.get('Authorization');
@@ -33,6 +34,33 @@ const verifyAdminToken = (req) => {
 
 const GOSIWON_PREFIX = 'GOSI';
 const GOSIWON_PADDING = 10;
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 // TINYINT(1) 필드를 boolean으로 변환하는 공통 함수
 const convertTinyIntToBoolean = (obj) => {
@@ -190,8 +218,10 @@ exports.getGosiwonNames = async (req, res, next) => {
 
 // 고시원 즐겨찾기 토글
 exports.toggleFavorite = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { esntlId } = req.body;
 
@@ -224,8 +254,37 @@ exports.toggleFavorite = async (req, res, next) => {
 				where: {
 					esntlId: esntlId,
 				},
+				transaction,
 			}
 		);
+
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const action = newFavorite === 1 ? '추가' : '제거';
+			const historyContent = `고시원 즐겨찾기 ${action}: ${gosiwonInfo.name}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: esntlId,
+					etcEsntlId: esntlId,
+					content: historyContent,
+					category: 'GOSIWON',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 즐겨찾기 토글 프로세스는 계속 진행
+		}
+
+		await transaction.commit();
 
 		// 업데이트된 정보 반환
 		const updatedInfo = await gosiwon.findOne({
@@ -249,6 +308,7 @@ exports.toggleFavorite = async (req, res, next) => {
 			}
 		);
 	} catch (err) {
+		await transaction.rollback();
 		next(err);
 	}
 };
@@ -258,6 +318,7 @@ exports.createGosiwon = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const {
 			name,
@@ -510,6 +571,31 @@ exports.createGosiwon = async (req, res, next) => {
 			}
 		}
 
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `고시원 생성: ${name}${address ? `, 주소: ${address}` : ''}${phone ? `, 전화: ${phone}` : ''}${keeperName ? `, 관리자: ${keeperName}` : ''}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: esntlId,
+					etcEsntlId: esntlId,
+					content: historyContent,
+					category: 'GOSIWON',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 고시원 생성 프로세스는 계속 진행
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '고시원 정보 등록 성공', { esntlId: esntlId });
@@ -523,7 +609,8 @@ exports.createGosiwon = async (req, res, next) => {
 exports.updateGosiwon = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { 
 			esntlId, 
@@ -558,6 +645,11 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (!gosiwonInfo) {
 			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
 		}
+
+		// 수정 전 고시원 정보 조회 (변경사항 추적 및 history 기록용)
+		const beforeGosiwon = await gosiwon.findByPk(esntlId, {
+			transaction,
+		});
 
 		const updateData = {};
 
@@ -825,6 +917,69 @@ exports.updateGosiwon = async (req, res, next) => {
 			}
 		}
 
+		// History 기록 생성 (변경사항 추적)
+		try {
+			if (Object.keys(updateData).length > 0) {
+				const historyId = await generateHistoryId(transaction);
+				const changes = [];
+				
+				// 주요 필드 변경사항 추적
+				if (updateData.name && updateData.name !== beforeGosiwon.name) {
+					changes.push(`이름: ${beforeGosiwon.name} → ${updateData.name}`);
+				}
+				if (updateData.address && updateData.address !== beforeGosiwon.address) {
+					changes.push(`주소 변경`);
+				}
+				if (updateData.phone && updateData.phone !== beforeGosiwon.phone) {
+					changes.push(`전화번호 변경`);
+				}
+				if (updateData.keeperName && updateData.keeperName !== beforeGosiwon.keeperName) {
+					changes.push(`관리자명: ${beforeGosiwon.keeperName} → ${updateData.keeperName}`);
+				}
+				if (updateData.status !== undefined && updateData.status !== beforeGosiwon.status) {
+					changes.push(`상태: ${beforeGosiwon.status} → ${updateData.status}`);
+				}
+				if (updateData.use_deposit !== undefined && updateData.use_deposit !== beforeGosiwon.use_deposit) {
+					changes.push(`보증금 사용: ${beforeGosiwon.use_deposit ? 'Y' : 'N'} → ${updateData.use_deposit ? 'Y' : 'N'}`);
+				}
+				if (updateData.use_sale_commision !== undefined && updateData.use_sale_commision !== beforeGosiwon.use_sale_commision) {
+					changes.push(`판매 수수료 사용: ${beforeGosiwon.use_sale_commision ? 'Y' : 'N'} → ${updateData.use_sale_commision ? 'Y' : 'N'}`);
+				}
+				if (updateData.use_settlement !== undefined && updateData.use_settlement !== beforeGosiwon.use_settlement) {
+					changes.push(`정산 사용: ${beforeGosiwon.use_settlement ? 'Y' : 'N'} → ${updateData.use_settlement ? 'Y' : 'N'}`);
+				}
+				
+				// 변경사항이 많으면 요약
+				if (changes.length === 0) {
+					changes.push('정보 수정');
+				} else if (changes.length > 5) {
+					changes.splice(5);
+					changes.push(`외 ${Object.keys(updateData).length - 5}개 필드 수정`);
+				}
+
+				const historyContent = `고시원 정보 수정: ${changes.join(', ')}`;
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: esntlId,
+						etcEsntlId: esntlId,
+						content: historyContent,
+						category: 'GOSIWON',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			}
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 고시원 수정 프로세스는 계속 진행
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '고시원 정보 수정 성공');
@@ -838,7 +993,8 @@ exports.updateGosiwon = async (req, res, next) => {
 exports.deleteGosiwon = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { esntlId } = req.query;
 
@@ -846,16 +1002,8 @@ exports.deleteGosiwon = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		// 조인 쿼리로 고시원 정보 확인
-		const checkQuery = `
-			SELECT G.esntlId
-			FROM gosiwon G 
-			WHERE G.esntlId = :esntlId
-		`;
-
-		const [gosiwonInfo] = await mariaDBSequelize.query(checkQuery, {
-			replacements: { esntlId: esntlId },
-			type: mariaDBSequelize.QueryTypes.SELECT,
+		// 삭제 전 고시원 정보 조회 (history 기록용)
+		const gosiwonInfo = await gosiwon.findByPk(esntlId, {
 			transaction,
 		});
 
@@ -902,11 +1050,36 @@ exports.deleteGosiwon = async (req, res, next) => {
 			transaction,
 		});
 
-		await transaction.commit();
-
 		if (!deleted) {
 			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
 		}
+
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `고시원 삭제: ${gosiwonInfo.name}${gosiwonInfo.address ? ` (${gosiwonInfo.address})` : ''}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: esntlId,
+					etcEsntlId: esntlId,
+					content: historyContent,
+					category: 'GOSIWON',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 고시원 삭제 프로세스는 계속 진행
+		}
+
+		await transaction.commit();
 
 		errorHandler.successThrow(res, '고시원 정보 삭제 성공');
 	} catch (err) {

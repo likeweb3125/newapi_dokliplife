@@ -1,15 +1,69 @@
 const moment = require('moment');
 const { Op, Sequelize } = require('sequelize');
 const bcrypt = require('bcryptjs');
-const { i_member, i_member_level, i_board, i_board_comment, i_member_login, i_member_sec, customer } = require('../models');
+const jwt = require('jsonwebtoken');
+const { i_member, i_member_level, i_board, i_board_comment, i_member_login, i_member_sec, customer, history } = require('../models');
 
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const isAuthControllers = require('../controllers/auth');
 const db = require('../models');
+const { getWriterAdminId } = require('../utils/auth');
+
+// 공통 토큰 검증 함수
+const verifyAdminToken = (req) => {
+	const authHeader = req.get('Authorization');
+	if (!authHeader) {
+		errorHandler.errorThrow(401, '토큰이 없습니다.');
+	}
+
+	const token = authHeader.split(' ')[1];
+	if (!token) {
+		errorHandler.errorThrow(401, '토큰 형식이 올바르지 않습니다.');
+	}
+
+	let decodedToken;
+	try {
+		decodedToken = jwt.decode(token);
+	} catch (err) {
+		errorHandler.errorThrow(401, '토큰 디코딩에 실패했습니다.');
+	}
+
+	if (!decodedToken || !decodedToken.admin) {
+		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
+	}
+	return decodedToken;
+};
 
 const CUSTOMER_PREFIX = 'CUTR';
 const CUSTOMER_PADDING = 10;
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 // 고객 ID 생성 함수
 const generateCustomerId = async (transaction) => {
@@ -72,6 +126,17 @@ exports.postCustomerRegister = async (req, res, next) => {
 	let transaction;
 	try {
 		transaction = await db.mariaDBSequelize.transaction();
+
+		// 관리자 토큰 검증 (관리자 등록인 경우)
+		let decodedToken = null;
+		let writerAdminId = null;
+		try {
+			decodedToken = verifyAdminToken(req);
+			writerAdminId = getWriterAdminId(decodedToken);
+		} catch (tokenErr) {
+			// 토큰이 없어도 회원 등록은 가능 (일반 회원 가입)
+			// 하지만 history는 관리자만 기록
+		}
 
 		const {
 			name,
@@ -146,6 +211,33 @@ exports.postCustomerRegister = async (req, res, next) => {
 			{ transaction }
 		);
 
+		// History 기록 생성 (관리자가 등록한 경우만)
+		if (writerAdminId) {
+			try {
+				const historyId = await generateHistoryId(transaction);
+				const historyContent = `고객 회원 등록: ${name} (${id}), 전화번호 ${phone}${gender ? `, 성별 ${gender}` : ''}`;
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: null,
+						etcEsntlId: esntlId,
+						content: historyContent,
+						category: 'CUSTOMER',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			} catch (historyErr) {
+				console.error('History 생성 실패:', historyErr);
+				// History 생성 실패해도 회원 등록 프로세스는 계속 진행
+			}
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '회원 등록 성공', {
@@ -166,6 +258,16 @@ exports.putCustomerUpdate = async (req, res, next) => {
 	let transaction;
 	try {
 		transaction = await db.mariaDBSequelize.transaction();
+
+		// 관리자 토큰 검증
+		let decodedToken = null;
+		let writerAdminId = null;
+		try {
+			decodedToken = verifyAdminToken(req);
+			writerAdminId = getWriterAdminId(decodedToken);
+		} catch (tokenErr) {
+			// 토큰이 없으면 history 기록하지 않음
+		}
 
 		const {
 			esntlId,
@@ -240,7 +342,75 @@ exports.putCustomerUpdate = async (req, res, next) => {
 			return;
 		}
 
+		// 수정 전 정보 저장 (변경사항 추적용)
+		const beforeCustomer = {
+			name: existingCustomer.name,
+			gender: existingCustomer.gender,
+			phone: existingCustomer.phone,
+			id: existingCustomer.id,
+			cus_collect_yn: existingCustomer.cus_collect_yn,
+			cus_location_yn: existingCustomer.cus_location_yn,
+			cus_promotion_yn: existingCustomer.cus_promotion_yn,
+		};
+
 		await customer.update(updateFields, { where: { esntlId }, transaction });
+
+		// History 기록 생성 (관리자가 수정한 경우만)
+		if (writerAdminId) {
+			try {
+				const historyId = await generateHistoryId(transaction);
+				const changes = [];
+				
+				if (updateFields.name && updateFields.name !== beforeCustomer.name) {
+					changes.push(`이름: ${beforeCustomer.name} → ${updateFields.name}`);
+				}
+				if (updateFields.gender !== undefined && updateFields.gender !== beforeCustomer.gender) {
+					changes.push(`성별 변경`);
+				}
+				if (updateFields.phone && updateFields.phone !== beforeCustomer.phone) {
+					changes.push(`전화번호 변경`);
+				}
+				if (updateFields.id && updateFields.id !== beforeCustomer.id) {
+					changes.push(`이메일: ${beforeCustomer.id} → ${updateFields.id}`);
+				}
+				if (updateFields.pass) {
+					changes.push(`비밀번호 변경`);
+				}
+				if (updateFields.cus_collect_yn !== undefined && updateFields.cus_collect_yn !== beforeCustomer.cus_collect_yn) {
+					changes.push(`개인정보 수집 동의: ${beforeCustomer.cus_collect_yn} → ${updateFields.cus_collect_yn}`);
+				}
+				if (updateFields.cus_location_yn !== undefined && updateFields.cus_location_yn !== beforeCustomer.cus_location_yn) {
+					changes.push(`위치정보 이용 동의: ${beforeCustomer.cus_location_yn} → ${updateFields.cus_location_yn}`);
+				}
+				if (updateFields.cus_promotion_yn !== undefined && updateFields.cus_promotion_yn !== beforeCustomer.cus_promotion_yn) {
+					changes.push(`프로모션 정보 수신 동의: ${beforeCustomer.cus_promotion_yn} → ${updateFields.cus_promotion_yn}`);
+				}
+
+				if (changes.length > 0) {
+					const historyContent = `고객 회원 정보 수정: ${changes.join(', ')}`;
+
+					await history.create(
+						{
+							esntlId: historyId,
+							gosiwonEsntlId: null,
+							etcEsntlId: esntlId,
+							content: historyContent,
+							category: 'CUSTOMER',
+							priority: 'NORMAL',
+							publicRange: 0,
+							writerAdminId: writerAdminId,
+							writerType: 'ADMIN',
+							deleteYN: 'N',
+						},
+						{ transaction }
+					);
+				}
+			} catch (historyErr) {
+				console.error('History 생성 실패:', historyErr);
+				// History 생성 실패해도 회원 수정 프로세스는 계속 진행
+			}
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '회원 정보 수정 성공', {

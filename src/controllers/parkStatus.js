@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { parkStatus, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -185,7 +186,7 @@ exports.createParkStatus = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const {
 			gosiwonEsntlId,
@@ -304,7 +305,7 @@ exports.updateParkStatus = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { parkStatusId } = req.params;
 		const {
@@ -461,7 +462,7 @@ exports.deleteParkStatus = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
 		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { parkStatusId } = req.params;
 

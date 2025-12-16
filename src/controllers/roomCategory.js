@@ -1,6 +1,7 @@
-const { roomCategory, roomCategoryOption, mariaDBSequelize } = require('../models');
+const { roomCategory, roomCategoryOption, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 const verifyAdminToken = (req) => {
 	const authHeader = req.get('Authorization');
@@ -54,6 +55,33 @@ const generateCategoryId = async (transaction) => {
 
 const OPTION_PREFIX = 'COPT';
 const OPTION_PADDING = 10;
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 const generateOptionId = async (transaction) => {
 	const latest = await roomCategoryOption.findOne({
@@ -130,7 +158,8 @@ exports.getCategoryList = async (req, res, next) => {
 exports.createCategory = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { goID, categoryName, basePrice, memo, options } = req.body;
 
@@ -171,6 +200,31 @@ exports.createCategory = async (req, res, next) => {
 			}
 		}
 
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `방 카테고리 생성: ${categoryName}, 기본가격 ${parsedBasePrice}원${memo ? `, 메모: ${memo}` : ''}${options && options.length > 0 ? `, 옵션 ${options.length}개` : ''}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: goID,
+					etcEsntlId: categoryId,
+					content: historyContent,
+					category: 'ROOM_CATEGORY',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 카테고리 생성 프로세스는 계속 진행
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '카테고리 등록 성공', { categoryID: categoryId });
@@ -184,7 +238,8 @@ exports.createCategory = async (req, res, next) => {
 exports.updateCategory = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { categoryID, categoryName, basePrice, memo, options } = req.body;
 
@@ -262,6 +317,54 @@ exports.updateCategory = async (req, res, next) => {
 			}
 		}
 
+		// History 기록 생성 (변경사항 추적)
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const changes = [];
+			if (categoryName && categoryName !== category.name) {
+				changes.push(`이름: ${category.name} → ${categoryName}`);
+			}
+			if (basePrice !== undefined && parsedBasePrice !== category.base_price) {
+				changes.push(`기본가격: ${category.base_price}원 → ${parsedBasePrice}원`);
+			}
+			if (memo !== undefined && memo !== category.memo) {
+				changes.push(`메모 변경`);
+			}
+			if (options && options.length > 0) {
+				const newOptions = options.filter(opt => !opt.isDeleted && !opt.esntlID);
+				const deletedOptions = options.filter(opt => opt.isDeleted && opt.esntlID);
+				if (newOptions.length > 0) {
+					changes.push(`옵션 추가 ${newOptions.length}개`);
+				}
+				if (deletedOptions.length > 0) {
+					changes.push(`옵션 삭제 ${deletedOptions.length}개`);
+				}
+			}
+
+			if (changes.length > 0) {
+				const historyContent = `방 카테고리 수정: ${changes.join(', ')}`;
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: category.gosiwonEsntlId,
+						etcEsntlId: categoryID,
+						content: historyContent,
+						category: 'ROOM_CATEGORY',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			}
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 카테고리 수정 프로세스는 계속 진행
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '카테고리 수정 성공');
@@ -275,12 +378,22 @@ exports.updateCategory = async (req, res, next) => {
 exports.deleteCategory = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { categoryID } = req.query;
 
 		if (!categoryID) {
 			errorHandler.errorThrow(400, 'categoryID를 입력해주세요.');
+		}
+
+		// 삭제 전 카테고리 정보 조회 (history 기록용)
+		const category = await roomCategory.findByPk(categoryID, {
+			transaction,
+		});
+
+		if (!category) {
+			errorHandler.errorThrow(404, '카테고리를 찾을 수 없습니다.');
 		}
 
 		await roomCategoryOption.destroy({
@@ -297,11 +410,36 @@ exports.deleteCategory = async (req, res, next) => {
 			transaction,
 		});
 
-		await transaction.commit();
-
 		if (!deleted) {
 			errorHandler.errorThrow(404, '카테고리를 찾을 수 없습니다.');
 		}
+
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `방 카테고리 삭제: ${category.name} (기본가격 ${category.base_price}원)`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: category.gosiwonEsntlId,
+					etcEsntlId: categoryID,
+					content: historyContent,
+					category: 'ROOM_CATEGORY',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 카테고리 삭제 프로세스는 계속 진행
+		}
+
+		await transaction.commit();
 
 		errorHandler.successThrow(res, '카테고리 삭제 성공');
 	} catch (err) {

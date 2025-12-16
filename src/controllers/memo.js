@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { memo, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 // 필수 연관 ID 검증
 const validateMemoLinkage = ({
@@ -313,7 +314,7 @@ exports.createMemo = async (req, res, next) => {
 		const memoId = await generateMemoId(transaction);
 
 		// 작성자 정보 설정
-		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		// 메모 생성
 		const newMemo = await memo.create(
