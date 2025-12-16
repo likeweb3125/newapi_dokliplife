@@ -6,7 +6,6 @@ const {
 	room,
 	gosiwon,
 	customer,
-	roomStatus,
 	mariaDBSequelize,
 } = require('../models');
 const jwt = require('jsonwebtoken');
@@ -221,28 +220,9 @@ exports.getDepositList = async (req, res, next) => {
 
 		const offset = (parseInt(page) - 1) * parseInt(limit);
 
-		// 방 목록 조회 (방 상태 포함)
+		// 방 목록 조회
 		const { count: roomCount, rows: roomRows } = await room.findAndCountAll({
 			where: roomWhereCondition,
-			include: [
-				{
-					model: roomStatus,
-					as: 'currentStatus',
-					attributes: [
-						'esntlId',
-						'status',
-						'customerEsntlId',
-						'customerName',
-						'reservationEsntlId',
-						'reservationName',
-						'contractorEsntlId',
-						'contractorName',
-						'contractStartDate',
-						'contractEndDate',
-					],
-					required: false,
-				},
-			],
 			order: [['orderNo', 'ASC'], ['roomNumber', 'ASC']],
 			limit: parseInt(limit),
 			offset: offset,
@@ -330,7 +310,6 @@ exports.getDepositList = async (req, res, next) => {
 						roomNumber: roomData.roomNumber,
 						roomType: roomData.roomType,
 						status: roomData.status,
-						currentStatus: roomData.currentStatus,
 					},
 					deposit: null,
 					latestDepositHistory: null,
@@ -438,21 +417,8 @@ exports.getDepositList = async (req, res, next) => {
 			return true;
 		});
 
-		// roomStatus 기반 검색 필터 (reservationName / contractName)
-		const searchTypeNormalized =
-			searchType === 'constractName' ? 'contractName' : searchType;
-		const finalList =
-			searchValue && searchTypeNormalized === 'reservationName'
-				? filteredList.filter((item) => {
-						const name = item.room.currentStatus?.reservationName || '';
-						return name.toLowerCase().includes(searchValue.toLowerCase());
-				  })
-				: searchValue && searchTypeNormalized === 'contractName'
-				? filteredList.filter((item) => {
-						const name = item.room.currentStatus?.contractorName || '';
-						return name.toLowerCase().includes(searchValue.toLowerCase());
-				  })
-				: filteredList;
+		// 검색 필터
+		const finalList = filteredList;
 
 		// searchType에 따라 메시지 변경
 		const message =
@@ -491,21 +457,6 @@ exports.getDepositInfo = async (req, res, next) => {
 					model: room,
 					as: 'room',
 					attributes: ['esntlId', 'roomNumber', 'roomType', 'status'],
-					include: [
-						{
-							model: roomStatus,
-							as: 'currentStatus',
-							attributes: [
-								'esntlId',
-								'status',
-								'customerEsntlId',
-								'customerName',
-								'contractStartDate',
-								'contractEndDate',
-							],
-							required: false,
-						},
-					],
 					required: false,
 				},
 				{

@@ -41,10 +41,10 @@ const adminMaintenanceRoutes = require('./src/routes/maintenance');
 const mailGunRoutes = require('./src/routes/mailGun');
 const gosiwonRoutes = require('./src/routes/gosiwon');
 const roomRoutes = require('./src/routes/room');
-const roomStatusRoutes = require('./src/routes/roomStatus');
-const roomActionRoutes = require('./src/routes/roomAction');
 const depositRoutes = require('./src/routes/deposit');
 const memoRoutes = require('./src/routes/memo');
+const historyRoutes = require('./src/routes/history');
+const parkStatusRoutes = require('./src/routes/parkStatus');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
@@ -110,14 +110,18 @@ app.use('/v1/gosiwon', gosiwonRoutes);
 
 // 방 Routes
 app.use('/v1/room', roomRoutes);
-app.use('/v1/room', roomStatusRoutes);
-app.use('/v1/room', roomActionRoutes);
 
 // 보증금 Routes
 app.use('/v1/deposit', depositRoutes);
 
 // 메모 Routes
 app.use('/v1/memo', memoRoutes);
+
+// 히스토리 Routes
+app.use('/v1/history', historyRoutes);
+
+// 주차 상태 Routes
+app.use('/v1/parkStatus', parkStatusRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to Doklip Life REST API');

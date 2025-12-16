@@ -56,13 +56,12 @@ db.roomCategoryOption = require('./roomCategoryOption')(mariaDBSequelize, Sequel
 db.customer = require('./customer')(mariaDBSequelize, Sequelize);
 db.parking = require('./parking')(mariaDBSequelize, Sequelize);
 db.roomMemo = require('./roomMemo')(mariaDBSequelize, Sequelize);
-db.roomStatus = require('./roomStatus')(mariaDBSequelize, Sequelize);
-db.roomStatusHistory = require('./roomStatusHistory')(mariaDBSequelize, Sequelize);
-db.roomActionHistory = require('./roomActionHistory')(mariaDBSequelize, Sequelize);
 db.deposit = require('./deposit')(mariaDBSequelize, Sequelize);
 db.depositHistory = require('./depositHistory')(mariaDBSequelize, Sequelize);
 db.depositDeduction = require('./depositDeduction')(mariaDBSequelize, Sequelize);
 db.memo = require('./memo')(mariaDBSequelize, Sequelize);
+db.history = require('./history')(mariaDBSequelize, Sequelize);
+db.parkStatus = require('./parkStatus')(mariaDBSequelize, Sequelize);
 
 db.i_category.hasMany(db.i_board, { as: 'iboard' });
 db.i_board.belongsTo(db.i_category, {
@@ -98,57 +97,6 @@ db.parking.belongsTo(db.gosiwon, {
 	targetKey: 'esntlId',
 });
 
-// Room Status 관계 설정
-db.room.hasOne(db.roomStatus, {
-	as: 'currentStatus',
-	foreignKey: 'roomEsntlId',
-	sourceKey: 'esntlId',
-});
-db.roomStatus.belongsTo(db.room, {
-	as: 'room',
-	foreignKey: 'roomEsntlId',
-	targetKey: 'esntlId',
-});
-
-db.room.hasMany(db.roomStatusHistory, {
-	as: 'statusHistory',
-	foreignKey: 'roomEsntlId',
-	sourceKey: 'esntlId',
-});
-db.roomStatusHistory.belongsTo(db.room, {
-	as: 'room',
-	foreignKey: 'roomEsntlId',
-	targetKey: 'esntlId',
-});
-
-// Customer 관계 설정
-db.roomStatus.belongsTo(db.customer, {
-	as: 'customer',
-	foreignKey: 'customerEsntlId',
-	targetKey: 'esntlId',
-});
-db.roomStatusHistory.belongsTo(db.customer, {
-	as: 'customer',
-	foreignKey: 'customerEsntlId',
-	targetKey: 'esntlId',
-});
-
-// Room Action History 관계 설정
-db.room.hasMany(db.roomActionHistory, {
-	as: 'actionHistory',
-	foreignKey: 'roomEsntlId',
-	sourceKey: 'esntlId',
-});
-db.roomActionHistory.belongsTo(db.room, {
-	as: 'room',
-	foreignKey: 'roomEsntlId',
-	targetKey: 'esntlId',
-});
-db.roomActionHistory.belongsTo(db.customer, {
-	as: 'actorCustomer',
-	foreignKey: 'actorCustomerId',
-	targetKey: 'esntlId',
-});
 
 // Deposit 관계 설정
 db.room.hasMany(db.deposit, {
