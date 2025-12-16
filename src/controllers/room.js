@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { room, memo, mariaDBSequelize } = require('../models');
+const { room, memo, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 
@@ -34,6 +34,33 @@ const ROOM_PADDING = 10;
 
 const MEMO_PREFIX = 'MEMO';
 const MEMO_PADDING = 10;
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 // 메모 ID 생성 함수
 const generateMemoId = async (transaction) => {
@@ -185,7 +212,7 @@ exports.getRoomInfo = async (req, res, next) => {
 				r.gosiwonEsntlId,
 				r.roomType,
 				r.roomCategory,
-				r.deposit / 10000 AS rom_deposit,
+				r.deposit AS rom_deposit,
 				r.monthlyRent,
 				r.startDate,
 				r.endDate,
@@ -235,7 +262,8 @@ exports.getRoomInfo = async (req, res, next) => {
 exports.createRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
 
 		const {
 			goID,
@@ -319,6 +347,31 @@ exports.createRoom = async (req, res, next) => {
 			{ transaction }
 		);
 
+		// 히스토리 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `방 정보가 등록되었습니다. 방번호: ${roomNumber || '미지정'}, 타입: ${roomType || '미지정'}, 상태: ${status || 'EMPTY'}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: goID,
+					roomEsntlId: roomId,
+					content: historyContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyError) {
+			console.error('히스토리 생성 실패:', historyError);
+			// 히스토리 생성 실패해도 방 정보 등록은 완료되도록 함
+		}
+
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '방 정보 등록 성공', { esntlID: roomId });
@@ -332,7 +385,8 @@ exports.createRoom = async (req, res, next) => {
 exports.updateRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
 
 		const {
 			esntlID,
@@ -385,12 +439,36 @@ exports.updateRoom = async (req, res, next) => {
 		}
 
 		const updateData = {};
+		const changes = [];
 
-		if (roomNumber !== undefined) updateData.roomNumber = roomNumber;
-		if (roomType !== undefined) updateData.roomType = roomType;
-		if (roomCategory !== undefined) updateData.roomCategory = roomCategory;
-		if (deposit !== undefined) updateData.deposit = parseInt(deposit, 10);
-		if (monthlyRent !== undefined) updateData.monthlyRent = monthlyRent;
+		if (roomNumber !== undefined && roomNumber !== roomInfo.roomNumber) {
+			updateData.roomNumber = roomNumber;
+			changes.push(`방번호: ${roomInfo.roomNumber || '없음'} → ${roomNumber}`);
+		}
+		if (roomType !== undefined && roomType !== roomInfo.roomType) {
+			updateData.roomType = roomType;
+			changes.push(`타입: ${roomInfo.roomType || '없음'} → ${roomType}`);
+		}
+		if (roomCategory !== undefined && roomCategory !== roomInfo.roomCategory) {
+			updateData.roomCategory = roomCategory;
+			changes.push(`카테고리: ${roomInfo.roomCategory || '없음'} → ${roomCategory}`);
+		}
+		if (deposit !== undefined && parseInt(deposit, 10) !== roomInfo.deposit) {
+			updateData.deposit = parseInt(deposit, 10);
+			changes.push(`보증금: ${roomInfo.deposit || 0} → ${deposit}`);
+		}
+		if (monthlyRent !== undefined && monthlyRent !== roomInfo.monthlyRent) {
+			updateData.monthlyRent = monthlyRent;
+			changes.push(`월세: ${roomInfo.monthlyRent || 0} → ${monthlyRent}`);
+		}
+		if (status !== undefined && status !== roomInfo.status) {
+			updateData.status = status;
+			changes.push(`상태: ${roomInfo.status || '없음'} → ${status}`);
+		}
+		if (customerEsntlId !== undefined && customerEsntlId !== roomInfo.customerEsntlId) {
+			updateData.customerEsntlId = customerEsntlId;
+			changes.push(`입실자: ${roomInfo.customerEsntlId || '없음'} → ${customerEsntlId || '없음'}`);
+		}
 		if (startDate !== undefined) updateData.startDate = startDate;
 		if (endDate !== undefined) updateData.endDate = endDate;
 		if (rom_checkout_expected_date !== undefined)
@@ -401,13 +479,10 @@ exports.updateRoom = async (req, res, next) => {
 		if (floor !== undefined) updateData.floor = floor;
 		if (intro !== undefined) updateData.intro = intro;
 		if (empty !== undefined) updateData.empty = empty;
-		if (status !== undefined) updateData.status = status;
 		if (month !== undefined) updateData.month = month;
 		if (description !== undefined) updateData.description = description;
 		if (top !== undefined) updateData.top = top;
 		if (youtube !== undefined) updateData.youtube = youtube;
-		if (customerEsntlId !== undefined)
-			updateData.customerEsntlId = customerEsntlId;
 		if (rom_successor_eid !== undefined)
 			updateData.rom_successor_eid = rom_successor_eid;
 		if (rom_dp_at !== undefined) updateData.rom_dp_at = rom_dp_at;
@@ -416,10 +491,40 @@ exports.updateRoom = async (req, res, next) => {
 		if (agreementType !== undefined) updateData.agreementType = agreementType;
 		if (agreementContent !== undefined) updateData.agreementContent = agreementContent;
 
-		await room.update(updateData, {
-			where: { esntlId: esntlID },
-			transaction,
-		});
+		// 변경사항이 있는 경우에만 업데이트 및 히스토리 생성
+		if (Object.keys(updateData).length > 0) {
+			await room.update(updateData, {
+				where: { esntlId: esntlID },
+				transaction,
+			});
+
+			// 히스토리 생성
+			try {
+				const historyId = await generateHistoryId(transaction);
+				const historyContent = changes.length > 0 
+					? `방 정보가 수정되었습니다. 변경사항: ${changes.join(', ')}`
+					: '방 정보가 수정되었습니다.';
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+						roomEsntlId: esntlID,
+						content: historyContent,
+						category: 'ROOM',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			} catch (historyError) {
+				console.error('히스토리 생성 실패:', historyError);
+				// 히스토리 생성 실패해도 방 정보 수정은 완료되도록 함
+			}
+		}
 
 		await transaction.commit();
 
@@ -434,7 +539,8 @@ exports.updateRoom = async (req, res, next) => {
 exports.deleteRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
 
 		const { esntlID } = req.query;
 
@@ -454,11 +560,36 @@ exports.deleteRoom = async (req, res, next) => {
 			transaction,
 		});
 
-		await transaction.commit();
-
 		if (!deleted) {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
 		}
+
+		// 히스토리 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `방 정보가 삭제되었습니다. 방번호: ${roomInfo.roomNumber || '미지정'}, 타입: ${roomInfo.roomType || '미지정'}, 상태: ${roomInfo.status || '없음'}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					roomEsntlId: esntlID,
+					content: historyContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyError) {
+			console.error('히스토리 생성 실패:', historyError);
+			// 히스토리 생성 실패해도 방 정보 삭제는 완료되도록 함
+		}
+
+		await transaction.commit();
 
 		errorHandler.successThrow(res, '방 정보 삭제 성공');
 	} catch (err) {

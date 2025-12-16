@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { parkStatus, mariaDBSequelize } = require('../models');
+const { parkStatus, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 
@@ -30,6 +30,33 @@ const verifyAdminToken = (req) => {
 
 const PARKSTATUS_PREFIX = 'PKST';
 const PARKSTATUS_PADDING = 10;
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 // 주차 상태 ID 생성 함수
 const generateParkStatusId = async (transaction) => {
@@ -157,7 +184,8 @@ exports.getParkStatusDetail = async (req, res, next) => {
 exports.createParkStatus = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
 
 		const {
 			gosiwonEsntlId,
@@ -173,6 +201,31 @@ exports.createParkStatus = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
 		}
 
+		// contractEsntlId 유효성 검증 (빈 문자열이거나 유효하지 않으면 null)
+		let validContractEsntlId = null;
+		if (contractEsntlId && contractEsntlId.trim() !== '') {
+			// roomContract 테이블에 존재하는지 확인
+			try {
+				const contractExists = await mariaDBSequelize.query(
+					'SELECT esntlId FROM roomContract WHERE esntlId = ? LIMIT 1',
+					{
+						replacements: [contractEsntlId],
+						type: mariaDBSequelize.QueryTypes.SELECT,
+						transaction,
+					}
+				);
+				if (contractExists && contractExists.length > 0) {
+					validContractEsntlId = contractEsntlId;
+				} else {
+					// 존재하지 않으면 null로 설정 (외래키 제약조건 오류 방지)
+					validContractEsntlId = null;
+				}
+			} catch (err) {
+				// 쿼리 오류 시 null로 설정
+				validContractEsntlId = null;
+			}
+		}
+
 		// 주차 상태 ID 생성
 		const parkStatusId = await generateParkStatusId(transaction);
 
@@ -181,7 +234,7 @@ exports.createParkStatus = async (req, res, next) => {
 			{
 				esntlId: parkStatusId,
 				gosiwonEsntlId: gosiwonEsntlId,
-				contractEsntlId: contractEsntlId || null,
+				contractEsntlId: validContractEsntlId,
 				customerEsntlId: customerEsntlId || null,
 				status: status,
 				useStartDate: useStartDate || null,
@@ -190,6 +243,48 @@ exports.createParkStatus = async (req, res, next) => {
 			},
 			{ transaction }
 		);
+
+		// 히스토리 생성
+		const historyId = await generateHistoryId(transaction);
+		const statusText = {
+			AVAILABLE: '사용가능',
+			IN_USE: '사용중',
+			RESERVED: '예약됨',
+			EXPIRED: '만료됨',
+		}[status] || status;
+		
+		const dateRange = useStartDate && useEndDate 
+			? `${useStartDate} ~ ${useEndDate}`
+			: useStartDate 
+			? `${useStartDate}부터`
+			: useEndDate
+			? `${useEndDate}까지`
+			: '';
+
+		const historyContent = `주차 상태가 생성되었습니다. 상태: ${statusText}${dateRange ? `, 사용기간: ${dateRange}` : ''}`;
+
+		// 히스토리 생성
+		try {
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: gosiwonEsntlId,
+					contractEsntlId: validContractEsntlId,
+					etcEsntlId: parkStatusId,
+					content: historyContent,
+					category: 'PARK_STATUS',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyError) {
+			console.error('히스토리 생성 실패:', historyError);
+			// 히스토리 생성 실패해도 주차 상태는 저장되도록 함
+		}
 
 		await transaction.commit();
 
@@ -208,7 +303,8 @@ exports.createParkStatus = async (req, res, next) => {
 exports.updateParkStatus = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
 
 		const { parkStatusId } = req.params;
 		const {
@@ -239,33 +335,105 @@ exports.updateParkStatus = async (req, res, next) => {
 
 		// 업데이트할 필드 구성
 		const updateData = {};
+		const changes = [];
 
-		if (gosiwonEsntlId !== undefined) {
+		if (gosiwonEsntlId !== undefined && gosiwonEsntlId !== existingParkStatus.gosiwonEsntlId) {
 			updateData.gosiwonEsntlId = gosiwonEsntlId;
+			changes.push(`고시원: ${existingParkStatus.gosiwonEsntlId} → ${gosiwonEsntlId}`);
 		}
 		if (contractEsntlId !== undefined) {
-			updateData.contractEsntlId = contractEsntlId || null;
+			// contractEsntlId 유효성 검증
+			let validContractEsntlId = null;
+			if (contractEsntlId && contractEsntlId.trim() !== '') {
+				try {
+					const contractExists = await mariaDBSequelize.query(
+						'SELECT esntlId FROM roomContract WHERE esntlId = ? LIMIT 1',
+						{
+							replacements: [contractEsntlId],
+							type: mariaDBSequelize.QueryTypes.SELECT,
+							transaction,
+						}
+					);
+					if (contractExists && contractExists.length > 0) {
+						validContractEsntlId = contractEsntlId;
+					}
+				} catch (err) {
+					// 쿼리 오류 시 null로 설정
+					validContractEsntlId = null;
+				}
+			}
+			
+			if (validContractEsntlId !== existingParkStatus.contractEsntlId) {
+				updateData.contractEsntlId = validContractEsntlId;
+				changes.push(`계약: ${existingParkStatus.contractEsntlId || '없음'} → ${validContractEsntlId || '없음'}`);
+			}
 		}
-		if (customerEsntlId !== undefined) {
+		if (customerEsntlId !== undefined && customerEsntlId !== existingParkStatus.customerEsntlId) {
 			updateData.customerEsntlId = customerEsntlId || null;
+			changes.push(`고객: ${existingParkStatus.customerEsntlId || '없음'} → ${customerEsntlId || '없음'}`);
 		}
-		if (status !== undefined) {
+		if (status !== undefined && status !== existingParkStatus.status) {
 			updateData.status = status;
+			const statusText = {
+				AVAILABLE: '사용가능',
+				IN_USE: '사용중',
+				RESERVED: '예약됨',
+				EXPIRED: '만료됨',
+			};
+			const oldStatusText = statusText[existingParkStatus.status] || existingParkStatus.status;
+			const newStatusText = statusText[status] || status;
+			changes.push(`상태: ${oldStatusText} → ${newStatusText}`);
 		}
-		if (useStartDate !== undefined) {
+		if (useStartDate !== undefined && useStartDate !== existingParkStatus.useStartDate) {
 			updateData.useStartDate = useStartDate || null;
+			changes.push(`시작일: ${existingParkStatus.useStartDate || '없음'} → ${useStartDate || '없음'}`);
 		}
-		if (useEndDate !== undefined) {
+		if (useEndDate !== undefined && useEndDate !== existingParkStatus.useEndDate) {
 			updateData.useEndDate = useEndDate || null;
+			changes.push(`종료일: ${existingParkStatus.useEndDate || '없음'} → ${useEndDate || '없음'}`);
 		}
 
-		// 주차 상태 업데이트
-		await parkStatus.update(updateData, {
-			where: {
-				esntlId: parkStatusId,
-			},
-			transaction,
-		});
+		// 변경사항이 있는 경우에만 업데이트 및 히스토리 생성
+		if (Object.keys(updateData).length > 0) {
+			// 주차 상태 업데이트
+			await parkStatus.update(updateData, {
+				where: {
+					esntlId: parkStatusId,
+				},
+				transaction,
+			});
+
+			// 히스토리 생성
+			try {
+				const historyId = await generateHistoryId(transaction);
+				const historyContent = `주차 상태가 수정되었습니다. 변경사항: ${changes.join(', ')}`;
+
+				// 업데이트된 contractEsntlId 사용 (없으면 기존 값)
+				const finalContractEsntlId = updateData.contractEsntlId !== undefined 
+					? updateData.contractEsntlId 
+					: existingParkStatus.contractEsntlId;
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: updateData.gosiwonEsntlId || existingParkStatus.gosiwonEsntlId,
+						contractEsntlId: finalContractEsntlId,
+						etcEsntlId: parkStatusId,
+						content: historyContent,
+						category: 'PARK_STATUS',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			} catch (historyError) {
+				console.error('히스토리 생성 실패:', historyError);
+				// 히스토리 생성 실패해도 주차 상태 수정은 완료되도록 함
+			}
+		}
 
 		// 업데이트된 주차 상태 조회
 		const updatedParkStatus = await parkStatus.findOne({
@@ -292,7 +460,8 @@ exports.updateParkStatus = async (req, res, next) => {
 exports.deleteParkStatus = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = decodedToken.admin?.id || decodedToken.adminId || null;
 
 		const { parkStatusId } = req.params;
 
@@ -325,6 +494,40 @@ exports.deleteParkStatus = async (req, res, next) => {
 				transaction,
 			}
 		);
+
+		// 히스토리 생성
+		const historyId = await generateHistoryId(transaction);
+		const statusText = {
+			AVAILABLE: '사용가능',
+			IN_USE: '사용중',
+			RESERVED: '예약됨',
+			EXPIRED: '만료됨',
+		}[existingParkStatus.status] || existingParkStatus.status;
+
+		const historyContent = `주차 상태가 삭제되었습니다. (상태: ${statusText})`;
+
+		// 히스토리 생성
+		try {
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: existingParkStatus.gosiwonEsntlId,
+					contractEsntlId: existingParkStatus.contractEsntlId || null,
+					etcEsntlId: parkStatusId,
+					content: historyContent,
+					category: 'PARK_STATUS',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyError) {
+			console.error('히스토리 생성 실패:', historyError);
+			// 히스토리 생성 실패해도 주차 상태 삭제는 완료되도록 함
+		}
 
 		await transaction.commit();
 
