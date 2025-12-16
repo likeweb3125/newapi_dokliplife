@@ -207,6 +207,8 @@ exports.getRoomInfo = async (req, res, next) => {
 				r.rom_dp_at,
 				r.deleteYN,
 				r.orderNo,
+				r.agreementType,
+				r.agreementContent,
 				gu.deposit AS gsw_deposit
 			FROM room AS r
 			JOIN gosiwonUse AS gu ON r.gosiwonEsntlId = gu.esntlId
