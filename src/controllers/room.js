@@ -729,12 +729,12 @@ exports.roomReserve = async (req, res, next) => {
 		);
 
 		// 방 정보 조회하여 gosiwonEsntlId 가져오기 (메모 및 history 생성에 필요)
-		const roomInfo = await room.findByPk(roomEsntlId, {
+		const roomBasicInfo = await room.findByPk(roomEsntlId, {
 			attributes: ['gosiwonEsntlId'],
 			transaction,
 		});
 
-		if (!roomInfo || !roomInfo.gosiwonEsntlId) {
+		if (!roomBasicInfo || !roomBasicInfo.gosiwonEsntlId) {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
 		}
 
@@ -746,7 +746,7 @@ exports.roomReserve = async (req, res, next) => {
 			await history.create(
 				{
 					esntlId: historyId,
-					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					gosiwonEsntlId: roomBasicInfo.gosiwonEsntlId,
 					roomEsntlId: roomEsntlId,
 					etcEsntlId: reservationId,
 					content: historyContent,
@@ -774,7 +774,7 @@ exports.roomReserve = async (req, res, next) => {
 			await memo.create(
 				{
 					esntlId: memoId,
-					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					gosiwonEsntlId: roomBasicInfo.gosiwonEsntlId,
 					roomEsntlId: roomEsntlId,
 					etcEsntlId: reservationId,
 					memo: memoContent,
@@ -821,13 +821,13 @@ exports.roomReserve = async (req, res, next) => {
 			WHERE r.esntlId = ?
 		`;
 
-		const [roomInfo] = await mariaDBSequelize.query(roomInfoQuery, {
+		const [roomInfoData] = await mariaDBSequelize.query(roomInfoQuery, {
 			replacements: [receiver, roomEsntlId],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 			transaction,
 		});
 
-		if (!roomInfo) {
+		if (!roomInfoData) {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
 		}
 
@@ -835,7 +835,7 @@ exports.roomReserve = async (req, res, next) => {
 
 		// 알림톡 발송 데이터 준비
 		const data = {
-			...roomInfo,
+			...roomInfoData,
 			receiver: receiver,
 			product: `${roomInfo.gsw_name} ${roomInfo.rom_name}`,
 			paymentType: paymentType || 'accountPayment',
