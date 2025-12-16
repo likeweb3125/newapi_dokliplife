@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { room, mariaDBSequelize } = require('../models');
+const { room, memo, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 
@@ -31,6 +31,33 @@ const verifyAdminToken = (req) => {
 
 const ROOM_PREFIX = 'ROOM';
 const ROOM_PADDING = 10;
+
+const MEMO_PREFIX = 'MEMO';
+const MEMO_PADDING = 10;
+
+// 메모 ID 생성 함수
+const generateMemoId = async (transaction) => {
+	const latest = await memo.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${MEMO_PREFIX}${String(1).padStart(MEMO_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(MEMO_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${MEMO_PREFIX}${String(nextNumber).padStart(
+		MEMO_PADDING,
+		'0'
+	)}`;
+};
 
 const generateRoomId = async (transaction) => {
 	const latest = await room.findOne({
@@ -451,6 +478,11 @@ exports.roomReserve = async (req, res, next) => {
 			receiver,
 			checkInDate,
 			paymentType,
+			rorPeriod,
+			rorContractStartDate,
+			rorContractEndDate,
+			rorPayMethod,
+			memo: memoContent,
 		} = req.body;
 
 		// 필수 필드 검증
@@ -465,6 +497,18 @@ exports.roomReserve = async (req, res, next) => {
 		}
 		if (!checkInDate) {
 			errorHandler.errorThrow(400, 'checkInDate를 입력해주세요.');
+		}
+		if (!rorPeriod) {
+			errorHandler.errorThrow(400, 'rorPeriod를 입력해주세요.');
+		}
+		// rorPeriod가 PART인 경우 계약 시작일과 종료일 필수
+		if (rorPeriod === 'PART') {
+			if (!rorContractStartDate) {
+				errorHandler.errorThrow(400, 'rorPeriod가 PART인 경우 rorContractStartDate를 입력해주세요.');
+			}
+			if (!rorContractEndDate) {
+				errorHandler.errorThrow(400, 'rorPeriod가 PART인 경우 rorContractEndDate를 입력해주세요.');
+			}
 		}
 
 		// 오늘 날짜 확인 (YYYY-MM-DD 형식)
@@ -496,7 +540,11 @@ exports.roomReserve = async (req, res, next) => {
 				ror_regist_dtm,
 				ror_registrant_sn,
 				ror_update_dtm,
-				ror_updater_sn
+				ror_updater_sn,
+				ror_period,
+				ror_contract_start_date,
+				ror_contract_end_date,
+				ror_pay_method
 			) VALUES (
 				?,
 				?,
@@ -507,6 +555,10 @@ exports.roomReserve = async (req, res, next) => {
 				NOW(),
 				?,
 				NOW(),
+				?,
+				?,
+				?,
+				?,
 				?
 			)
 		`;
@@ -520,6 +572,10 @@ exports.roomReserve = async (req, res, next) => {
 				checkInDate,
 				userSn,
 				userSn,
+				rorPeriod,
+				rorContractStartDate || null,
+				rorContractEndDate || null,
+				rorPayMethod || null,
 			],
 			type: mariaDBSequelize.QueryTypes.INSERT,
 			transaction,
@@ -537,6 +593,40 @@ exports.roomReserve = async (req, res, next) => {
 				transaction,
 			}
 		);
+
+		// 3. 메모 내용이 있으면 메모 생성
+		if (memoContent) {
+			// 방 정보 조회하여 gosiwonEsntlId 가져오기
+			const roomInfo = await room.findByPk(roomEsntlId, {
+				attributes: ['gosiwonEsntlId'],
+				transaction,
+			});
+
+			if (!roomInfo || !roomInfo.gosiwonEsntlId) {
+				errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
+			}
+
+			// 메모 ID 생성
+			const memoId = await generateMemoId(transaction);
+
+			// 메모 생성
+			await memo.create(
+				{
+					esntlId: memoId,
+					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					roomEsntlId: roomEsntlId,
+					etcEsntlId: reservationId,
+					memo: memoContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: userSn,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		}
 
 		// 예약일이 오늘이 아니면 예약만 하고 종료
 		if (isReserve) {

@@ -749,66 +749,6 @@ router.delete('/category/delete', roomCategoryController.deleteCategory);
 
 /**
  * @swagger
- * /v1/room/memo/list:
- *   get:
- *     summary: 방 메모 목록 조회
- *     description: 방 ID로 해당 방의 메모 목록을 조회합니다.
- *     tags: [Room]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: roomEsntlId
- *         required: true
- *         schema:
- *           type: string
- *         description: 방 고유 아이디
- *         example: ROOM0000022725
- *     responses:
- *       200:
- *         description: 방 메모 목록 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 statusCode:
- *                   type: integer
- *                   example: 200
- *                 message:
- *                   type: string
- *                   example: 방 메모 목록 조회 성공
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       memoID:
- *                         type: string
- *                         example: RMEM000000001
- *                       roomEsntlId:
- *                         type: string
- *                         example: ROOM0000022725
- *                       memo:
- *                         type: string
- *                         example: 방 상태 양호
- *                       publicRange:
- *                         type: integer
- *                         example: 0
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-/**
- * @swagger
  * /v1/room/reserve:
  *   post:
  *     summary: 방 예약 및 결제 요청
@@ -827,6 +767,7 @@ router.delete('/category/delete', roomCategoryController.deleteCategory);
  *               - deposit
  *               - receiver
  *               - checkInDate
+ *               - rorPeriod
  *             properties:
  *               roomEsntlId:
  *                 type: string
@@ -850,6 +791,30 @@ router.delete('/category/delete', roomCategoryController.deleteCategory);
  *                 enum: [accountPayment, cardPayment]
  *                 description: '결제 유형 (accountPayment: 계좌 결제, cardPayment: 카드 결제)'
  *                 example: accountPayment
+ *               rorPeriod:
+ *                 type: string
+ *                 enum: [MONTH, PART]
+ *                 description: '결제요청 계약기간 (MONTH: 월 단위, PART: 부분 결제)'
+ *                 example: MONTH
+ *               rorContractStartDate:
+ *                 type: string
+ *                 format: date
+ *                 description: '부분 결제의 시작날짜 (rorPeriod가 PART인 경우 필수)'
+ *                 example: 2025-12-20
+ *               rorContractEndDate:
+ *                 type: string
+ *                 format: date
+ *                 description: '부분 결제의 종료날짜 (rorPeriod가 PART인 경우 필수)'
+ *                 example: 2026-01-20
+ *               rorPayMethod:
+ *                 type: string
+ *                 enum: [APP, ACCOUNT]
+ *                 description: '결제 방식 (APP: 앱 결제, ACCOUNT: 계좌 결제)'
+ *                 example: ACCOUNT
+ *               memo:
+ *                 type: string
+ *                 description: 메모 내용
+ *                 example: 계약 관련 특이사항 메모
  *     responses:
  *       200:
  *         description: 예약 및 결제 요청 성공
