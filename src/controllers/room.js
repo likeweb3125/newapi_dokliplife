@@ -554,6 +554,66 @@ exports.deleteRoom = async (req, res, next) => {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
 		}
 
+		// 외래키 제약 조건 때문에 관련된 자식 테이블 레코드들을 먼저 삭제
+		// roomImage 테이블 삭제
+		await mariaDBSequelize.query(
+			`DELETE FROM roomImage WHERE roomEsntlId = ?`,
+			{
+				replacements: [esntlID],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
+		// roomStatus 테이블 삭제 (CASCADE로 설정되어 있어도 명시적으로 삭제)
+		await mariaDBSequelize.query(
+			`DELETE FROM roomStatus WHERE roomEsntlId = ?`,
+			{
+				replacements: [esntlID],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
+		// roomMemo 테이블 삭제
+		await mariaDBSequelize.query(
+			`DELETE FROM roomMemo WHERE roomEsntlId = ?`,
+			{
+				replacements: [esntlID],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
+		// roomContract 테이블 삭제 (있다면)
+		await mariaDBSequelize.query(
+			`DELETE FROM roomContract WHERE roomEsntlId = ?`,
+			{
+				replacements: [esntlID],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
+		// roomSee, roomLike 테이블 삭제 (있다면)
+		await mariaDBSequelize.query(
+			`DELETE FROM roomSee WHERE roomEsntlId = ?`,
+			{
+				replacements: [esntlID],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
+		await mariaDBSequelize.query(
+			`DELETE FROM roomLike WHERE roomEsntlId = ?`,
+			{
+				replacements: [esntlID],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
 		const deleted = await room.destroy({
 			where: {
 				esntlId: esntlID,
@@ -871,6 +931,184 @@ exports.roomReserve = async (req, res, next) => {
 		*/
 
 		errorHandler.successThrow(res, '결제 요청이 발송되었습니다.', data);
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 방 판매 시작
+exports.startRoomSell = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		verifyAdminToken(req);
+
+		const { rooms } = req.body;
+
+		if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
+			errorHandler.errorThrow(400, 'rooms 배열을 입력해주세요.');
+		}
+
+		// roomStatus ID 생성 함수
+		const generateRoomStatusId = async () => {
+			const [result] = await mariaDBSequelize.query(
+				`SELECT CONCAT('RSTA', LPAD(CAST(SUBSTRING(IFNULL(MAX(esntlId), 'RSTA0000000000'), 5) AS UNSIGNED) + 1, 10, '0')) AS nextId
+				FROM roomStatus`,
+				{
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+			return result?.nextId || 'RSTA0000000001';
+		};
+
+		const results = [];
+
+		for (const roomData of rooms) {
+			const {
+				roomId,
+				statusStartDate,
+				statusEndDate,
+				sameAsCheckinInfo,
+				etcStartDate,
+				etcEndDate,
+			} = roomData;
+
+			// 필수 필드 검증
+			if (!roomId) {
+				errorHandler.errorThrow(400, 'roomId를 입력해주세요.');
+			}
+			if (!statusStartDate) {
+				errorHandler.errorThrow(400, 'statusStartDate를 입력해주세요.');
+			}
+			if (!statusEndDate) {
+				errorHandler.errorThrow(400, 'statusEndDate를 입력해주세요.');
+			}
+			if (sameAsCheckinInfo === undefined) {
+				errorHandler.errorThrow(400, 'sameAsCheckinInfo를 입력해주세요.');
+			}
+
+			// 방 정보 조회 (고시원 ID 확인)
+			const [roomInfo] = await mariaDBSequelize.query(
+				`SELECT esntlId, gosiwonEsntlId FROM room WHERE esntlId = ? AND deleteYN = 'N'`,
+				{
+					replacements: [roomId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (!roomInfo) {
+				errorHandler.errorThrow(404, `방을 찾을 수 없습니다. (roomId: ${roomId})`);
+			}
+
+			// etcStartDate, etcEndDate, statusEndDate 계산
+			let finalEtcStartDate = null;
+			let finalEtcEndDate = null;
+			let finalStatusEndDate = statusEndDate;
+
+			if (sameAsCheckinInfo) {
+				// sameAsCheckinInfo가 true인 경우
+				// etcStartDate = statusStartDate
+				finalEtcStartDate = statusStartDate;
+				// statusEndDate = etcStartDate
+				finalStatusEndDate = finalEtcStartDate;
+			} else {
+				// sameAsCheckinInfo가 false인 경우
+				if (!etcStartDate) {
+					errorHandler.errorThrow(400, 'sameAsCheckinInfo가 false인 경우 etcStartDate를 입력해주세요.');
+				}
+				if (!etcEndDate) {
+					errorHandler.errorThrow(400, 'sameAsCheckinInfo가 false인 경우 etcEndDate를 입력해주세요.');
+				}
+				finalEtcStartDate = etcStartDate;
+				finalEtcEndDate = etcEndDate;
+			}
+
+			// 기존 roomStatus 레코드 확인
+			const [existingStatus] = await mariaDBSequelize.query(
+				`SELECT esntlId, status FROM roomStatus WHERE roomEsntlId = ?`,
+				{
+					replacements: [roomId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+
+			if (existingStatus) {
+				// 기존 레코드의 status가 'ON_SALE'인 경우에만 업데이트
+				if (existingStatus.status === 'ON_SALE') {
+					await mariaDBSequelize.query(
+						`UPDATE roomStatus 
+						SET status = 'ON_SALE',
+							statusStartDate = ?,
+							statusEndDate = ?,
+							etcStartDate = ?,
+							etcEndDate = ?,
+							updatedAt = NOW()
+						WHERE roomEsntlId = ?`,
+						{
+							replacements: [
+								statusStartDate,
+								finalStatusEndDate,
+								finalEtcStartDate,
+								finalEtcEndDate,
+								roomId,
+							],
+							type: mariaDBSequelize.QueryTypes.UPDATE,
+							transaction,
+						}
+					);
+					results.push({
+						roomId,
+						action: 'updated',
+						esntlId: existingStatus.esntlId,
+					});
+				} else {
+					// status가 'ON_SALE'이 아닌 경우 에러 처리
+					errorHandler.errorThrow(400, `해당 방의 상태가 'ON_SALE'이 아니어서 판매 시작을 할 수 없습니다. (현재 상태: ${existingStatus.status}, roomId: ${roomId})`);
+				}
+			} else {
+				// 새 레코드 생성
+				const newStatusId = await generateRoomStatusId();
+				await mariaDBSequelize.query(
+					`INSERT INTO roomStatus (
+						esntlId,
+						roomEsntlId,
+						status,
+						statusStartDate,
+						statusEndDate,
+						etcStartDate,
+						etcEndDate,
+						createdAt,
+						updatedAt
+					) VALUES (?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())`,
+					{
+						replacements: [
+							newStatusId,
+							roomId,
+							statusStartDate,
+							finalStatusEndDate,
+							finalEtcStartDate,
+							finalEtcEndDate,
+						],
+						type: mariaDBSequelize.QueryTypes.INSERT,
+						transaction,
+					}
+				);
+				results.push({
+					roomId,
+					action: 'created',
+					esntlId: newStatusId,
+				});
+			}
+		}
+
+		await transaction.commit();
+		errorHandler.successThrow(res, '방 판매 시작이 완료되었습니다.', {
+			totalCount: results.length,
+			results,
+		});
 	} catch (err) {
 		await transaction.rollback();
 		next(err);

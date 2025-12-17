@@ -871,5 +871,109 @@ router.delete('/category/delete', roomCategoryController.deleteCategory);
  */
 router.post('/reserve', roomController.roomReserve);
 
+/**
+ * @swagger
+ * /v1/room/roomSell/start:
+ *   post:
+ *     summary: 방 판매 시작
+ *     description: 선택한 방들의 판매를 시작합니다. roomStatus 테이블에 판매 정보를 저장합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rooms
+ *             properties:
+ *               rooms:
+ *                 type: array
+ *                 description: 판매를 시작할 방 목록
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - roomId
+ *                     - statusStartDate
+ *                     - statusEndDate
+ *                     - sameAsCheckinInfo
+ *                   properties:
+ *                     roomId:
+ *                       type: string
+ *                       description: 방 고유아이디
+ *                       example: ROOM0000000001
+ *                     statusStartDate:
+ *                       type: string
+ *                       format: date-time
+ *                       description: 판매 시작일
+ *                       example: 2025-12-20 00:00:00
+ *                     statusEndDate:
+ *                       type: string
+ *                       format: date-time
+ *                       description: 판매 종료일
+ *                       example: 2026-01-20 00:00:00
+ *                     sameAsCheckinInfo:
+ *                       type: boolean
+ *                       description: 입실 가능 기간을 판매 기간과 동일하게 설정할지 여부
+ *                       example: true
+ *                     etcStartDate:
+ *                       type: string
+ *                       format: date-time
+ *                       description: 입실 가능 시작일 (sameAsCheckinInfo가 false인 경우 필수)
+ *                       example: 2025-12-22 00:00:00
+ *                     etcEndDate:
+ *                       type: string
+ *                       format: date-time
+ *                       description: 입실 가능 종료일 (sameAsCheckinInfo가 false인 경우 필수)
+ *                       example: 2026-01-22 00:00:00
+ *     responses:
+ *       200:
+ *         description: 방 판매 시작 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 판매 시작이 완료되었습니다.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalCount:
+ *                       type: integer
+ *                       description: 처리된 방 개수
+ *                       example: 2
+ *                     results:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomId:
+ *                             type: string
+ *                             description: 방 고유아이디
+ *                           action:
+ *                             type: string
+ *                             enum: [created, updated]
+ *                             description: 수행된 작업 (created: 새로 생성, updated: 기존 레코드 업데이트)
+ *                           esntlId:
+ *                             type: string
+ *                             description: roomStatus 고유아이디
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/roomSell/start', roomController.startRoomSell);
+
 module.exports = router;
 
