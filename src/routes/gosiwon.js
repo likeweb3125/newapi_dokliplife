@@ -703,6 +703,49 @@ router.get('/names', gosiwonController.getGosiwonNames);
 
 /**
  * @swagger
+ * /v1/gosiwon/favorites:
+ *   get:
+ *     summary: 즐겨찾기 고시원 목록 조회
+ *     description: is_favorite가 1인 고시원 목록을 조회합니다. esntlId와 name만 반환합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 즐겨찾기 고시원 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 즐겨찾기 고시원 목록 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 고시원 고유 아이디
+ *                         example: GOSI0000002130
+ *                       name:
+ *                         type: string
+ *                         description: 고시원명
+ *                         example: 홍대 고시원
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/favorites', gosiwonController.getFavoriteGosiwonList);
+
+/**
+ * @swagger
  * /v1/gosiwon/favorite:
  *   put:
  *     summary: 고시원 즐겨찾기 토글

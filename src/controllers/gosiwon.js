@@ -245,6 +245,31 @@ exports.getGosiwonNames = async (req, res, next) => {
 	}
 };
 
+// 즐겨찾기 고시원 목록 조회
+exports.getFavoriteGosiwonList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const favoriteGosiwons = await gosiwon.findAll({
+			where: {
+				is_favorite: 1,
+			},
+			attributes: ['esntlId', 'name'],
+			order: [['name', 'ASC']],
+			raw: true,
+		});
+
+		const result = favoriteGosiwons.map((item) => ({
+			esntlId: item.esntlId,
+			name: item.name,
+		}));
+
+		errorHandler.successThrow(res, '즐겨찾기 고시원 목록 조회 성공', result);
+	} catch (err) {
+		next(err);
+	}
+};
+
 // 고시원 즐겨찾기 토글
 exports.toggleFavorite = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
