@@ -238,7 +238,11 @@ exports.getRoomInfo = async (req, res, next) => {
 				r.agreementType,
 				r.agreementContent,
 				gu.deposit AS gsw_deposit,
-				g.contract
+				g.contract as gsw_contract,
+				(SELECT content
+				 FROM adminContract
+				 ORDER BY numberOrder ASC
+				 LIMIT 1) AS gs_contract
 			FROM room AS r
 			JOIN gosiwonUse AS gu ON r.gosiwonEsntlId = gu.esntlId
 			JOIN gosiwon AS g ON r.gosiwonEsntlId = g.esntlId
