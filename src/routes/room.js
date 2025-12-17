@@ -392,6 +392,11 @@ router.get('/info', roomController.getRoomInfo);
  *                 type: string
  *                 description: 특약내용 (리치 텍스트)
  *                 example: <p>특약 내용입니다.</p>
+ *               availableGender:
+ *                 type: string
+ *                 enum: [DEFAULT, MALE, FEMALE]
+ *                 description: 이용 가능 성별 (DEFAULT는 제한없음, MALE는 남성, FEMALE는 여성)
+ *                 example: DEFAULT
  *     responses:
  *       200:
  *         description: 방 정보 등록 성공
@@ -514,6 +519,11 @@ router.post('/create', roomController.createRoom);
  *                 type: string
  *                 description: 특약내용 (리치 텍스트)
  *                 example: <p>수정된 특약 내용입니다.</p>
+ *               availableGender:
+ *                 type: string
+ *                 enum: [DEFAULT, MALE, FEMALE]
+ *                 description: 이용 가능 성별 (DEFAULT는 제한없음, MALE는 남성, FEMALE는 여성)
+ *                 example: DEFAULT
  *     responses:
  *       200:
  *         description: 방 정보 수정 성공
@@ -876,7 +886,7 @@ router.post('/reserve', roomController.roomReserve);
  * /v1/room/roomSell/start:
  *   post:
  *     summary: 방 판매 시작
- *     description: 선택한 방들의 판매를 시작합니다. roomStatus 테이블에 판매 정보를 저장합니다.
+ *     description: 선택한 방들의 판매를 시작합니다. roomStatus 테이블에 판매 정보를 저장합니다.sameAsCheckinInfo true 면 판개기간과 동일
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -960,7 +970,7 @@ router.post('/reserve', roomController.roomReserve);
  *                           action:
  *                             type: string
  *                             enum: [created, updated]
- *                             description: 수행된 작업 (created: 새로 생성, updated: 기존 레코드 업데이트)
+ *                             description: 수행된 작업 (created는 새로 생성, updated는 기존 레코드 업데이트)
  *                           esntlId:
  *                             type: string
  *                             description: roomStatus 고유아이디

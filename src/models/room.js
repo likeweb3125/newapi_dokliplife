@@ -163,6 +163,13 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'agreementContent',
 				comment: '특약내용',
 			},
+			availableGender: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				defaultValue: 'DEFAULT',
+				field: 'availableGender',
+				comment: '이용 가능 성별 (DEFAULT: 제한없음, MALE: 남성, FEMALE: 여성)',
+			},
 		},
 		{
 			timestamps: false,
