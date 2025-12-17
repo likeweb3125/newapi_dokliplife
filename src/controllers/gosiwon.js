@@ -555,6 +555,9 @@ exports.createGosiwon = async (req, res, next) => {
 			if (checkInTimeStart !== undefined) configData.gsc_checkInTimeStart = checkInTimeStart;
 			if (checkInTimeEnd !== undefined) configData.gsc_checkInTimeEnd = checkInTimeEnd;
 			if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;
+			
+			// 등록한 관리자 ID 필수 추가 (고시원 관리자 ID 또는 등록한 관리자 ID)
+			const registrantId = decodedToken.admin || writerAdminId;
 
 			// 먼저 존재 여부 확인
 			const [existingConfig] = await mariaDBSequelize.query(
@@ -567,6 +570,10 @@ exports.createGosiwon = async (req, res, next) => {
 			);
 
 			if (existingConfig) {
+				// UPDATE 시: 업데이트 시간과 업데이트한 관리자 ID 추가
+				configData.gsc_update_dtm = new Date();
+				configData.gsc_updater_id = registrantId;
+				
 				const configSetClause = Object.keys(configData)
 					.map((key) => `\`${key}\` = ?`)
 					.join(', ');
@@ -581,6 +588,9 @@ exports.createGosiwon = async (req, res, next) => {
 					}
 				);
 			} else {
+				// INSERT 시: 등록자 ID 추가
+				configData.gsc_registrant_id = registrantId;
+				
 				const configColumns = Object.keys(configData)
 					.map((key) => `\`${key}\``)
 					.join(', ');
