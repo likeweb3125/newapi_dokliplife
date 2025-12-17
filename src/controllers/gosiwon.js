@@ -122,7 +122,7 @@ exports.getGosiwonInfo = async (req, res, next) => {
 
 		// 여러 테이블을 조인하여 고시원 정보 조회
 		const query = `
-                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason,G.is_controlled,G.is_favorite,G.penaltyRate,G.penaltyMin
+                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason,G.is_controlled,G.is_favorite,G.penaltyRate,G.penaltyMin, G.contract
                     ,GA.hp adminHP, GA.ceo admin
                     ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
                     ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
@@ -171,6 +171,35 @@ exports.getGosiwonInfo = async (req, res, next) => {
 
 		// 결과 반환
 		errorHandler.successThrow(res, '고시원 정보 조회 성공', gosiwonInfo);
+	} catch (err) {
+		next(err);
+	}
+};
+
+// 관리자 계약 정보 조회
+exports.getAdminContract = async (req, res, next) => {
+	try {
+		// 토큰 검증
+		verifyAdminToken(req);
+
+		// adminContract 테이블에서 numberOrder ASC로 정렬하여 첫 번째 레코드 조회
+		const query = `
+			SELECT title, content
+			FROM adminContract
+			ORDER BY numberOrder ASC
+			LIMIT 1
+		`;
+
+		const [adminContract] = await mariaDBSequelize.query(query, {
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		if (!adminContract) {
+			errorHandler.errorThrow(404, '관리자 계약 정보를 찾을 수 없습니다.');
+		}
+
+		// 결과 반환
+		errorHandler.successThrow(res, '관리자 계약 정보 조회 성공', adminContract);
 	} catch (err) {
 		next(err);
 	}

@@ -1109,5 +1109,48 @@ router.put('/parking/update', parkingController.updateParking);
  */
 router.delete('/parking/delete', parkingController.deleteParking);
 
+/**
+ * @swagger
+ * /v1/gosiwon/adminContract:
+ *   get:
+ *     summary: 관리자 계약 정보 조회
+ *     description: gosiwonAdmin 테이블에서 numberOrder ASC로 정렬하여 첫 번째 레코드의 title, content를 조회합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 관리자 계약 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 관리자 계약 정보 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                       description: 제목
+ *                       example: 관리자 계약서
+ *                     content:
+ *                       type: string
+ *                       description: 내용
+ *                       example: 계약서 내용...
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/adminContract', gosiwonController.getAdminContract);
+
 module.exports = router;
 
