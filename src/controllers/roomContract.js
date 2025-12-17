@@ -1,5 +1,33 @@
-const { mariaDBSequelize } = require('../models');
+const { mariaDBSequelize, room, customer, history, deposit } = require('../models');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
+
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -203,21 +231,59 @@ exports.getContractDetail = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 결제 내역 조회 쿼리
+		// 계약 및 결제 상세 조회 쿼리
+		// - roomContract, gosiwon, room, customer, deposit, paymentLog, userCoupon 조인
+		// - 각 결제 행마다 계약/고시원/방/고객/계약자 정보를 함께 반환
 		const query = `
 			SELECT 
-				pDate,
-				pTime,
+				RC.esntlId AS contractNumber,
+				G.name AS gosiwonName,
+				G.address AS gosiwonAddress,
+				R.roomNumber,
+				R.roomType,
+				R.window,
+				R.monthlyRent AS roomMonthlyRent,
+				C.name AS customerName,
+				C.phone AS customerPhone,
+				C.gender,
+				C.id AS customerId,
+				C.bank AS customerBank,
+				C.bankAccount AS customerBankAccount,
+				FLOOR(
+					(
+						CAST(REPLACE(CURRENT_DATE, '-', '') AS UNSIGNED) -
+						CAST(REPLACE(C.birth, '-', '') AS UNSIGNED)
+					) / 10000
+				) AS age,
+				RC.month,
+				RC.startDate,
+				RC.endDate,
+				RC.contractDate,
+				RC.status AS contractStatus,
+				RC.monthlyRent AS contractMonthlyRent,
+				RC.memo AS occupantMemo,
+				RC.memo2 AS occupantMemo2,
+				RC.emergencyContact AS emergencyContact,
+				CT.name AS contractorName,
+				CT.phone AS contractorPhone,
+				pyl.pDate,
+				pyl.pTime,
 				pyl.pyl_goods_amount AS pyl_goods_amount,
-				FORMAT(IFNULL(paymentAmount, 0), 0) AS paymentAmount,
-				FORMAT(IFNULL(paymentPoint, 0), 0) AS paymentPoint,
-				FORMAT(IFNULL(paymentCoupon, 0), 0) AS paymentCoupon,
+				FORMAT(IFNULL(pyl.paymentAmount, 0), 0) AS paymentAmount,
+				pyl.paymentAmount AS payment_amount,
+				FORMAT(IFNULL(pyl.paymentPoint, 0), 0) AS paymentPoint,
+				FORMAT(IFNULL(pyl.paymentCoupon, 0), 0) AS paymentCoupon,
 				ucp.name AS couponName,
-				paymentType
-			FROM paymentLog AS pyl
-			LEFT JOIN userCoupon AS ucp
-				ON pyl.ucp_eid = ucp.esntlId
-			WHERE contractEsntlId = ?
+				pyl.paymentType
+			FROM roomContract RC
+			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
+			JOIN room R ON RC.roomEsntlId = R.esntlId
+			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
+			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
+			LEFT JOIN paymentLog AS pyl ON pyl.contractEsntlId = RC.esntlId
+			LEFT JOIN userCoupon AS ucp ON pyl.ucp_eid = ucp.esntlId
+			WHERE RC.esntlId = ?
 		`;
 
 		const result = await mariaDBSequelize.query(query, {
@@ -234,3 +300,289 @@ exports.getContractDetail = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 계약 정보 수정
+exports.updateContract = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { contractEsntlId } = req.body;
+
+		if (!contractEsntlId) {
+			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
+		}
+
+		// 계약 정보 조회
+		const contractInfo = await mariaDBSequelize.query(
+			`
+			SELECT 
+				RC.*,
+				C.birth AS customerBirth,
+				D.contractorEsntlId,
+				D.accountHolder AS depositAccountHolder
+			FROM roomContract RC
+			JOIN room R ON RC.roomEsntlId = R.esntlId
+			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
+			WHERE RC.esntlId = ?
+			LIMIT 1
+		`,
+			{
+				replacements: [contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (!contractInfo || contractInfo.length === 0) {
+			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		}
+
+		const contract = contractInfo[0];
+		const changes = [];
+
+		// roomContract 테이블 업데이트
+		const contractUpdateData = {};
+		const {
+			month,
+			startDate,
+			endDate,
+			checkinTime,
+			occupantMemo,
+			occupantMemo2,
+			emergencyContact,
+		} = req.body;
+
+		if (month !== undefined && month !== contract.month) {
+			contractUpdateData.month = month;
+			changes.push(`계약 기간: ${contract.month || '없음'} → ${month}`);
+		}
+		if (startDate !== undefined && startDate !== contract.startDate) {
+			contractUpdateData.startDate = startDate;
+			changes.push(`계약 시작일: ${contract.startDate || '없음'} → ${startDate}`);
+		}
+		if (endDate !== undefined && endDate !== contract.endDate) {
+			contractUpdateData.endDate = endDate;
+			changes.push(`계약 종료일: ${contract.endDate || '없음'} → ${endDate}`);
+		}
+		if (checkinTime !== undefined && checkinTime !== contract.checkinTime) {
+			contractUpdateData.checkinTime = checkinTime;
+			changes.push(
+				`입실시간: ${contract.checkinTime || '없음'} → ${checkinTime || '없음'}`
+			);
+		}
+		if (occupantMemo !== undefined && occupantMemo !== contract.memo) {
+			contractUpdateData.memo = occupantMemo;
+			changes.push(`입실자 메모: ${contract.memo || '없음'} → ${occupantMemo || '없음'}`);
+		}
+		if (occupantMemo2 !== undefined && occupantMemo2 !== contract.memo2) {
+			contractUpdateData.memo2 = occupantMemo2;
+			changes.push(
+				`입실자 메모2: ${contract.memo2 || '없음'} → ${occupantMemo2 || '없음'}`
+			);
+		}
+		if (
+			emergencyContact !== undefined &&
+			emergencyContact !== contract.emergencyContact
+		) {
+			contractUpdateData.emergencyContact = emergencyContact;
+			changes.push(
+				`비상연락망/관계: ${contract.emergencyContact || '없음'} → ${emergencyContact || '없음'}`
+			);
+		}
+
+		// customer 테이블 업데이트 (입주자)
+		const customerUpdateData = {};
+		const {
+			customerName,
+			customerPhone,
+			customerGender,
+			customerBirth,
+			customerBank,
+			customerBankAccount,
+		} = req.body;
+
+		const customerInfo = await customer.findByPk(contract.customerEsntlId, {
+			transaction,
+		});
+		if (!customerInfo) {
+			errorHandler.errorThrow(404, '고객 정보를 찾을 수 없습니다.');
+		}
+
+		if (customerName !== undefined && customerName !== customerInfo.name) {
+			customerUpdateData.name = customerName;
+			changes.push(`입주자명: ${customerInfo.name || '없음'} → ${customerName}`);
+		}
+		if (customerPhone !== undefined && customerPhone !== customerInfo.phone) {
+			customerUpdateData.phone = customerPhone;
+			changes.push(
+				`입주자 연락처: ${customerInfo.phone || '없음'} → ${customerPhone}`
+			);
+		}
+		if (customerGender !== undefined && customerGender !== customerInfo.gender) {
+			customerUpdateData.gender = customerGender;
+			changes.push(
+				`입주자 성별: ${customerInfo.gender || '없음'} → ${customerGender}`
+			);
+		}
+		if (customerBirth !== undefined && customerBirth !== customerInfo.birth) {
+			customerUpdateData.birth = customerBirth;
+			changes.push(`입주자 생년월일: ${customerInfo.birth || '없음'} → ${customerBirth}`);
+		}
+		if (customerBank !== undefined && customerBank !== customerInfo.bank) {
+			customerUpdateData.bank = customerBank;
+			changes.push(`입주자 은행: ${customerInfo.bank || '없음'} → ${customerBank}`);
+		}
+		if (
+			customerBankAccount !== undefined &&
+			customerBankAccount !== customerInfo.bankAccount
+		) {
+			customerUpdateData.bankAccount = customerBankAccount;
+			changes.push(
+				`입주자 계좌: ${customerInfo.bankAccount || '없음'} → ${customerBankAccount}`
+			);
+		}
+
+		// customer 테이블 업데이트 (계약자)
+		const contractorUpdateData = {};
+		const { contractorName, contractorPhone } = req.body;
+
+		if (contract.contractorEsntlId) {
+			const contractorInfo = await customer.findByPk(contract.contractorEsntlId, {
+				transaction,
+			});
+
+			if (contractorInfo) {
+				if (
+					contractorName !== undefined &&
+					contractorName !== contractorInfo.name
+				) {
+					contractorUpdateData.name = contractorName;
+					changes.push(
+						`계약자명: ${contractorInfo.name || '없음'} → ${contractorName}`
+					);
+				}
+				if (
+					contractorPhone !== undefined &&
+					contractorPhone !== contractorInfo.phone
+				) {
+					contractorUpdateData.phone = contractorPhone;
+					changes.push(
+						`계약자 연락처: ${contractorInfo.phone || '없음'} → ${contractorPhone}`
+					);
+				}
+			}
+		}
+
+		// deposit 테이블 업데이트 (예금주)
+		const depositUpdateData = {};
+		const { accountHolder } = req.body;
+
+		if (contract.contractorEsntlId) {
+			const depositInfo = await deposit.findOne({
+				where: {
+					contractEsntlId: contractEsntlId,
+					deleteYN: 'N',
+				},
+				transaction,
+			});
+
+			if (depositInfo) {
+				if (
+					accountHolder !== undefined &&
+					accountHolder !== depositInfo.accountHolder
+				) {
+					depositUpdateData.accountHolder = accountHolder;
+					changes.push(
+						`예금주: ${depositInfo.accountHolder || '없음'} → ${accountHolder}`
+					);
+				}
+			}
+		}
+
+		// 업데이트 실행
+		if (Object.keys(contractUpdateData).length > 0) {
+			const setClause = Object.keys(contractUpdateData)
+				.map((key) => `${key} = ?`)
+				.join(', ');
+			const values = Object.values(contractUpdateData);
+			values.push(contractEsntlId);
+
+			await mariaDBSequelize.query(
+				`UPDATE roomContract SET ${setClause} WHERE esntlId = ?`,
+				{
+					replacements: values,
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+
+		if (Object.keys(customerUpdateData).length > 0) {
+			await customer.update(customerUpdateData, {
+				where: { esntlId: contract.customerEsntlId },
+				transaction,
+			});
+		}
+
+		if (
+			Object.keys(contractorUpdateData).length > 0 &&
+			contract.contractorEsntlId
+		) {
+			await customer.update(contractorUpdateData, {
+				where: { esntlId: contract.contractorEsntlId },
+				transaction,
+			});
+		}
+
+		if (Object.keys(depositUpdateData).length > 0) {
+			await deposit.update(depositUpdateData, {
+				where: {
+					contractEsntlId: contractEsntlId,
+					deleteYN: 'N',
+				},
+				transaction,
+			});
+		}
+
+		// 히스토리 생성
+		if (changes.length > 0) {
+			try {
+				const historyId = await generateHistoryId(transaction);
+				const historyContent = `계약 정보 수정: ${changes.join(', ')}`;
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: contract.gosiwonEsntlId,
+						roomEsntlId: contract.roomEsntlId,
+						contractEsntlId: contractEsntlId,
+						content: historyContent,
+						category: 'CONTRACT',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			} catch (historyError) {
+				console.error('히스토리 생성 실패:', historyError);
+			}
+		}
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '계약 정보 수정 성공', {
+			contractEsntlId: contractEsntlId,
+			changes: changes,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
