@@ -597,6 +597,110 @@ exports.updateRoom = async (req, res, next) => {
 	}
 };
 
+// 방 특약 내역 수정
+exports.updateRoomAgreement = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { roomEsntlId, agreementType, agreementContent } = req.body;
+
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
+		}
+
+		const roomInfo = await room.findByPk(roomEsntlId);
+		if (!roomInfo) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+
+		// 특약 타입 유효성 검사
+		if (agreementType !== undefined) {
+			const validTypes = ['GENERAL', 'GOSIWON', 'ROOM'];
+			if (agreementType && !validTypes.includes(agreementType)) {
+				errorHandler.errorThrow(
+					400,
+					'agreementType은 GENERAL, GOSIWON, ROOM 중 하나여야 합니다.'
+				);
+			}
+		}
+
+		const updateData = {};
+		const changes = [];
+
+		if (agreementType !== undefined) {
+			updateData.agreementType = agreementType || null;
+			changes.push(
+				`특약 타입: ${roomInfo.agreementType || '없음'} → ${agreementType || '없음'}`
+			);
+		}
+
+		if (agreementContent !== undefined) {
+			updateData.agreementContent = agreementContent || null;
+			const oldContent = roomInfo.agreementContent
+				? roomInfo.agreementContent.substring(0, 50) + '...'
+				: '없음';
+			const newContent = agreementContent
+				? agreementContent.substring(0, 50) + '...'
+				: '없음';
+			changes.push(`특약 내용: ${oldContent} → ${newContent}`);
+		}
+
+		// 변경사항이 있는 경우에만 업데이트 및 히스토리 생성
+		if (Object.keys(updateData).length > 0) {
+			await room.update(updateData, {
+				where: { esntlId: roomEsntlId },
+				transaction,
+			});
+
+			// 히스토리 생성
+			try {
+				const historyId = await generateHistoryId(transaction);
+				const historyContent =
+					changes.length > 0
+						? `방 특약 내역이 수정되었습니다. 변경사항: ${changes.join(', ')}`
+						: '방 특약 내역이 수정되었습니다.';
+
+				await history.create(
+					{
+						esntlId: historyId,
+						gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+						roomEsntlId: roomEsntlId,
+						content: historyContent,
+						category: 'ROOM',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerType: 'ADMIN',
+						deleteYN: 'N',
+					},
+					{ transaction }
+				);
+			} catch (historyError) {
+				console.error('히스토리 생성 실패:', historyError);
+				// 히스토리 생성 실패해도 방 정보 수정은 완료되도록 함
+			}
+		}
+
+		await transaction.commit();
+
+		// 업데이트된 방 정보 조회
+		const updatedRoom = await room.findByPk(roomEsntlId, {
+			attributes: ['esntlId', 'agreementType', 'agreementContent'],
+		});
+
+		errorHandler.successThrow(res, '방 특약 내역 수정 성공', {
+			esntlId: updatedRoom.esntlId,
+			agreementType: updatedRoom.agreementType,
+			agreementContent: updatedRoom.agreementContent,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
 // 방 정보 삭제
 exports.deleteRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();

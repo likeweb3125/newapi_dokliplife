@@ -540,6 +540,77 @@ router.put('/update', roomController.updateRoom);
 
 /**
  * @swagger
+ * /v1/room/agreement:
+ *   put:
+ *     summary: 방 특약 내역 수정
+ *     description: 특정 방의 특약 타입과 특약 내용만 수정합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomEsntlId
+ *             properties:
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *                 example: ROOM0000022725
+ *               agreementType:
+ *                 type: string
+ *                 enum: [GENERAL, GOSIWON, ROOM]
+ *                 description: '특약 타입 (GENERAL=일반, GOSIWON=고시원, ROOM=방)'
+ *                 example: ROOM
+ *               agreementContent:
+ *                 type: string
+ *                 description: 특약 내용
+ *                 example: 반려동물 입실 가능, 흡연 가능
+ *     responses:
+ *       200:
+ *         description: 방 특약 내역 수정 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 특약 내역 수정 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 방 고유 아이디
+ *                       example: ROOM0000022725
+ *                     agreementType:
+ *                       type: string
+ *                       description: 특약 타입
+ *                       example: ROOM
+ *                     agreementContent:
+ *                       type: string
+ *                       description: 특약 내용
+ *                       example: 반려동물 입실 가능, 흡연 가능
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/agreement', roomController.updateRoomAgreement);
+
+/**
+ * @swagger
  * /v1/room/delete:
  *   delete:
  *     summary: 방 정보 삭제

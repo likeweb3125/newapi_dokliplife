@@ -289,4 +289,127 @@ router.get('/list', roomContractController.getContractList);
  */
 router.get('/detail', roomContractController.getContractDetail);
 
+/**
+ * @swagger
+ * /v1/roomContract/detail:
+ *   put:
+ *     summary: 계약 정보 수정
+ *     description: 계약 정보를 수정합니다. roomContract, customer(입주자), customer(계약자), deposit 테이블의 정보를 수정할 수 있습니다.
+ *     tags: [RoomContract]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contractEsntlId
+ *             properties:
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 계약 고유 아이디
+ *                 example: RCO0000000001
+ *               month:
+ *                 type: string
+ *                 description: 계약 기간 (월)
+ *                 example: '1'
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 계약 시작일
+ *                 example: '2025-10-18'
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 계약 종료일
+ *                 example: '2025-11-17'
+ *               checkinTime:
+ *                 type: string
+ *                 description: '입실시간 (예: AM|9|00 형식)'
+ *                 example: 'AM|9|00'
+ *               customerName:
+ *                 type: string
+ *                 description: 입주자명
+ *                 example: 'test'
+ *               customerPhone:
+ *                 type: string
+ *                 description: 입주자 연락처
+ *                 example: '01055857382'
+ *               customerGender:
+ *                 type: string
+ *                 description: 입주자 성별
+ *                 example: '남성'
+ *               customerBirth:
+ *                 type: string
+ *                 description: 입주자 생년월일
+ *                 example: '1992-01-01'
+ *               customerBank:
+ *                 type: string
+ *                 description: 입주자 은행
+ *                 example: '신한은행'
+ *               customerBankAccount:
+ *                 type: string
+ *                 description: 입주자 계좌번호
+ *                 example: '123-456-789'
+ *               contractorName:
+ *                 type: string
+ *                 description: 계약자명
+ *                 example: '계약자명'
+ *               contractorPhone:
+ *                 type: string
+ *                 description: 계약자 연락처
+ *                 example: '01012345678'
+ *               accountHolder:
+ *                 type: string
+ *                 description: 예금주
+ *                 example: '홍길동'
+ *               occupantMemo:
+ *                 type: string
+ *                 description: 입실자 메모(요청사항)
+ *                 example: '안녕하세용!'
+ *               occupantMemo2:
+ *                 type: string
+ *                 description: 입실자 메모2
+ *               emergencyContact:
+ *                 type: string
+ *                 description: 비상연락망/관계
+ *                 example: '010-1234-5678 / 부모'
+ *     responses:
+ *       200:
+ *         description: 계약 정보 수정 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 계약 정보 수정 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     contractEsntlId:
+ *                       type: string
+ *                       description: 계약 고유 아이디
+ *                     changes:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: 변경된 항목 목록
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/detail', roomContractController.updateContract);
+
 module.exports = router;
