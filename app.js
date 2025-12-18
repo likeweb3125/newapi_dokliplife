@@ -46,6 +46,7 @@ const memoRoutes = require('./src/routes/memo');
 const historyRoutes = require('./src/routes/history');
 const parkStatusRoutes = require('./src/routes/parkStatus');
 const roomContractRoutes = require('./src/routes/roomContract');
+const refundRoutes = require('./src/routes/refund');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
@@ -126,6 +127,9 @@ app.use('/v1/parkStatus', parkStatusRoutes);
 
 // 계약현황 Routes
 app.use('/v1/roomContract', roomContractRoutes);
+
+// 환불 Routes
+app.use('/v1/refund', refundRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to Doklip Life REST API');

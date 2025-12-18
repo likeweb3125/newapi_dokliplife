@@ -1,0 +1,135 @@
+module.exports = (sequelize, DataTypes) => {
+	return sequelize.define(
+		'refund',
+		{
+			esntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				primaryKey: true,
+				field: 'esntlId',
+				comment: '환불 고유아이디 (RFND0000000001 형식)',
+			},
+			gosiwonEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				field: 'gosiwonEsntlId',
+				comment: '고시원 고유아이디',
+			},
+			roomEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				field: 'roomEsntlId',
+				comment: '방 고유아이디',
+			},
+			contractEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'contractEsntlId',
+				comment: '계약 고유아이디',
+			},
+			contractorEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'contractorEsntlId',
+				comment: '계약자 고유아이디',
+			},
+			customerEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'customerEsntlId',
+				comment: '사용자(입실자) 고유아이디',
+			},
+			cancelReason: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				field: 'cancelReason',
+				comment: '취소사유 (EXPIRED_CHECKOUT: 만기퇴실, MIDDLE_CHECKOUT: 중도퇴실, CONTRACT_CANCEL: 계약취소)',
+			},
+			cancelDate: {
+				type: DataTypes.DATEONLY,
+				allowNull: false,
+				field: 'cancelDate',
+				comment: '취소날짜',
+			},
+			cancelMemo: {
+				type: DataTypes.TEXT,
+				allowNull: true,
+				field: 'cancelMemo',
+				comment: '취소메모',
+			},
+			liabilityReason: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'liabilityReason',
+				comment: '귀책사유 (OWNER: 사장님, OCCUPANT: 입실자)',
+			},
+			contactedOwner: {
+				type: DataTypes.TINYINT(1),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'contactedOwner',
+				comment: '사장님과 연락이 되었는지 유무 (0: 미연락, 1: 연락완료)',
+			},
+			refundMethod: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'refundMethod',
+				comment: '환불수단 (예: 계좌이체, 현금, 카드취소 등)',
+			},
+			paymentAmount: {
+				type: DataTypes.INTEGER(11),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'paymentAmount',
+				comment: '결제금액',
+			},
+			proratedRent: {
+				type: DataTypes.INTEGER(11),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'proratedRent',
+				comment: '일할입실료',
+			},
+			penalty: {
+				type: DataTypes.INTEGER(11),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'penalty',
+				comment: '위약금',
+			},
+			totalRefundAmount: {
+				type: DataTypes.INTEGER(11),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'totalRefundAmount',
+				comment: '총환불금액',
+			},
+			deleteYN: {
+				type: DataTypes.CHAR(1),
+				allowNull: false,
+				defaultValue: 'N',
+				field: 'deleteYN',
+				comment: '삭제여부',
+			},
+			createdAt: {
+				type: DataTypes.DATE,
+				allowNull: false,
+				field: 'createdAt',
+				defaultValue: DataTypes.NOW,
+				comment: '생성일',
+			},
+			updatedAt: {
+				type: DataTypes.DATE,
+				allowNull: false,
+				field: 'updatedAt',
+				defaultValue: DataTypes.NOW,
+				comment: '수정일',
+			},
+		},
+		{
+			tableName: 'refund',
+			timestamps: true,
+			freezeTableName: true,
+		}
+	);
+};

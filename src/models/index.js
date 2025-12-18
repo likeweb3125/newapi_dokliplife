@@ -62,6 +62,7 @@ db.depositDeduction = require('./depositDeduction')(mariaDBSequelize, Sequelize)
 db.memo = require('./memo')(mariaDBSequelize, Sequelize);
 db.history = require('./history')(mariaDBSequelize, Sequelize);
 db.parkStatus = require('./parkStatus')(mariaDBSequelize, Sequelize);
+db.refund = require('./refund')(mariaDBSequelize, Sequelize);
 
 db.i_category.hasMany(db.i_board, { as: 'iboard' });
 db.i_board.belongsTo(db.i_category, {
