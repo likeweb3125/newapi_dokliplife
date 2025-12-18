@@ -15,7 +15,7 @@ const refundController = require('../controllers/refund');
  * /v1/refund/process:
  *   post:
  *     summary: 환불 및 퇴실처리
- *     description: 계약에 대한 환불 및 퇴실처리를 수행합니다. refund 테이블에 환불 정보를 저장하고, roomStatus를 CHECKOUT_REQUESTED로 업데이트하며, history에 기록을 남깁니다.
+ *     description: '계약에 대한 환불 및 퇴실처리를 수행합니다. refund 테이블에 환불 정보를 저장하고, roomStatus를 CHECKOUT_REQUESTED로 업데이트하며, history에 기록을 남깁니다. 취소사유 (EXPIRED_CHECKOUT: 만기퇴실, MIDDLE_CHECKOUT: 중도퇴실, CONTRACT_CANCEL: 계약취소)'
  *     tags: [Refund]
  *     security:
  *       - bearerAuth: []
@@ -77,6 +77,10 @@ const refundController = require('../controllers/refund');
  *                 type: integer
  *                 description: 총환불금액
  *                 example: 70000
+ *               usePeriod:
+ *                 type: integer
+ *                 description: 사용기간 (일수)
+ *                 example: 10
  *     responses:
  *       200:
  *         description: 환불 및 퇴실처리 성공
@@ -94,10 +98,10 @@ const refundController = require('../controllers/refund');
  *                 data:
  *                   type: object
  *                   properties:
- *                     refundId:
- *                       type: string
- *                       description: 환불 고유아이디
- *                       example: RFND0000000001
+ *                     rrr_sno:
+ *                       type: integer
+ *                       description: 환불요청 일련번호
+ *                       example: 1
  *                     historyId:
  *                       type: string
  *                       description: 히스토리 고유아이디

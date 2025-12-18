@@ -1,0 +1,135 @@
+module.exports = (sequelize, DataTypes) => {
+	return sequelize.define(
+		'ilRoomRefundRequest',
+		{
+			rrr_sno: {
+				type: DataTypes.BIGINT(20),
+				allowNull: false,
+				autoIncrement: true,
+				primaryKey: true,
+				field: 'rrr_sno',
+				comment: '방환불요청 일련번호(자동증가)',
+			},
+			gsw_eid: {
+				type: DataTypes.STRING(14),
+				allowNull: false,
+				field: 'gsw_eid',
+				comment: '고시원 고유아이디',
+			},
+			rom_eid: {
+				type: DataTypes.STRING(14),
+				allowNull: false,
+				field: 'rom_eid',
+				comment: '방 고유 아이디',
+			},
+			mbr_eid: {
+				type: DataTypes.STRING(14),
+				allowNull: false,
+				field: 'mbr_eid',
+				comment: '회원 고유 아이디',
+			},
+			ctt_eid: {
+				type: DataTypes.STRING(14),
+				allowNull: false,
+				field: 'ctt_eid',
+				comment: '계약 고유 아이디',
+			},
+			rrr_leave_type_cd: {
+				type: DataTypes.STRING(30),
+				allowNull: false,
+				field: 'rrr_leave_type_cd',
+				comment: '만기퇴실(FULL), 중도퇴실(INTERIM), 계약취소(CANCEL)',
+			},
+			rrr_leave_date: {
+				type: DataTypes.DATEONLY,
+				allowNull: false,
+				field: 'rrr_leave_date',
+				comment: '퇴실일시',
+			},
+			rrr_leave_reason: {
+				type: DataTypes.STRING(255),
+				allowNull: false,
+				field: 'rrr_leave_reason',
+				comment: '퇴실 사유',
+			},
+			rrr_payment_amt: {
+				type: DataTypes.BIGINT(20),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'rrr_payment_amt',
+				comment: '결제금액',
+			},
+			rrr_use_period: {
+				type: DataTypes.INTEGER(11),
+				allowNull: true,
+				field: 'rrr_use_period',
+				comment: '사용기간',
+			},
+			rrr_use_amt: {
+				type: DataTypes.BIGINT(20),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'rrr_use_amt',
+				comment: '일할입실료',
+			},
+			rrr_penalty_amt: {
+				type: DataTypes.BIGINT(20),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'rrr_penalty_amt',
+				comment: '위약금',
+			},
+			rrr_refund_total_arr: {
+				type: DataTypes.BIGINT(20),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'rrr_refund_total_arr',
+				comment: '환불총액',
+			},
+			rrr_process_status_: {
+				type: DataTypes.STRING(30),
+				allowNull: false,
+				defaultValue: 'REQUEST',
+				field: 'rrr_process_status_',
+				comment: '요청(REQUEST), 승인(APPROVAL), 반려(REJECT), 취소(CANCELLATION)',
+			},
+			rrr_process_reason: {
+				type: DataTypes.STRING(255),
+				allowNull: true,
+				defaultValue: '',
+				field: 'rrr_process_reason',
+				comment: '처리사유',
+			},
+			rrr_regist_dtm: {
+				type: DataTypes.DATE,
+				allowNull: false,
+				field: 'rrr_regist_dtm',
+				defaultValue: DataTypes.NOW,
+				comment: '등록일시',
+			},
+			rrr_registrant_id: {
+				type: DataTypes.STRING(100),
+				allowNull: false,
+				field: 'rrr_registrant_id',
+				comment: '등록자 ID',
+			},
+			rrr_update_dtm: {
+				type: DataTypes.DATE,
+				allowNull: true,
+				field: 'rrr_update_dtm',
+				comment: '수정일시',
+			},
+			rrr_updater_id: {
+				type: DataTypes.STRING(100),
+				allowNull: true,
+				field: 'rrr_updater_id',
+				comment: '수정자 ID',
+			},
+		},
+		{
+			tableName: 'il_room_refund_request',
+			timestamps: false,
+			freezeTableName: true,
+		}
+	);
+};

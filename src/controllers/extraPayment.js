@@ -1,0 +1,244 @@
+const {
+	mariaDBSequelize,
+	paymentLog,
+	roomContract,
+	room,
+	customer,
+	gosiwon,
+	history,
+} = require('../models');
+const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
+
+const PYLG_PREFIX = 'PYLG';
+const PYLG_PADDING = 10;
+
+// paymentLog ID 생성 함수 (PYLG 접두사 사용, 마지막 키값 확인)
+const generatePaymentLogId = async (transaction) => {
+	const idQuery = `
+		SELECT CONCAT('PYLG', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+		FROM paymentLog
+		WHERE esntlId LIKE 'PYLG%'
+	`;
+	const [idResult] = await mariaDBSequelize.query(idQuery, {
+		type: mariaDBSequelize.QueryTypes.SELECT,
+		transaction,
+	});
+	return idResult?.nextId || 'PYLG0000000001';
+};
+
+// 공통 토큰 검증 함수
+const verifyAdminToken = (req) => {
+	const authHeader = req.get('Authorization');
+	if (!authHeader) {
+		errorHandler.errorThrow(401, '토큰이 없습니다.');
+	}
+
+	const token = authHeader.split(' ')[1];
+	if (!token) {
+		errorHandler.errorThrow(401, '토큰 형식이 올바르지 않습니다.');
+	}
+
+	const jwt = require('jsonwebtoken');
+	let decodedToken;
+	try {
+		decodedToken = jwt.decode(token);
+	} catch (err) {
+		errorHandler.errorThrow(401, '토큰 디코딩에 실패했습니다.');
+	}
+
+	if (!decodedToken || !decodedToken.admin) {
+		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
+	}
+	return decodedToken;
+};
+
+// 날짜 비교 함수 (YYYY-MM-DD 형식)
+const compareDates = (date1, date2) => {
+	const d1 = new Date(date1);
+	const d2 = new Date(date2);
+	return d1.getTime() - d2.getTime();
+};
+
+// 추가 결제 요청
+exports.roomExtraPayment = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const {
+			contractEsntlId,
+			extraPayments, // 배열: [{ extraCostName, cost, memo, extendWithPayment, useStartDate?, carInfo?, optionName? }]
+			receiverPhone,
+			sendDate,
+		} = req.body;
+
+		// 필수 필드 검증
+		if (!contractEsntlId) {
+			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
+		}
+		if (!extraPayments || !Array.isArray(extraPayments) || extraPayments.length === 0) {
+			errorHandler.errorThrow(400, 'extraPayments 배열을 입력해주세요.');
+		}
+
+		// 계약 정보 조회
+		const contractInfo = await mariaDBSequelize.query(
+			`
+			SELECT 
+				RC.*
+			FROM roomContract RC
+			JOIN room R ON RC.roomEsntlId = R.esntlId
+			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			WHERE RC.esntlId = ?
+			LIMIT 1
+		`,
+			{
+				replacements: [contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (!contractInfo || contractInfo.length === 0) {
+			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		}
+
+		const contract = contractInfo[0];
+
+		// 계약기간 확인 (sendDate가 계약기간 안에 있는지)
+		if (sendDate) {
+			const contractStartDate = contract.startDate;
+			const contractEndDate = contract.endDate;
+
+			if (contractStartDate && contractEndDate) {
+				// 날짜 형식 변환 (YYYY-MM-DD)
+				const sendDateStr = sendDate.split(' ')[0]; // 시간 부분 제거
+				const startDateStr = contractStartDate.split(' ')[0];
+				const endDateStr = contractEndDate.split(' ')[0];
+
+				if (
+					compareDates(sendDateStr, startDateStr) < 0 ||
+					compareDates(sendDateStr, endDateStr) > 0
+				) {
+					errorHandler.errorThrow(
+						400,
+						'발송일은 계약기간 안에만 입력할 수 있습니다.'
+					);
+				}
+			}
+		}
+
+		// 현재 날짜/시간 (YYYY-MM-DD, HH:MM:SS 형식)
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, '0');
+		const day = String(now.getDate()).padStart(2, '0');
+		const hours = String(now.getHours()).padStart(2, '0');
+		const minutes = String(now.getMinutes()).padStart(2, '0');
+		const seconds = String(now.getSeconds()).padStart(2, '0');
+		const pDate = `${year}-${month}-${day}`;
+		const pTime = `${hours}:${minutes}:${seconds}`;
+
+		// 추가 결제 항목들 저장
+		const createdPayments = [];
+		let totalAmount = 0;
+
+		for (const payment of extraPayments) {
+			const { extraCostName, cost, memo, extendWithPayment, useStartDate, optionInfo, optionName } = payment;
+
+			// 필수 필드 검증
+			if (!extraCostName) {
+				errorHandler.errorThrow(400, 'extraCostName을 입력해주세요.');
+			}
+			if (cost === undefined || cost === null) {
+				errorHandler.errorThrow(400, 'cost를 입력해주세요.');
+			}
+
+			// esntlId 생성
+			const esntlId = await generatePaymentLogId(transaction);
+
+			// paymentLog 생성
+			const extraPayment = await paymentLog.create(
+				{
+					esntlId: esntlId,
+					contractEsntlId: contractEsntlId,
+					gosiwonEsntlId: contract.gosiwonEsntlId,
+					roomEsntlId: contract.roomEsntlId,
+					customerEsntlId: contract.customerEsntlId || '',
+					extraCostName: extraCostName,
+					memo: memo || null,
+					optionInfo: optionInfo || null,
+					useStartDate: useStartDate || null,
+					optionName: optionName || null,
+					extendWithPayment: extendWithPayment ? 1 : 0,
+					isExtra: 1, // 옵션에서 발생한 추가 결제
+					pDate: pDate,
+					pTime: pTime,
+					paymentAmount: String(Math.abs(parseInt(cost, 10))),
+					discountAmount: '0',
+					paymentPoint: '0',
+					paymentCoupon: '0',
+					calAmount: '',
+					pyl_goods_amount: Math.abs(parseInt(cost, 10)),
+					imp_uid: '', // 추가 결제 요청 시 PG 결제 전이므로 빈 문자열
+					paymentType: null, // paymentType은 결제 주체(수단)이므로 추가 결제 요청 시에는 null
+				},
+				{ transaction }
+			);
+
+			createdPayments.push({
+				esntlId: extraPayment.esntlId,
+				extraCostName: extraPayment.extraCostName,
+				cost: parseInt(extraPayment.paymentAmount, 10),
+			});
+
+			totalAmount += Math.abs(parseInt(cost, 10));
+		}
+
+		// History 기록 생성
+		const historyIdQuery = `
+			SELECT CONCAT('HISTORY', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 8) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+			FROM history
+		`;
+		const [historyIdResult] = await mariaDBSequelize.query(historyIdQuery, {
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		});
+		const historyId = historyIdResult?.nextId || 'HISTORY0000000001';
+
+		const historyContent = `추가 결제 요청: ${extraPayments.length}건, 총액: ${totalAmount.toLocaleString()}원${
+			receiverPhone ? `, 수신자: ${receiverPhone}` : ''
+		}${sendDate ? `, 발송일: ${sendDate}` : ''}`;
+
+		await history.create(
+			{
+				esntlId: historyId,
+				gosiwonEsntlId: contract.gosiwonEsntlId,
+				roomEsntlId: contract.roomEsntlId,
+				contractEsntlId: contractEsntlId,
+				content: historyContent,
+				category: 'EXTRA_PAYMENT',
+				priority: 'NORMAL',
+				publicRange: 0,
+				writerAdminId: writerAdminId,
+				writerType: 'ADMIN',
+				deleteYN: 'N',
+			},
+			{ transaction }
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '추가 결제 요청이 완료되었습니다.', {
+			contractEsntlId: contractEsntlId,
+			totalAmount: totalAmount,
+			paymentCount: createdPayments.length,
+			payments: createdPayments,
+			historyId: historyId,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};

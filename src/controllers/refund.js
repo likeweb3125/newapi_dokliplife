@@ -1,6 +1,6 @@
 const {
 	mariaDBSequelize,
-	refund,
+	ilRoomRefundRequest,
 	room,
 	customer,
 	history,
@@ -8,34 +8,8 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 
-const REFUND_PREFIX = 'RFND';
-const REFUND_PADDING = 10;
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
-
-// 환불 ID 생성 함수
-const generateRefundId = async (transaction) => {
-	const latest = await refund.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${REFUND_PREFIX}${String(1).padStart(REFUND_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(REFUND_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${REFUND_PREFIX}${String(nextNumber).padStart(
-		REFUND_PADDING,
-		'0'
-	)}`;
-};
 
 // 히스토리 ID 생성 함수
 const generateHistoryId = async (transaction) => {
@@ -106,6 +80,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			proratedRent,
 			penalty,
 			totalRefundAmount,
+			usePeriod,
 		} = req.body;
 
 		// 필수 필드 검증
@@ -119,18 +94,20 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'cancelDate를 입력해주세요.');
 		}
 
-		// 취소사유 유효성 검증
-		const validCancelReasons = [
-			'EXPIRED_CHECKOUT',
-			'MIDDLE_CHECKOUT',
-			'CONTRACT_CANCEL',
-		];
+		// 취소사유 유효성 검증 및 매핑
+		const cancelReasonMap = {
+			EXPIRED_CHECKOUT: 'FULL',
+			MIDDLE_CHECKOUT: 'INTERIM',
+			CONTRACT_CANCEL: 'CANCEL',
+		};
+		const validCancelReasons = Object.keys(cancelReasonMap);
 		if (!validCancelReasons.includes(cancelReason)) {
 			errorHandler.errorThrow(
 				400,
 				`cancelReason는 ${validCancelReasons.join(', ')} 중 하나여야 합니다.`
 			);
 		}
+		const rrr_leave_type_cd = cancelReasonMap[cancelReason];
 
 		// 계약 정보 조회
 		const contractInfo = await mariaDBSequelize.query(
@@ -169,30 +146,31 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		const contractorEsntlId = contract.contractorEsntlId || contract.customerEsntlId || null; // 계약자 정보가 없으면 입실자와 동일
 		const contractorName = contract.contractorName || contract.customerName || null; // 계약자 이름이 없으면 입실자 이름과 동일
 
-		// 환불 정보 생성
-		const refundId = await generateRefundId(transaction);
-		await refund.create(
+
+		// 환불 정보 생성 (il_room_refund_request 테이블 사용)
+		const refundRequest = await ilRoomRefundRequest.create(
 			{
-				esntlId: refundId,
-				gosiwonEsntlId: contract.gosiwonEsntlId,
-				roomEsntlId: contract.roomEsntlId,
-				contractEsntlId: contractEsntlId,
-				contractorEsntlId: contract.contractorEsntlId || null,
-				customerEsntlId: contract.customerEsntlId,
-				cancelReason: cancelReason,
-				cancelDate: cancelDate,
-				cancelMemo: cancelMemo || null,
-				liabilityReason: liabilityReason || null,
-				contactedOwner: contactedOwner ? 1 : 0,
-				refundMethod: refundMethod || null,
-				paymentAmount: paymentAmount || 0,
-				proratedRent: proratedRent || 0,
-				penalty: penalty || 0,
-				totalRefundAmount: totalRefundAmount || 0,
-				deleteYN: 'N',
+				gsw_eid: contract.gosiwonEsntlId,
+				rom_eid: contract.roomEsntlId,
+				mbr_eid: contract.customerEsntlId,
+				ctt_eid: contractEsntlId,
+				rrr_leave_type_cd: rrr_leave_type_cd,
+				rrr_leave_date: cancelDate,
+				rrr_leave_reason: cancelMemo || '',
+				rrr_payment_amt: paymentAmount || 0,
+				rrr_use_period: usePeriod || null,
+				rrr_use_amt: proratedRent || 0,
+				rrr_penalty_amt: penalty || 0,
+				rrr_refund_total_arr: totalRefundAmount || 0,
+				rrr_process_status_: 'REQUEST',
+				rrr_process_reason: '',
+				rrr_regist_dtm: new Date(),
+				rrr_registrant_id: writerAdminId || 'SYSTEM',
 			},
 			{ transaction }
 		);
+
+		const refundId = refundRequest.rrr_sno;
 
 		// roomStatus를 CHECKOUT_REQUESTED로 업데이트
 		// 기존 roomStatus 레코드 확인
@@ -312,7 +290,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				contractEsntlId: contractEsntlId,
-				etcEsntlId: refundId,
+				etcEsntlId: String(refundId),
 				content: historyContent,
 				category: 'REFUND',
 				priority: 'NORMAL',
@@ -327,7 +305,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '환불 및 퇴실처리 성공', {
-			refundId: refundId,
+			rrr_sno: refundId,
 			historyId: historyId,
 			roomStatus: 'CHECKOUT_REQUESTED',
 		});
