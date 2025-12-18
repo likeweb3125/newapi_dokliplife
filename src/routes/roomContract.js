@@ -160,9 +160,6 @@ const roomContractController = require('../controllers/roomContract');
  *                           paymentAmount:
  *                             type: string
  *                             description: 결제 금액 (포맷팅)
- *                           payment_amount:
- *                             type: number
- *                             description: 결제 금액 (숫자)
  *                           paymentPoint:
  *                             type: string
  *                             description: 포인트 결제 금액 (포맷팅)
@@ -222,7 +219,7 @@ router.get('/list', roomContractController.getContractList);
  * /v1/roomContract/detail:
  *   get:
  *     summary: 계약 상세보기 (결제 내역 조회)
- *     description: 계약 고유 아이디로 해당 계약의 결제 내역을 조회합니다. paymentLog와 userCoupon 테이블을 조인하여 결제 정보와 쿠폰 정보를 포함합니다.
+ *     description: 계약 고유 아이디로 해당 계약의 상세 정보와 결제 내역을 조회합니다. roomContract 테이블을 기준으로 계약 정보를 조회하고, 해당 계약의 paymentLog 목록을 함께 반환합니다.
  *     tags: [RoomContract]
  *     security:
  *       - bearerAuth: []
@@ -251,8 +248,43 @@ router.get('/list', roomContractController.getContractList);
  *                 data:
  *                   type: object
  *                   properties:
- *                     resultList:
+ *                     contractInfo:
+ *                       type: object
+ *                       description: 계약 정보
+ *                       properties:
+ *                         contractNumber:
+ *                           type: string
+ *                           description: 계약 고유 아이디
+ *                         gosiwonName:
+ *                           type: string
+ *                           description: 고시원명
+ *                         gosiwonAddress:
+ *                           type: string
+ *                           description: 고시원 주소
+ *                         roomNumber:
+ *                           type: string
+ *                           description: 방 번호
+ *                         roomType:
+ *                           type: string
+ *                           description: 방 타입
+ *                         customerName:
+ *                           type: string
+ *                           description: 고객명
+ *                         customerPhone:
+ *                           type: string
+ *                           description: 고객 전화번호
+ *                         startDate:
+ *                           type: string
+ *                           description: 계약 시작일
+ *                         endDate:
+ *                           type: string
+ *                           description: 계약 종료일
+ *                         contractStatus:
+ *                           type: string
+ *                           description: 계약 상태
+ *                     paymentList:
  *                       type: array
+ *                       description: 결제 내역 목록
  *                       items:
  *                         type: object
  *                         properties:
@@ -280,6 +312,15 @@ router.get('/list', roomContractController.getContractList);
  *                           paymentType:
  *                             type: string
  *                             description: 결제 타입
+ *                           extraCostName:
+ *                             type: string
+ *                             description: 추가비용명칭
+ *                           isExtra:
+ *                             type: integer
+ *                             description: '추가 결제 여부 (0: 일반 연장 결제, 1: 옵션에서 발생한 추가 결제)'
+ *                           extendWithPayment:
+ *                             type: integer
+ *                             description: '연장시 함께 결제 여부 (0: 미사용, 1: 사용)'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

@@ -231,10 +231,8 @@ exports.getContractDetail = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 및 결제 상세 조회 쿼리
-		// - roomContract, gosiwon, room, customer, deposit, paymentLog, userCoupon 조인
-		// - 각 결제 행마다 계약/고시원/방/고객/계약자 정보를 함께 반환
-		const query = `
+		// 계약 정보 조회 (roomContract 기준)
+		const contractQuery = `
 			SELECT 
 				RC.esntlId AS contractNumber,
 				G.name AS gosiwonName,
@@ -265,36 +263,54 @@ exports.getContractDetail = async (req, res, next) => {
 				RC.memo2 AS occupantMemo2,
 				RC.emergencyContact AS emergencyContact,
 				CT.name AS contractorName,
-				CT.phone AS contractorPhone,
-				pyl.pDate,
-				pyl.pTime,
-				pyl.pyl_goods_amount AS pyl_goods_amount,
-				FORMAT(IFNULL(pyl.paymentAmount, 0), 0) AS paymentAmount,
-				pyl.paymentAmount AS payment_amount,
-				FORMAT(IFNULL(pyl.paymentPoint, 0), 0) AS paymentPoint,
-				FORMAT(IFNULL(pyl.paymentCoupon, 0), 0) AS paymentCoupon,
-				ucp.name AS couponName,
-				pyl.paymentType
+				CT.phone AS contractorPhone
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
 			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
-			LEFT JOIN paymentLog AS pyl ON pyl.contractEsntlId = RC.esntlId
-			LEFT JOIN userCoupon AS ucp ON pyl.ucp_eid = ucp.esntlId
 			WHERE RC.esntlId = ?
+			LIMIT 1
 		`;
 
-		const result = await mariaDBSequelize.query(query, {
+		const [contractInfo] = await mariaDBSequelize.query(contractQuery, {
 			replacements: [contractEsntlId],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		const resultList = Array.isArray(result) ? result : [];
+		if (!contractInfo) {
+			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		}
+
+		// 결제 내역 조회 (paymentLog 기준)
+		const paymentQuery = `
+			SELECT 
+				pyl.pDate,
+				pyl.pTime,
+				pyl.pyl_goods_amount AS pyl_goods_amount,
+				FORMAT(IFNULL(pyl.paymentAmount, 0), 0) AS paymentAmount,
+				FORMAT(IFNULL(pyl.paymentPoint, 0), 0) AS paymentPoint,
+				FORMAT(IFNULL(pyl.paymentCoupon, 0), 0) AS paymentCoupon,
+				ucp.name AS couponName,
+				pyl.paymentType,
+				pyl.extraCostName,
+				pyl.isExtra,
+				pyl.extendWithPayment
+			FROM paymentLog pyl
+			LEFT JOIN userCoupon AS ucp ON pyl.ucp_eid = ucp.esntlId
+			WHERE pyl.contractEsntlId = ?
+			ORDER BY pyl.pDate DESC, pyl.pTime DESC
+		`;
+
+		const paymentList = await mariaDBSequelize.query(paymentQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
 
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
-			resultList: resultList,
+			contractInfo: contractInfo,
+			paymentList: paymentList || [],
 		});
 	} catch (err) {
 		next(err);
