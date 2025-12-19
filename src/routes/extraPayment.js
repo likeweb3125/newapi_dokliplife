@@ -15,7 +15,7 @@ const extraPaymentController = require('../controllers/extraPayment');
  * /v1/roomExtraPayment:
  *   post:
  *     summary: 추가 결제 요청
- *     description: 계약에 대한 추가 결제 요청을 등록합니다. 주차비, 추가 입실료, 직접 입력 등 여러 종류의 추가 비용을 한 번에 등록할 수 있습니다. extendWithPayment = ture 인 경우 연장시 함께 결제 됩니다. extraCostName= '추가비용명칭 (주차비, 추가 입실료, 직접 입력 등)'
+ *     description: 계약에 대한 추가 결제 요청을 등록합니다. 주차비, 추가 입실료, 직접 입력 등 여러 종류의 추가 비용을 한 번에 등록할 수 있습니다. extendWithPayment = ture 인 경우 연장시 함께 결제 됩니다. extraCostName= '추가비용명칭 (주차비, 추가 입실료, 직접 입력 등)' optionName='자동차/오토바이/직접입력'
  *     tags: [ExtraPayment]
  *     security:
  *       - bearerAuth: []

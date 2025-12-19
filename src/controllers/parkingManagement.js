@@ -1,0 +1,563 @@
+const {
+	mariaDBSequelize,
+	paymentLog,
+	roomContract,
+	parking,
+	parkStatus,
+	history,
+} = require('../models');
+const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
+
+const PYLG_PREFIX = 'PYLG';
+const PYLG_PADDING = 10;
+const PARKSTATUS_PREFIX = 'PKST';
+const PARKSTATUS_PADDING = 10;
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 공통 토큰 검증 함수
+const verifyAdminToken = (req) => {
+	const authHeader = req.get('Authorization');
+	if (!authHeader) {
+		errorHandler.errorThrow(401, '토큰이 없습니다.');
+	}
+
+	const token = authHeader.split(' ')[1];
+	if (!token) {
+		errorHandler.errorThrow(401, '토큰 형식이 올바르지 않습니다.');
+	}
+
+	const jwt = require('jsonwebtoken');
+	let decodedToken;
+	try {
+		decodedToken = jwt.decode(token);
+	} catch (err) {
+		errorHandler.errorThrow(401, '토큰 디코딩에 실패했습니다.');
+	}
+
+	if (!decodedToken || !decodedToken.admin) {
+		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
+	}
+	return decodedToken;
+};
+
+// paymentLog ID 생성 함수
+const generatePaymentLogId = async (transaction) => {
+	const idQuery = `
+		SELECT CONCAT('PYLG', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+		FROM paymentLog
+		WHERE esntlId LIKE 'PYLG%'
+	`;
+	const [idResult] = await mariaDBSequelize.query(idQuery, {
+		type: mariaDBSequelize.QueryTypes.SELECT,
+		transaction,
+	});
+	return idResult?.nextId || 'PYLG0000000001';
+};
+
+// parkStatus ID 생성 함수
+const generateParkStatusId = async (transaction) => {
+	const idQuery = `
+		SELECT CONCAT('PKST', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+		FROM parkStatus
+		WHERE esntlId LIKE 'PKST%'
+	`;
+	const [idResult] = await mariaDBSequelize.query(idQuery, {
+		type: mariaDBSequelize.QueryTypes.SELECT,
+		transaction,
+	});
+	return idResult?.nextId || 'PKST0000000001';
+};
+
+// history ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const idQuery = `
+		SELECT CONCAT('HISTORY', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 8) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+		FROM history
+	`;
+	const [idResult] = await mariaDBSequelize.query(idQuery, {
+		type: mariaDBSequelize.QueryTypes.SELECT,
+		transaction,
+	});
+	return idResult?.nextId || 'HISTORY0000000001';
+};
+
+// 현재 날짜/시간 (YYYY-MM-DD, HH:MM:SS 형식)
+const getCurrentDateTime = () => {
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = String(now.getMonth() + 1).padStart(2, '0');
+	const day = String(now.getDate()).padStart(2, '0');
+	const hours = String(now.getHours()).padStart(2, '0');
+	const minutes = String(now.getMinutes()).padStart(2, '0');
+	const seconds = String(now.getSeconds()).padStart(2, '0');
+	return {
+		pDate: `${year}-${month}-${day}`,
+		pTime: `${hours}:${minutes}:${seconds}`,
+	};
+};
+
+// 주차 등록 (Create)
+exports.createParking = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const {
+			contractEsntlId,
+			optionName, // '자동차' 또는 '오토바이'
+			optionInfo, // 차량번호
+			useStartDate,
+			useEndDate,
+			cost = 0, // 주차비 (0원 가능)
+			extend, // 연장시 함께 연장 여부
+		} = req.body;
+
+		// extend가 true이면 1로 설정
+		const extendValue = extend === true;
+
+		// 필수 필드 검증
+		if (!contractEsntlId) {
+			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
+		}
+		if (!optionName || (optionName !== '자동차' && optionName !== '오토바이')) {
+			errorHandler.errorThrow(400, 'optionName은 "자동차" 또는 "오토바이"여야 합니다.');
+		}
+
+		// 계약 정보 조회
+		const contractInfo = await mariaDBSequelize.query(
+			`
+			SELECT 
+				RC.*
+			FROM roomContract RC
+			WHERE RC.esntlId = ?
+			LIMIT 1
+		`,
+			{
+				replacements: [contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (!contractInfo || contractInfo.length === 0) {
+			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		}
+
+		const contract = contractInfo[0];
+
+		// 현재 날짜/시간
+		const { pDate, pTime } = getCurrentDateTime();
+
+		// paymentLog 생성 (0원이어도 기록)
+		const paymentLogId = await generatePaymentLogId(transaction);
+		await paymentLog.create(
+			{
+				esntlId: paymentLogId,
+				contractEsntlId: contractEsntlId,
+				gosiwonEsntlId: contract.gosiwonEsntlId,
+				roomEsntlId: contract.roomEsntlId,
+				customerEsntlId: contract.customerEsntlId || '',
+				extraCostName: '주차비',
+				memo: null,
+				optionInfo: optionInfo || null,
+				useStartDate: useStartDate || null,
+				optionName: optionName,
+				extendWithPayment: extendValue ? 1 : 0,
+				isExtra: 1,
+				pDate: pDate,
+				pTime: pTime,
+				paymentAmount: String(Math.abs(parseInt(cost, 10))),
+				discountAmount: '0',
+				paymentPoint: '0',
+				paymentCoupon: '0',
+				calAmount: '',
+				pyl_goods_amount: Math.abs(parseInt(cost, 10)),
+				imp_uid: cost > 0 ? '' : '', // 0원이면 빈 문자열
+				paymentType: cost > 0 ? null : null, // 0원이면 null
+			},
+			{ transaction }
+		);
+
+		// gosiwonParking 조회 및 사용 대수 증가
+		const parkingInfo = await parking.findOne({
+			where: { gosiwonEsntlId: contract.gosiwonEsntlId },
+			transaction,
+		});
+
+		if (parkingInfo) {
+			// 사용 대수 증가
+			if (optionName === '자동차') {
+				await parking.update(
+					{ autoUse: (parkingInfo.autoUse || 0) + 1 },
+					{
+						where: { esntlId: parkingInfo.esntlId },
+						transaction,
+					}
+				);
+			} else if (optionName === '오토바이') {
+				await parking.update(
+					{ bikeUse: (parkingInfo.bikeUse || 0) + 1 },
+					{
+						where: { esntlId: parkingInfo.esntlId },
+						transaction,
+					}
+				);
+			}
+		}
+
+		// parkStatus 생성
+		const parkStatusId = await generateParkStatusId(transaction);
+		const parkStatusMemo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+		await parkStatus.create(
+			{
+				esntlId: parkStatusId,
+				gosiwonEsntlId: contract.gosiwonEsntlId,
+				contractEsntlId: contractEsntlId,
+				customerEsntlId: contract.customerEsntlId || null,
+				status: 'IN_USE',
+				useStartDate: useStartDate || pDate,
+				useEndDate: useEndDate || contract.endDate || null,
+				memo: parkStatusMemo,
+				deleteYN: 'N',
+			},
+			{ transaction }
+		);
+
+		// History 기록 생성
+		const historyId = await generateHistoryId(transaction);
+		const costText = cost > 0 ? `${cost.toLocaleString()}원` : '입실료 포함';
+		const historyContent = `주차 등록: ${optionName}${parkStatusMemo ? ` (${parkStatusMemo})` : ''}, 주차비: ${costText}`;
+
+		await history.create(
+			{
+				esntlId: historyId,
+				gosiwonEsntlId: contract.gosiwonEsntlId,
+				roomEsntlId: contract.roomEsntlId,
+				contractEsntlId: contractEsntlId,
+				content: historyContent,
+				category: 'PARKING',
+				priority: 'NORMAL',
+				publicRange: 0,
+				writerAdminId: writerAdminId,
+				writerType: 'ADMIN',
+				deleteYN: 'N',
+			},
+			{ transaction }
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '주차 등록이 완료되었습니다.', {
+			contractEsntlId: contractEsntlId,
+			paymentLogId: paymentLogId,
+			parkStatusId: parkStatusId,
+			historyId: historyId,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 주차 목록 조회 (Read)
+exports.getParkingList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { contractEsntlId } = req.query;
+
+		if (!contractEsntlId) {
+			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
+		}
+
+		// paymentLog와 parkStatus 조인하여 주차 정보 조회
+		const query = `
+			SELECT 
+				PL.esntlId AS paymentLogId,
+				PS.esntlId AS parkStatusId,
+				PL.optionName,
+				PL.optionInfo,
+				PS.useStartDate,
+				PS.useEndDate,
+				PL.pyl_goods_amount AS cost,
+				PL.paymentAmount,
+				PL.paymentType,
+				PL.extendWithPayment,
+				PL.pDate,
+				PL.pTime,
+				PS.status,
+				PS.memo,
+				CASE 
+					WHEN PL.pyl_goods_amount = 0 THEN '입실료 포함'
+					ELSE '별도 결제'
+				END AS paymentStatus
+			FROM paymentLog PL
+			LEFT JOIN parkStatus PS ON PL.contractEsntlId = PS.contractEsntlId 
+				AND PS.deleteYN = 'N'
+				AND PS.status = 'IN_USE'
+			WHERE PL.contractEsntlId = ?
+				AND PL.isExtra = 1
+				AND PL.extraCostName = '주차비'
+				AND (PL.optionName = '자동차' OR PL.optionName = '오토바이')
+			ORDER BY PL.pDate DESC, PL.pTime DESC
+		`;
+
+		const result = await mariaDBSequelize.query(query, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		errorHandler.successThrow(res, '주차 목록 조회 성공', {
+			list: result || [],
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+// 주차 정보 수정 (Update)
+exports.updateParking = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { parkingId } = req.params; // paymentLog의 esntlId
+		const {
+			optionName,
+			optionInfo,
+			useStartDate,
+			useEndDate,
+			extend, // 연장시 함께 연장 여부
+		} = req.body;
+
+		// extend가 true이면 1로 설정
+		const extendValue = extend === true;
+
+		if (!parkingId) {
+			errorHandler.errorThrow(400, 'parkingId를 입력해주세요.');
+		}
+
+		// paymentLog 조회
+		const paymentLogInfo = await paymentLog.findOne({
+			where: {
+				esntlId: parkingId,
+				isExtra: 1,
+				extraCostName: '주차비',
+			},
+			transaction,
+		});
+
+		if (!paymentLogInfo) {
+			errorHandler.errorThrow(404, '주차 정보를 찾을 수 없습니다.');
+		}
+
+		// 업데이트할 필드 구성
+		const updateData = {};
+		if (optionName !== undefined) {
+			if (optionName !== '자동차' && optionName !== '오토바이') {
+				errorHandler.errorThrow(400, 'optionName은 "자동차" 또는 "오토바이"여야 합니다.');
+			}
+			updateData.optionName = optionName;
+		}
+		if (optionInfo !== undefined) {
+			updateData.optionInfo = optionInfo || null;
+		}
+		if (useStartDate !== undefined) {
+			updateData.useStartDate = useStartDate || null;
+		}
+		if (extend !== undefined) {
+			updateData.extendWithPayment = extendValue ? 1 : 0;
+		}
+
+		// paymentLog 업데이트
+		if (Object.keys(updateData).length > 0) {
+			await paymentLog.update(updateData, {
+				where: { esntlId: parkingId },
+				transaction,
+			});
+		}
+
+		// parkStatus 조회 및 업데이트
+		const parkStatusInfo = await parkStatus.findOne({
+			where: {
+				contractEsntlId: paymentLogInfo.contractEsntlId,
+				deleteYN: 'N',
+			},
+			order: [['createdAt', 'DESC']],
+			transaction,
+		});
+
+		if (parkStatusInfo) {
+			const parkStatusUpdateData = {};
+			if (useStartDate !== undefined) {
+				parkStatusUpdateData.useStartDate = useStartDate || null;
+			}
+			if (useEndDate !== undefined) {
+				parkStatusUpdateData.useEndDate = useEndDate || null;
+			}
+			if (optionInfo !== undefined) {
+				parkStatusUpdateData.memo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+			}
+
+			if (Object.keys(parkStatusUpdateData).length > 0) {
+				await parkStatus.update(parkStatusUpdateData, {
+					where: { esntlId: parkStatusInfo.esntlId },
+					transaction,
+				});
+			}
+		}
+
+		// History 기록 생성
+		const historyId = await generateHistoryId(transaction);
+		const historyContent = `주차 정보 수정: ${parkingId}`;
+
+		await history.create(
+			{
+				esntlId: historyId,
+				gosiwonEsntlId: paymentLogInfo.gosiwonEsntlId,
+				roomEsntlId: paymentLogInfo.roomEsntlId,
+				contractEsntlId: paymentLogInfo.contractEsntlId,
+				content: historyContent,
+				category: 'PARKING',
+				priority: 'NORMAL',
+				publicRange: 0,
+				writerAdminId: writerAdminId,
+				writerType: 'ADMIN',
+				deleteYN: 'N',
+			},
+			{ transaction }
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '주차 정보 수정이 완료되었습니다.', {
+			paymentLogId: parkingId,
+			historyId: historyId,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 주차 삭제 (Delete)
+exports.deleteParking = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { parkingId } = req.params; // paymentLog의 esntlId
+
+		if (!parkingId) {
+			errorHandler.errorThrow(400, 'parkingId를 입력해주세요.');
+		}
+
+		// paymentLog 조회 (필요한 컬럼만 선택하여 pyl_expected_settle 오류 방지)
+		const paymentLogInfo = await paymentLog.findOne({
+			attributes: [
+				'esntlId',
+				'contractEsntlId',
+				'gosiwonEsntlId',
+				'roomEsntlId',
+				'customerEsntlId',
+				'optionName',
+			],
+			where: {
+				esntlId: parkingId,
+				isExtra: 1,
+				extraCostName: '주차비',
+			},
+			transaction,
+		});
+
+		if (!paymentLogInfo) {
+			errorHandler.errorThrow(404, '주차 정보를 찾을 수 없습니다.');
+		}
+
+		// gosiwonParking 사용 대수 감소
+		const parkingInfo = await parking.findOne({
+			where: { gosiwonEsntlId: paymentLogInfo.gosiwonEsntlId },
+			transaction,
+		});
+
+		if (parkingInfo && paymentLogInfo.optionName) {
+			if (paymentLogInfo.optionName === '자동차') {
+				const newAutoUse = Math.max(0, (parkingInfo.autoUse || 0) - 1);
+				await parking.update(
+					{ autoUse: newAutoUse },
+					{
+						where: { esntlId: parkingInfo.esntlId },
+						transaction,
+					}
+				);
+			} else if (paymentLogInfo.optionName === '오토바이') {
+				const newBikeUse = Math.max(0, (parkingInfo.bikeUse || 0) - 1);
+				await parking.update(
+					{ bikeUse: newBikeUse },
+					{
+						where: { esntlId: parkingInfo.esntlId },
+						transaction,
+					}
+				);
+			}
+		}
+
+		// parkStatus 소프트 삭제
+		const parkStatusInfo = await parkStatus.findOne({
+			where: {
+				contractEsntlId: paymentLogInfo.contractEsntlId,
+				deleteYN: 'N',
+			},
+			order: [['createdAt', 'DESC']],
+			transaction,
+		});
+
+		if (parkStatusInfo) {
+			await parkStatus.update(
+				{ deleteYN: 'Y' },
+				{
+					where: { esntlId: parkStatusInfo.esntlId },
+					transaction,
+				}
+			);
+		}
+
+		// paymentLog는 삭제하지 않고 유지 (결제 내역 보존)
+
+		// History 기록 생성
+		const historyId = await generateHistoryId(transaction);
+		const historyContent = `주차 삭제: ${parkingId} (${paymentLogInfo.optionName || ''})`;
+
+		await history.create(
+			{
+				esntlId: historyId,
+				gosiwonEsntlId: paymentLogInfo.gosiwonEsntlId,
+				roomEsntlId: paymentLogInfo.roomEsntlId,
+				contractEsntlId: paymentLogInfo.contractEsntlId,
+				content: historyContent,
+				category: 'PARKING',
+				priority: 'NORMAL',
+				publicRange: 0,
+				writerAdminId: writerAdminId,
+				writerType: 'ADMIN',
+				deleteYN: 'N',
+			},
+			{ transaction }
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '주차 삭제가 완료되었습니다.', {
+			paymentLogId: parkingId,
+			historyId: historyId,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};

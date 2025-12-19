@@ -154,10 +154,10 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'tid',
 				comment: '승인아이디(PG)',
 			},
-			pyl_expected_settle: {
+			pyl_expected_settlement_date: {
 				type: DataTypes.STRING(10),
 				allowNull: true,
-				field: 'pyl_expected_settle',
+				field: 'pyl_expected_settlement_date',
 				comment: '정산예정일',
 			},
 			pyl_contract_data: {

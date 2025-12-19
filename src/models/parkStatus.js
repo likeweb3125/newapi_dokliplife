@@ -46,6 +46,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'useEndDate',
 				comment: '사용 종료일',
 			},
+			memo: {
+				type: DataTypes.STRING(500),
+				allowNull: true,
+				field: 'memo',
+				comment: '메모 (차량번호, 차종 등)',
+			},
 			deleteYN: {
 				type: DataTypes.CHAR(1),
 				allowNull: false,

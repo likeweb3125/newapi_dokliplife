@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `parkStatus` (
   `status` VARCHAR(50) NOT NULL DEFAULT 'AVAILABLE' COMMENT '주차 상태 (AVAILABLE: 사용가능, IN_USE: 사용중, RESERVED: 예약됨, EXPIRED: 만료됨)',
   `useStartDate` DATE NULL COMMENT '사용 시작일',
   `useEndDate` DATE NULL COMMENT '사용 종료일',
+  `memo` VARCHAR(500) NULL COMMENT '메모 (차량번호, 차종 등)',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
@@ -69,6 +70,7 @@ CREATE INDEX `idx_parkStatus_gosiwon_date` ON `parkStatus` (`gosiwonEsntlId`, `u
 --     * RESERVED: 예약됨
 --     * EXPIRED: 만료됨
 --   - useStartDate, useEndDate: 주차 사용 기간
+--   - memo: 차량번호, 차종 등 주차 관련 메모 정보
 -- 
 -- 사용 예시:
 --   - 계약 시 주차 사용: contractEsntlId와 customerEsntlId 함께 사용

@@ -10,8 +10,10 @@ CREATE TABLE IF NOT EXISTS `gosiwonParking` (
   `structure` VARCHAR(255) NULL COMMENT '주차장 구조',
   `auto` INT(11) DEFAULT 0 COMMENT '자동차 주차 가능 대수',
   `autoPrice` INT(11) DEFAULT 0 COMMENT '자동차 한달 주차비',
+  `autoUse` INT(11) DEFAULT 0 COMMENT '자동차 사용 중인 대수',
   `bike` INT(11) DEFAULT 0 COMMENT '오토바이 주차 가능 대수',
   `bikePrice` INT(11) DEFAULT 0 COMMENT '오토바이 한달 주차비',
+  `bikeUse` INT(11) DEFAULT 0 COMMENT '오토바이 사용 중인 대수',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '등록일',
   PRIMARY KEY (`esntlId`),
   INDEX `idx_gosiwonEsntlId` (`gosiwonEsntlId`),
@@ -40,6 +42,8 @@ CREATE TABLE IF NOT EXISTS `gosiwonParking` (
 --   - structure: 주차장 구조 (예: 필로티 구조, 지하 주차장 등)
 --   - auto: 자동차 주차 가능 대수
 --   - autoPrice: 자동차 한달 주차비 (단위: 원)
+--   - autoUse: 자동차 사용 중인 대수
 --   - bike: 오토바이 주차 가능 대수
 --   - bikePrice: 오토바이 한달 주차비 (단위: 원)
-
+--   - bikeUse: 오토바이 사용 중인 대수
+--   - 남아있는 자리수 = auto - autoUse, bike - bikeUse 로 계산할 수 있습니다.

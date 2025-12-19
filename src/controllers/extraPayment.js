@@ -6,6 +6,8 @@ const {
 	customer,
 	gosiwon,
 	history,
+	parking,
+	parkStatus,
 } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
@@ -130,6 +132,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 		}
 
 		// 현재 날짜/시간 (YYYY-MM-DD, HH:MM:SS 형식)
+		// 시스템 시간대가 Asia/Seoul로 설정되어 있으므로 new Date()는 한국 시간을 반환
 		const now = new Date();
 		const year = now.getFullYear();
 		const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -194,6 +197,69 @@ exports.roomExtraPayment = async (req, res, next) => {
 			});
 
 			totalAmount += Math.abs(parseInt(cost, 10));
+
+			// optionName이 '자동차' 또는 '오토바이'인 경우 주차장 사용 대수 증가 및 parkStatus 업데이트
+			if (optionName === '자동차' || optionName === '오토바이') {
+				// gosiwonParking 조회
+				const parkingInfo = await parking.findOne({
+					where: { gosiwonEsntlId: contract.gosiwonEsntlId },
+					transaction,
+				});
+
+				if (parkingInfo) {
+					// 사용 대수 증가
+					if (optionName === '자동차') {
+						await parking.update(
+							{ autoUse: (parkingInfo.autoUse || 0) + 1 },
+							{
+								where: { esntlId: parkingInfo.esntlId },
+								transaction,
+							}
+						);
+					} else if (optionName === '오토바이') {
+						await parking.update(
+							{ bikeUse: (parkingInfo.bikeUse || 0) + 1 },
+							{
+								where: { esntlId: parkingInfo.esntlId },
+								transaction,
+							}
+						);
+					}
+
+					// parkStatus ID 생성 함수
+					const generateParkStatusId = async (transaction) => {
+						const idQuery = `
+							SELECT CONCAT('PKST', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+							FROM parkStatus
+							WHERE esntlId LIKE 'PKST%'
+						`;
+						const [idResult] = await mariaDBSequelize.query(idQuery, {
+							type: mariaDBSequelize.QueryTypes.SELECT,
+							transaction,
+						});
+						return idResult?.nextId || 'PKST0000000001';
+					};
+
+					// parkStatus 생성
+					const parkStatusId = await generateParkStatusId(transaction);
+					// optionInfo를 memo에 저장 (차량번호, 차종 등)
+					const parkStatusMemo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+					await parkStatus.create(
+						{
+							esntlId: parkStatusId,
+							gosiwonEsntlId: contract.gosiwonEsntlId,
+							contractEsntlId: contractEsntlId,
+							customerEsntlId: contract.customerEsntlId || null,
+							status: 'IN_USE',
+							useStartDate: useStartDate || pDate,
+							useEndDate: contract.endDate || null,
+							memo: parkStatusMemo, // 차량번호, 차종 등 메모 정보 (optionInfo에서 가져옴)
+							deleteYN: 'N',
+						},
+						{ transaction }
+					);
+				}
+			}
 		}
 
 		// History 기록 생성

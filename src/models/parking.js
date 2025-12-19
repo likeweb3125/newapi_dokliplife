@@ -35,6 +35,13 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'autoPrice',
 				comment: '자동차 한달 주차비',
 			},
+			autoUse: {
+				type: DataTypes.INTEGER(11),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'autoUse',
+				comment: '자동차 사용 중인 대수',
+			},
 			bike: {
 				type: DataTypes.INTEGER(11),
 				allowNull: true,
@@ -48,6 +55,13 @@ module.exports = (sequelize, DataTypes) => {
 				defaultValue: 0,
 				field: 'bikePrice',
 				comment: '오토바이 한달 주차비',
+			},
+			bikeUse: {
+				type: DataTypes.INTEGER(11),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'bikeUse',
+				comment: '오토바이 사용 중인 대수',
 			},
 			created_at: {
 				type: DataTypes.DATE,
