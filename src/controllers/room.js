@@ -1215,6 +1215,7 @@ exports.startRoomSell = async (req, res, next) => {
 						await mariaDBSequelize.query(
 							`UPDATE roomStatus 
 							SET status = 'ON_SALE',
+								gosiwonEsntlId = ?,
 								statusStartDate = ?,
 								statusEndDate = ?,
 								etcStartDate = ?,
@@ -1223,6 +1224,7 @@ exports.startRoomSell = async (req, res, next) => {
 							WHERE roomEsntlId = ?`,
 							{
 								replacements: [
+									roomInfo.gosiwonEsntlId,
 									statusStartDate,
 									finalStatusEndDate,
 									finalEtcStartDate,
@@ -1249,6 +1251,7 @@ exports.startRoomSell = async (req, res, next) => {
 						`INSERT INTO roomStatus (
 							esntlId,
 							roomEsntlId,
+							gosiwonEsntlId,
 							status,
 							statusStartDate,
 							statusEndDate,
@@ -1256,11 +1259,12 @@ exports.startRoomSell = async (req, res, next) => {
 							etcEndDate,
 							createdAt,
 							updatedAt
-						) VALUES (?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())`,
+						) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())`,
 						{
 							replacements: [
 								newStatusId,
 								singleRoomId,
+								roomInfo.gosiwonEsntlId,
 								statusStartDate,
 								finalStatusEndDate,
 								finalEtcStartDate,
@@ -1286,6 +1290,83 @@ exports.startRoomSell = async (req, res, next) => {
 		});
 	} catch (err) {
 		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 빈 방 목록 조회 (ON_SALE, BEFORE_SALE 상태)
+exports.getFreeRoomList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { goID } = req.query;
+
+		if (!goID) {
+			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
+		}
+
+		// roomStatus 테이블에서 ON_SALE, BEFORE_SALE 상태인 방들을 조회하고 room 테이블과 join
+		const query = `
+			SELECT 
+				R.esntlId,
+				R.gosiwonEsntlId,
+				R.roomType,
+				R.roomCategory,
+				R.deposit,
+				R.monthlyRent,
+				R.startDate,
+				R.endDate,
+				R.rom_checkout_expected_date,
+				R.window,
+				R.option,
+				R.orderOption,
+				R.roomNumber,
+				R.floor,
+				R.intro,
+				R.empty,
+				R.status,
+				R.month,
+				R.description,
+				R.top,
+				R.youtube,
+				R.customerEsntlId,
+				R.rom_successor_eid,
+				R.rom_dp_at,
+				R.deleteYN,
+				R.orderNo,
+				R.agreementType,
+				R.agreementContent,
+				R.availableGender,
+				RS.esntlId AS roomStatusId,
+				RS.gosiwonEsntlId AS roomStatusGosiwonEsntlId,
+				RS.status AS roomStatusStatus,
+				RS.customerEsntlId AS roomStatusCustomerEsntlId,
+				RS.customerName,
+				RS.reservationEsntlId,
+				RS.reservationName,
+				RS.contractorEsntlId,
+				RS.contractorName,
+				RS.statusStartDate,
+				RS.statusEndDate,
+				RS.etcStartDate,
+				RS.etcEndDate,
+				RS.createdAt AS roomStatusCreatedAt,
+				RS.updatedAt AS roomStatusUpdatedAt
+			FROM roomStatus RS
+			INNER JOIN room R ON RS.roomEsntlId = R.esntlId
+			WHERE R.gosiwonEsntlId = :goID
+				AND RS.status IN ('ON_SALE', 'BEFORE_SALE')
+				AND R.deleteYN = 'N'
+			ORDER BY R.orderNo ASC
+		`;
+
+		const roomList = await mariaDBSequelize.query(query, {
+			replacements: { goID: goID },
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		errorHandler.successThrow(res, '빈 방 목록 조회 성공', roomList);
+	} catch (err) {
 		next(err);
 	}
 };

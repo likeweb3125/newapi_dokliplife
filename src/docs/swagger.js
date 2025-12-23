@@ -39,6 +39,10 @@ const options = {
 						roomType: { type: 'string', description: '방타입' },
 						deposit: { type: 'integer', description: '보증금' },
 						monthlyRent: { type: 'string', description: '입실료' },
+						// /v1/gosiwon/names와 동일한 형식의 추가 필드
+						isControlled: { type: 'string', description: '관제 여부 (관제 또는 빈 문자열)', example: '관제' },
+						deposit: { type: 'string', description: '보증급 관리 여부 (하드코딩)', example: '보증급 관리' },
+						settle: { type: 'string', description: '정산 지급 여부 (하드코딩)', example: '정산지급' },
 						// gosiwonUse, gosiwonBuilding, gosiwonFacilities, gosiwonAdmin 테이블 필드들
 						// 실제 컬럼명은 동적으로 포함됨
 					},

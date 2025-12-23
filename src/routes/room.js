@@ -13,6 +13,13 @@ const roomCategoryController = require('../controllers/roomCategory');
 
 /**
  * @swagger
+ * tags:
+ *   name: 방이동
+ *   description: 방이동 관련 API
+ */
+
+/**
+ * @swagger
  * /v1/room/list:
  *   get:
  *     summary: 방 목록 조회
@@ -1055,6 +1062,101 @@ router.post('/reserve', roomController.roomReserve);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.post('/roomSell/start', roomController.startRoomSell);
+
+/**
+ * @swagger
+ * /v1/room/free/list:
+ *   get:
+ *     summary: 빈 방 목록 조회
+ *     description: 고시원 ID로 roomStatus 테이블에서 상태가 ON_SALE, BEFORE_SALE인 방들의 목록을 조회합니다. room 테이블과 join하여 방 정보를 포함합니다.
+ *     tags: [방이동]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: goID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유 아이디
+ *         example: GOSI0000002130
+ *     responses:
+ *       200:
+ *         description: 빈 방 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 빈 방 목록 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 방 고유 아이디
+ *                       gosiwonEsntlId:
+ *                         type: string
+ *                         description: 고시원 고유 아이디
+ *                       roomType:
+ *                         type: string
+ *                         description: 방 타입
+ *                       roomCategory:
+ *                         type: string
+ *                         description: 방 카테고리
+ *                       deposit:
+ *                         type: integer
+ *                         description: 보증금
+ *                       monthlyRent:
+ *                         type: string
+ *                         description: 입실료
+ *                       roomNumber:
+ *                         type: string
+ *                         description: 방번호
+ *                       floor:
+ *                         type: string
+ *                         description: 층
+ *                       status:
+ *                         type: string
+ *                         description: 방 상태
+ *                       roomStatusId:
+ *                         type: string
+ *                         description: roomStatus 고유 아이디
+ *                       roomStatusStatus:
+ *                         type: string
+ *                         enum: [ON_SALE, BEFORE_SALE]
+ *                         description: roomStatus 상태
+ *                       statusStartDate:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 판매 시작일
+ *                       statusEndDate:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 판매 종료일
+ *                       etcStartDate:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 입실 가능 시작일
+ *                       etcEndDate:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 입실 가능 종료일
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/free/list', roomController.getFreeRoomList);
 
 module.exports = router;
 

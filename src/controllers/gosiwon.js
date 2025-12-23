@@ -169,6 +169,12 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		// TINYINT(1) 필드를 boolean으로 변환
 		convertTinyIntToBoolean(gosiwonInfo);
 
+		// /v1/gosiwon/names와 동일한 형식의 추가 정보 추가
+		gosiwonInfo.address = gosiwonInfo.address || '';
+		gosiwonInfo.isControlled = Number(gosiwonInfo.is_controlled) === 1 ? '관제' : '';
+		gosiwonInfo.deposit = Number(gosiwonInfo.use_deposit) === 1 ? '보증급 관리' : '';
+		gosiwonInfo.settle = Number(gosiwonInfo.use_settlement) === 1 ? '정산지급' : '';
+
 		// 결과 반환
 		errorHandler.successThrow(res, '고시원 정보 조회 성공', gosiwonInfo);
 	} catch (err) {
@@ -224,7 +230,7 @@ exports.getGosiwonNames = async (req, res, next) => {
 					[Op.like]: `%${searchValue}%`,
 				},
 			},
-			attributes: ['name', 'esntlId', 'address', 'is_controlled'],
+			attributes: ['name', 'esntlId', 'address', 'is_controlled', 'use_deposit', 'use_settlement'],
 			limit: take,
 			order: [['name', 'ASC']],
 			raw: true,
@@ -235,8 +241,8 @@ exports.getGosiwonNames = async (req, res, next) => {
 			esntID: item.esntlId,
 			address: item.address || '',
 			isControlled: Number(item.is_controlled) === 1 ? '관제' : '',
-			deposit: '보증급 관리',
-			settle: '정산지급',
+			deposit: Number(item.use_deposit) === 1 ? '보증급 관리' : '',
+			settle: Number(item.use_settlement) === 1 ? '정산지급' : '',
 		}));
 
 		errorHandler.successThrow(res, '고시원 이름 목록 조회 성공', names);

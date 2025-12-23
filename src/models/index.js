@@ -66,6 +66,7 @@ db.ilRoomRefundRequest = require('./ilRoomRefundRequest')(
 	mariaDBSequelize,
 	Sequelize
 );
+db.refund = require('./refund')(mariaDBSequelize, Sequelize);
 db.paymentLog = require('./paymentLog')(
 	mariaDBSequelize,
 	Sequelize
