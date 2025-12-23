@@ -6,8 +6,8 @@ const refundController = require('../controllers/refund');
 /**
  * @swagger
  * tags:
- *   name: Refund
- *   description: 환불 및 퇴실처리 관리 API
+ *   name: 계약현황
+ *   description: 계약현황 관리 API
  */
 
 /**
@@ -16,7 +16,7 @@ const refundController = require('../controllers/refund');
  *   post:
  *     summary: 환불 및 퇴실처리
  *     description: '계약에 대한 환불 및 퇴실처리를 수행합니다. refund 테이블에 환불 정보를 저장하고, roomStatus를 CHECKOUT_REQUESTED로 업데이트하며, history에 기록을 남깁니다. 취소사유 (EXPIRED_CHECKOUT: 만기퇴실, MIDDLE_CHECKOUT: 중도퇴실, CONTRACT_CANCEL: 계약취소), liabilityReason: 귀책사유 (OWNER: 사장님, OCCUPANT: 입실자)'
- *     tags: [Refund]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     requestBody:

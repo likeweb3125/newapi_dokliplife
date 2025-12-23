@@ -14,8 +14,8 @@ const roomCategoryController = require('../controllers/roomCategory');
 /**
  * @swagger
  * tags:
- *   name: 방이동
- *   description: 방이동 관련 API
+ *   name: 계약현황
+ *   description: 계약현황 관리 API
  */
 
 /**
@@ -84,7 +84,14 @@ const roomCategoryController = require('../controllers/roomCategory');
  *                         description: 방 타입
  *                       roomCategory:
  *                         type: string
- *                         description: 방 카테고리
+ *                         description: 방 카테고리 고유아이디
+ *                       roomCategoryName:
+ *                         type: string
+ *                         description: 방 카테고리명
+ *                       availableGender:
+ *                         type: string
+ *                         enum: [DEFAULT, MALE, FEMALE]
+ *                         description: 이용 가능 성별 (DEFAULT: 제한없음, MALE: 남성, FEMALE: 여성)
  *                       rom_deposit:
  *                         type: number
  *                         description: 보증금(만원 단위)
@@ -964,7 +971,7 @@ router.post('/reserve', roomController.roomReserve);
  * /v1/room/roomSell/start:
  *   post:
  *     summary: 방 판매 시작
- *     description: 선택한 방들의 판매를 시작합니다. roomStatus 테이블에 판매 정보를 저장합니다.sameAsCheckinInfo true 면 판개기간과 동일
+ *     description: 선택한 방들의 판매를 시작합니다. roomStatus 테이블에 판매 정보를 저장합니다.sameAsCheckinInfo true 면 판개기간과 동일, 방아이디를 콤마로 구분하여 여러개 입력 가능
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -1067,9 +1074,9 @@ router.post('/roomSell/start', roomController.startRoomSell);
  * @swagger
  * /v1/room/free/list:
  *   get:
- *     summary: 빈 방 목록 조회
+ *     summary: 빈 방 목록 조회 (방이동시 사용)
  *     description: 고시원 ID로 roomStatus 테이블에서 상태가 ON_SALE, BEFORE_SALE인 방들의 목록을 조회합니다. room 테이블과 join하여 방 정보를 포함합니다.
- *     tags: [방이동]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     parameters:

@@ -166,6 +166,8 @@ exports.getRoomList = async (req, res, next) => {
 				R.status,
 				R.description,
 				R.top,
+				R.availableGender,
+				RCAT.name AS roomCategoryName,
 				RC.startDate,
 				RC.endDate,
 				RC.month,
@@ -176,6 +178,8 @@ exports.getRoomList = async (req, res, next) => {
 			LEFT OUTER JOIN roomContract RC
 				ON RC.roomEsntlId = R.esntlId
 				${rcStatus !== null ? 'AND RC.status = :rcStatus' : ''}
+			LEFT OUTER JOIN roomCategory RCAT
+				ON R.roomCategory = RCAT.esntlId
 			${whereClause}
 			${orderByClause}
 		`;

@@ -6,8 +6,8 @@ const roomContractController = require('../controllers/roomContract');
 /**
  * @swagger
  * tags:
- *   name: RoomContract
- *   description: 방 계약현황 관리 API
+ *   name: 계약현황
+ *   description: 계약현황 관리 API
  */
 
 /**
@@ -16,7 +16,7 @@ const roomContractController = require('../controllers/roomContract');
  *   get:
  *     summary: 계약현황 목록 조회
  *     description: 계약현황 목록을 조회합니다. roomContract, gosiwon, customer, room, paymentLog 테이블을 조인하여 계약 정보, 고시원 정보, 고객 정보, 방 정보, 결제 정보를 포함합니다.
- *     tags: [RoomContract]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -220,7 +220,7 @@ router.get('/list', roomContractController.getContractList);
  *   get:
  *     summary: 계약 상세보기 (결제 내역 조회)
  *     description: 계약 고유 아이디로 해당 계약의 상세 정보와 결제 내역을 조회합니다. roomContract 테이블을 기준으로 계약 정보를 조회하고, 해당 계약의 paymentLog 목록을 함께 반환합니다.
- *     tags: [RoomContract]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -336,7 +336,7 @@ router.get('/detail', roomContractController.getContractDetail);
  *   put:
  *     summary: 계약 정보 수정
  *     description: 계약 정보를 수정합니다. roomContract, customer(입주자), customer(계약자), deposit 테이블의 정보를 수정할 수 있습니다.
- *     tags: [RoomContract]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     requestBody:

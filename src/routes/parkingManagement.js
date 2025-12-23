@@ -6,8 +6,8 @@ const parkingManagementController = require('../controllers/parkingManagement');
 /**
  * @swagger
  * tags:
- *   name: ParkingManagement
- *   description: 주차 관리 API
+ *   name: 계약현황
+ *   description: 계약현황 관리 API
  */
 
 /**
@@ -16,7 +16,7 @@ const parkingManagementController = require('../controllers/parkingManagement');
  *   post:
  *     summary: 주차 등록
  *     description: 계약에 대한 주차를 등록합니다. 주차비가 0원인 경우(입실료 포함)에도 paymentLog, gosiwonParking, parkStatus에 기록됩니다.
- *     tags: [ParkingManagement]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -80,7 +80,7 @@ router.post('/', parkingManagementController.createParking);
  *   get:
  *     summary: 주차 목록 조회
  *     description: 계약별 주차 목록을 조회합니다.
- *     tags: [ParkingManagement]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -152,7 +152,7 @@ router.get('/', parkingManagementController.getParkingList);
  *   put:
  *     summary: 주차 정보 수정
  *     description: 주차 정보를 수정합니다.
- *     tags: [ParkingManagement]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -208,7 +208,7 @@ router.put('/:parkingId', parkingManagementController.updateParking);
  *   delete:
  *     summary: 주차 삭제
  *     description: 주차 정보를 삭제합니다. gosiwonParking의 사용 대수도 감소하고, parkStatus는 소프트 삭제됩니다.
- *     tags: [ParkingManagement]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     parameters:
