@@ -91,7 +91,7 @@ const roomCategoryController = require('../controllers/roomCategory');
  *                       availableGender:
  *                         type: string
  *                         enum: [DEFAULT, MALE, FEMALE]
- *                         description: 이용 가능 성별 (DEFAULT: 제한없음, MALE: 남성, FEMALE: 여성)
+ *                         description: "이용 가능 성별 (DEFAULT: 제한없음, MALE: 남성, FEMALE: 여성)"
  *                       rom_deposit:
  *                         type: number
  *                         description: 보증금(만원 단위)
