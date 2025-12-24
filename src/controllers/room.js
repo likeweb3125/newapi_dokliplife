@@ -168,6 +168,7 @@ exports.getRoomList = async (req, res, next) => {
 				R.description,
 				R.top,
 				R.availableGender,
+				R.rom_dp_at,
 				RCAT.name AS roomCategoryName,
 				RC.startDate,
 				RC.endDate,
@@ -699,6 +700,91 @@ exports.updateRoomAgreement = async (req, res, next) => {
 			esntlId: updatedRoom.esntlId,
 			agreementType: updatedRoom.agreementType,
 			agreementContent: updatedRoom.agreementContent,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 방 DP 여부 수정
+exports.updateRoomDpAt = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { roomEsntlId, rom_dp_at } = req.body;
+
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
+		}
+
+		if (rom_dp_at === undefined) {
+			errorHandler.errorThrow(400, 'rom_dp_at을 입력해주세요.');
+		}
+
+		// rom_dp_at 유효성 검사 (N 또는 Y만 허용)
+		if (rom_dp_at !== 'N' && rom_dp_at !== 'Y') {
+			errorHandler.errorThrow(400, 'rom_dp_at은 N 또는 Y 값만 허용됩니다.');
+		}
+
+		const roomInfo = await room.findByPk(roomEsntlId);
+		if (!roomInfo) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+
+		// rom_dp_at은 첫 번째 문자만 사용 (기존 로직과 동일)
+		const dpAtValue = String(rom_dp_at).substring(0, 1).toUpperCase();
+
+		// 변경사항 확인
+		const oldValue = roomInfo.rom_dp_at || 'N';
+		const newValue = dpAtValue;
+
+		// 업데이트
+		await room.update(
+			{ rom_dp_at: newValue },
+			{
+				where: { esntlId: roomEsntlId },
+				transaction,
+			}
+		);
+
+		// 히스토리 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `방 DP 여부가 수정되었습니다. 변경사항: ${oldValue} → ${newValue}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					roomEsntlId: roomEsntlId,
+					content: historyContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyError) {
+			console.error('히스토리 생성 실패:', historyError);
+			// 히스토리 생성 실패해도 방 정보 수정은 완료되도록 함
+		}
+
+		await transaction.commit();
+
+		// 업데이트된 방 정보 조회
+		const updatedRoom = await room.findByPk(roomEsntlId, {
+			attributes: ['esntlId', 'rom_dp_at'],
+		});
+
+		errorHandler.successThrow(res, '방 DP 여부 수정 성공', {
+			esntlId: updatedRoom.esntlId,
+			rom_dp_at: updatedRoom.rom_dp_at,
 		});
 	} catch (err) {
 		await transaction.rollback();

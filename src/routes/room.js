@@ -625,6 +625,70 @@ router.put('/agreement', roomController.updateRoomAgreement);
 
 /**
  * @swagger
+ * /v1/room/dp-at:
+ *   put:
+ *     summary: 방 DP 여부 수정
+ *     description: 특정 방의 DP 여부(rom_dp_at)만 수정합니다. N 또는 Y 값만 허용됩니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomEsntlId
+ *               - rom_dp_at
+ *             properties:
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *                 example: ROOM0000022725
+ *               rom_dp_at:
+ *                 type: string
+ *                 enum: [N, Y]
+ *                 description: 'DP 방 여부 (N: 일반 방, Y: DP 방)'
+ *                 example: Y
+ *     responses:
+ *       200:
+ *         description: 방 DP 여부 수정 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 DP 여부 수정 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 방 고유 아이디
+ *                       example: ROOM0000022725
+ *                     rom_dp_at:
+ *                       type: string
+ *                       description: DP 방 여부
+ *                       example: Y
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/dp-at', roomController.updateRoomDpAt);
+
+/**
+ * @swagger
  * /v1/room/delete:
  *   delete:
  *     summary: 방 정보 삭제
