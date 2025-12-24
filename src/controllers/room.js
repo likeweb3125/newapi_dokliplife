@@ -792,6 +792,109 @@ exports.updateRoomDpAt = async (req, res, next) => {
 	}
 };
 
+// 결제 요청 취소
+exports.reserveCancel = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const userSn = getWriterAdminId(decodedToken);
+
+		const { roomEsntlId, isReserve } = req.body;
+
+		// 필수 필드 검증
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
+		}
+
+		// isReserve 값 처리 (기본값: false)
+		const isReserveValue = isReserve === 'Y' || isReserve === true;
+
+		// 1. 예약 상태를 CANCEL로 업데이트
+		const updateReservationQuery = `
+			UPDATE il_room_reservation 
+			SET ror_status_cd = 'CANCEL',
+				ror_update_dtm = NOW(),
+				ror_updater_sn = ?
+			WHERE rom_sn = ?
+				AND ror_status_cd = 'WAIT'
+		`;
+
+		const updateResult = await mariaDBSequelize.query(updateReservationQuery, {
+			replacements: [userSn, roomEsntlId],
+			type: mariaDBSequelize.QueryTypes.UPDATE,
+			transaction,
+		});
+
+		// 업데이트된 행이 없으면 예약이 없거나 이미 취소된 상태
+		if (updateResult[1] === 0) {
+			errorHandler.errorThrow(404, '취소할 예약을 찾을 수 없습니다. (WAIT 상태의 예약이 없습니다.)');
+		}
+
+		// 2. isReserve가 false인 경우에만 방 상태 업데이트
+		if (!isReserveValue) {
+			const updateRoomQuery = `
+				UPDATE room 
+				SET status = IF(customerEsntlId IS NOT NULL, 'CONTRACT', 'EMPTY')
+				WHERE esntlId = ?
+			`;
+
+			await mariaDBSequelize.query(updateRoomQuery, {
+				replacements: [roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			});
+		}
+
+		// 방 정보 조회하여 gosiwonEsntlId 가져오기 (히스토리 생성에 필요)
+		const roomBasicInfo = await room.findByPk(roomEsntlId, {
+			attributes: ['gosiwonEsntlId', 'status'],
+			transaction,
+		});
+
+		if (!roomBasicInfo || !roomBasicInfo.gosiwonEsntlId) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
+		}
+
+		// 3. 히스토리 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = isReserveValue
+				? `결제 요청이 취소되었습니다. (예약만 취소)`
+				: `결제 요청이 취소되었습니다. 방 상태: ${roomBasicInfo.status}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: roomBasicInfo.gosiwonEsntlId,
+					roomEsntlId: roomEsntlId,
+					content: historyContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: userSn,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyError) {
+			console.error('히스토리 생성 실패:', historyError);
+			// 히스토리 생성 실패해도 취소 프로세스는 계속 진행
+		}
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '결제 요청 취소 성공', {
+			roomEsntlId: roomEsntlId,
+			isReserve: isReserveValue,
+			roomStatus: roomBasicInfo.status,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
 // 방 정보 삭제
 exports.deleteRoom = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();

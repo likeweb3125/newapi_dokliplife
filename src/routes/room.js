@@ -689,6 +689,73 @@ router.put('/dp-at', roomController.updateRoomDpAt);
 
 /**
  * @swagger
+ * /v1/room/reserveCancel:
+ *   post:
+ *     summary: 결제 요청 취소
+ *     description: 방 예약의 결제 요청을 취소합니다. isReserve가 Y이면 예약만 취소하고, 아니면 예약 취소 후 방 상태도 업데이트합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomEsntlId
+ *             properties:
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *                 example: ROOM0000022725
+ *               isReserve:
+ *                 type: string
+ *                 enum: [Y, N]
+ *                 description: '예약만 취소 여부 (Y: 예약만 취소, N 또는 미입력: 예약 취소 + 방 상태 업데이트)'
+ *                 example: Y
+ *     responses:
+ *       200:
+ *         description: 결제 요청 취소 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 결제 요청 취소 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     roomEsntlId:
+ *                       type: string
+ *                       description: 방 고유 아이디
+ *                       example: ROOM0000022725
+ *                     isReserve:
+ *                       type: boolean
+ *                       description: 예약만 취소 여부
+ *                       example: true
+ *                     roomStatus:
+ *                       type: string
+ *                       description: 방 상태 (isReserve가 false인 경우)
+ *                       example: EMPTY
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/reserveCancel', roomController.reserveCancel);
+
+/**
+ * @swagger
  * /v1/room/delete:
  *   delete:
  *     summary: 방 정보 삭제
