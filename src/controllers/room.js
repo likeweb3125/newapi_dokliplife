@@ -1256,7 +1256,7 @@ exports.roomReserve = async (req, res, next) => {
 		const data = {
 			...roomInfoData,
 			receiver: receiver,
-			product: `${roomInfo.gsw_name} ${roomInfo.rom_name}`,
+			product: `${roomInfoData.gsw_name} ${roomInfoData.rom_name}`,
 			paymentType: paymentType || 'accountPayment',
 		};
 
@@ -1291,7 +1291,15 @@ exports.roomReserve = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '결제 요청이 발송되었습니다.', data);
 	} catch (err) {
-		await transaction.rollback();
+		// 트랜잭션이 이미 완료되지 않은 경우에만 rollback
+		try {
+			await transaction.rollback();
+		} catch (rollbackErr) {
+			// 트랜잭션이 이미 완료된 경우 rollback 오류는 무시
+			if (!rollbackErr.message || !rollbackErr.message.includes('finished')) {
+				console.error('트랜잭션 rollback 오류:', rollbackErr);
+			}
+		}
 		next(err);
 	}
 };
