@@ -8,12 +8,20 @@
  * @param {Object} decodedToken - 디코딩된 JWT 토큰
  * @returns {string|null} 관리자 ID 또는 null
  */
-const getWriterAdminId = (decodedToken) =>
-	decodedToken.admin?.id ||
-	decodedToken.adminId ||
-	decodedToken.admin?.adminId ||
-	decodedToken.admin?.sn ||
-	null;
+const getWriterAdminId = (decodedToken) => {
+	// admin이 문자열인 경우 (예: "ADMN00000000001")
+	if (typeof decodedToken.admin === 'string') {
+		return decodedToken.admin;
+	}
+	// admin이 객체인 경우
+	return (
+		decodedToken.admin?.id ||
+		decodedToken.adminId ||
+		decodedToken.admin?.adminId ||
+		decodedToken.admin?.sn ||
+		null
+	);
+};
 
 module.exports = {
 	getWriterAdminId,
