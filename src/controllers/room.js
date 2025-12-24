@@ -156,6 +156,7 @@ exports.getRoomList = async (req, res, next) => {
 			SELECT 
 				R.esntlId,
 				R.roomType,
+				R.deposit AS room_deposit,
 				R.monthlyRent,
 				R.window,
 				R.option,
