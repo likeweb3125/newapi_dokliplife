@@ -122,8 +122,7 @@ exports.getContractList = async (req, res, next) => {
 				R.window,
 				C.name AS customerName,
 				C.phone AS customerPhone,
-				C.gender,
-				FLOOR((CAST(REPLACE(CURRENT_DATE,'-','') AS UNSIGNED) - CAST(REPLACE(C.birth,'-','') AS UNSIGNED)) / 10000) AS age,
+				RC.customerEsntlId AS customerEsntlId,
 				RC.checkinName AS checkinName,
 				RC.checkinPhone AS checkinPhone,
 				RC.checkinGender AS checkinGender,
@@ -132,8 +131,6 @@ exports.getContractList = async (req, res, next) => {
 				RC.customerPhone AS contractCustomerPhone,
 				RC.customerGender AS contractCustomerGender,
 				RC.customerAge AS contractCustomerAge,
-				CT.name AS contractorName,
-				CT.phone AS contractorPhone,
 				COALESCE(PL.pyl_goods_amount, 0) AS pyl_goods_amount,
 				FORMAT(COALESCE(PL.paymentAmount, 0), 0) AS paymentAmount,
 				COALESCE(PL.paymentAmount, 0) AS payment_amount,
@@ -147,8 +144,6 @@ exports.getContractList = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
-			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
-			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
 			LEFT JOIN (
 				SELECT 
 					contractEsntlId,
@@ -255,16 +250,10 @@ exports.getContractDetail = async (req, res, next) => {
 				R.monthlyRent AS roomMonthlyRent,
 				C.name AS customerName,
 				C.phone AS customerPhone,
-				C.gender,
+				RC.customerEsntlId AS customerEsntlId,
 				C.id AS customerId,
 				C.bank AS customerBank,
 				C.bankAccount AS customerBankAccount,
-				FLOOR(
-					(
-						CAST(REPLACE(CURRENT_DATE, '-', '') AS UNSIGNED) -
-						CAST(REPLACE(C.birth, '-', '') AS UNSIGNED)
-					) / 10000
-				) AS age,
 				RC.month,
 				RC.startDate,
 				RC.endDate,
@@ -282,14 +271,17 @@ exports.getContractDetail = async (req, res, next) => {
 				RC.customerPhone AS contractCustomerPhone,
 				RC.customerGender AS contractCustomerGender,
 				RC.customerAge AS contractCustomerAge,
-				CT.name AS contractorName,
-				CT.phone AS contractorPhone
+				R.agreementType AS agreementType,
+				R.agreementContent AS agreementContent,
+				G.contract AS gsw_contract,
+				(SELECT content
+				 FROM adminContract
+				 ORDER BY numberOrder ASC
+				 LIMIT 1) AS gs_contract
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
-			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
-			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`;
@@ -357,7 +349,9 @@ exports.updateContract = async (req, res, next) => {
 				RC.*,
 				C.birth AS customerBirth,
 				D.contractorEsntlId,
-				D.accountHolder AS depositAccountHolder
+				D.accountHolder AS depositAccountHolder,
+				R.agreementType AS roomAgreementType,
+				R.agreementContent AS roomAgreementContent
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
@@ -635,6 +629,46 @@ exports.updateContract = async (req, res, next) => {
 					contractEsntlId: contractEsntlId,
 					deleteYN: 'N',
 				},
+				transaction,
+			});
+		}
+
+		// room 테이블 업데이트 (agreementType, agreementContent)
+		const roomUpdateData = {};
+		const { agreementType, agreementContent } = req.body;
+
+		// 특약 타입 유효성 검사
+		if (agreementType !== undefined) {
+			const validTypes = ['GENERAL', 'GOSIWON', 'ROOM'];
+			if (agreementType && !validTypes.includes(agreementType)) {
+				errorHandler.errorThrow(
+					400,
+					'agreementType은 GENERAL, GOSIWON, ROOM 중 하나여야 합니다.'
+				);
+			}
+		}
+
+		if (agreementType !== undefined && agreementType !== contract.roomAgreementType) {
+			roomUpdateData.agreementType = agreementType || null;
+			changes.push(
+				`특약 타입: ${contract.roomAgreementType || '없음'} → ${agreementType || '없음'}`
+			);
+		}
+
+		if (agreementContent !== undefined && agreementContent !== contract.roomAgreementContent) {
+			roomUpdateData.agreementContent = agreementContent || null;
+			const oldContent = contract.roomAgreementContent
+				? contract.roomAgreementContent.substring(0, 50) + '...'
+				: '없음';
+			const newContent = agreementContent
+				? agreementContent.substring(0, 50) + '...'
+				: '없음';
+			changes.push(`특약 내용: ${oldContent} → ${newContent}`);
+		}
+
+		if (Object.keys(roomUpdateData).length > 0) {
+			await room.update(roomUpdateData, {
+				where: { esntlId: contract.roomEsntlId },
 				transaction,
 			});
 		}

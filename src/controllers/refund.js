@@ -453,6 +453,23 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			}
 		);
 
+		// roomContract 테이블의 status 업데이트
+		// cancelReason이 CONTRACT_CANCEL이면 CANCEL, 그 외에는 FIN
+		const contractStatus = cancelReason === 'CONTRACT_CANCEL' ? 'CANCEL' : 'FIN';
+		await mariaDBSequelize.query(
+			`
+			UPDATE roomContract 
+			SET status = ?,
+				updatedAt = NOW()
+			WHERE esntlId = ?
+		`,
+			{
+				replacements: [contractStatus, contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
 		// roomAfterUse 함수 호출
 		if (
 			check_basic_sell !== undefined ||

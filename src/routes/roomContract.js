@@ -273,6 +273,36 @@ router.get('/list', roomContractController.getContractList);
  *                         customerPhone:
  *                           type: string
  *                           description: 고객 전화번호
+ *                         gender:
+ *                           type: string
+ *                           description: 고객 성별
+ *                         age:
+ *                           type: integer
+ *                           description: 고객 나이
+ *                         checkinName:
+ *                           type: string
+ *                           description: 체크인한 사람 이름
+ *                         checkinPhone:
+ *                           type: string
+ *                           description: 체크인한 사람 연락처
+ *                         checkinGender:
+ *                           type: string
+ *                           description: 체크인한 사람 성별
+ *                         checkinAge:
+ *                           type: integer
+ *                           description: 체크인한 사람 나이
+ *                         contractCustomerName:
+ *                           type: string
+ *                           description: 고객 이름 (roomContract 테이블)
+ *                         contractCustomerPhone:
+ *                           type: string
+ *                           description: 고객 연락처 (roomContract 테이블)
+ *                         contractCustomerGender:
+ *                           type: string
+ *                           description: 고객 성별 (roomContract 테이블)
+ *                         contractCustomerAge:
+ *                           type: integer
+ *                           description: 고객 나이 (roomContract 테이블)
  *                         startDate:
  *                           type: string
  *                           description: 계약 시작일
@@ -335,7 +365,7 @@ router.get('/detail', roomContractController.getContractDetail);
  * /v1/roomContract/detail:
  *   put:
  *     summary: 계약 정보 수정
- *     description: 계약 정보를 수정합니다. roomContract, customer(입주자), customer(계약자), deposit 테이블의 정보를 수정할 수 있습니다.
+ *     description: 계약 정보를 수정합니다. roomContract, customer(입주자), customer(계약자), deposit, room 테이블의 정보를 수정할 수 있습니다.
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -417,6 +447,47 @@ router.get('/detail', roomContractController.getContractDetail);
  *                 type: string
  *                 description: 비상연락망/관계
  *                 example: '010-1234-5678 / 부모'
+ *               checkinName:
+ *                 type: string
+ *                 description: 체크인한 사람 이름
+ *                 example: '홍길동'
+ *               checkinPhone:
+ *                 type: string
+ *                 description: 체크인한 사람 연락처
+ *                 example: '010-1234-5678'
+ *               checkinGender:
+ *                 type: string
+ *                 description: 체크인한 사람 성별
+ *                 example: '남성'
+ *               checkinAge:
+ *                 type: integer
+ *                 description: 체크인한 사람 나이
+ *                 example: 25
+ *               contractCustomerName:
+ *                 type: string
+ *                 description: 고객 이름 (roomContract 테이블에 저장)
+ *                 example: '홍길동'
+ *               contractCustomerPhone:
+ *                 type: string
+ *                 description: 고객 연락처 (roomContract 테이블에 저장)
+ *                 example: '010-1234-5678'
+ *               contractCustomerGender:
+ *                 type: string
+ *                 description: 고객 성별 (roomContract 테이블에 저장)
+ *                 example: '남성'
+ *               contractCustomerAge:
+ *                 type: integer
+ *                 description: 고객 나이 (roomContract 테이블에 저장)
+ *                 example: 30
+ *               agreementType:
+ *                 type: string
+ *                 enum: [GENERAL, GOSIWON, ROOM]
+ *                 description: '특약 타입 (room 테이블에 저장, GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)'
+ *                 example: 'ROOM'
+ *               agreementContent:
+ *                 type: string
+ *                 description: 특약 내용 (room 테이블에 저장)
+ *                 example: '추가 특약사항 내용입니다.'
  *     responses:
  *       200:
  *         description: 계약 정보 수정 성공
