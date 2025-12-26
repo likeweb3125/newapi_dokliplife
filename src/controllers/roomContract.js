@@ -124,6 +124,16 @@ exports.getContractList = async (req, res, next) => {
 				C.phone AS customerPhone,
 				C.gender,
 				FLOOR((CAST(REPLACE(CURRENT_DATE,'-','') AS UNSIGNED) - CAST(REPLACE(C.birth,'-','') AS UNSIGNED)) / 10000) AS age,
+				RC.checkinName AS checkinName,
+				RC.checkinPhone AS checkinPhone,
+				RC.checkinGender AS checkinGender,
+				RC.checkinAge AS checkinAge,
+				RC.customerName AS contractCustomerName,
+				RC.customerPhone AS contractCustomerPhone,
+				RC.customerGender AS contractCustomerGender,
+				RC.customerAge AS contractCustomerAge,
+				CT.name AS contractorName,
+				CT.phone AS contractorPhone,
 				COALESCE(PL.pyl_goods_amount, 0) AS pyl_goods_amount,
 				FORMAT(COALESCE(PL.paymentAmount, 0), 0) AS paymentAmount,
 				COALESCE(PL.paymentAmount, 0) AS payment_amount,
@@ -137,6 +147,8 @@ exports.getContractList = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
+			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
+			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
 			LEFT JOIN (
 				SELECT 
 					contractEsntlId,
@@ -262,6 +274,14 @@ exports.getContractDetail = async (req, res, next) => {
 				RC.memo AS occupantMemo,
 				RC.memo2 AS occupantMemo2,
 				RC.emergencyContact AS emergencyContact,
+				RC.checkinName AS checkinName,
+				RC.checkinPhone AS checkinPhone,
+				RC.checkinGender AS checkinGender,
+				RC.checkinAge AS checkinAge,
+				RC.customerName AS contractCustomerName,
+				RC.customerPhone AS contractCustomerPhone,
+				RC.customerGender AS contractCustomerGender,
+				RC.customerAge AS contractCustomerAge,
 				CT.name AS contractorName,
 				CT.phone AS contractorPhone
 			FROM roomContract RC
@@ -369,6 +389,14 @@ exports.updateContract = async (req, res, next) => {
 			occupantMemo,
 			occupantMemo2,
 			emergencyContact,
+			checkinName,
+			checkinPhone,
+			checkinGender,
+			checkinAge,
+			contractCustomerName,
+			contractCustomerPhone,
+			contractCustomerGender,
+			contractCustomerAge,
 		} = req.body;
 
 		if (month !== undefined && month !== contract.month) {
@@ -406,6 +434,54 @@ exports.updateContract = async (req, res, next) => {
 			contractUpdateData.emergencyContact = emergencyContact;
 			changes.push(
 				`비상연락망/관계: ${contract.emergencyContact || '없음'} → ${emergencyContact || '없음'}`
+			);
+		}
+		if (checkinName !== undefined && checkinName !== contract.checkinName) {
+			contractUpdateData.checkinName = checkinName;
+			changes.push(
+				`체크인한 사람 이름: ${contract.checkinName || '없음'} → ${checkinName || '없음'}`
+			);
+		}
+		if (checkinPhone !== undefined && checkinPhone !== contract.checkinPhone) {
+			contractUpdateData.checkinPhone = checkinPhone;
+			changes.push(
+				`체크인한 사람 연락처: ${contract.checkinPhone || '없음'} → ${checkinPhone || '없음'}`
+			);
+		}
+		if (checkinGender !== undefined && checkinGender !== contract.checkinGender) {
+			contractUpdateData.checkinGender = checkinGender;
+			changes.push(
+				`체크인한 사람 성별: ${contract.checkinGender || '없음'} → ${checkinGender || '없음'}`
+			);
+		}
+		if (checkinAge !== undefined && checkinAge !== contract.checkinAge) {
+			contractUpdateData.checkinAge = checkinAge;
+			changes.push(
+				`체크인한 사람 나이: ${contract.checkinAge || '없음'} → ${checkinAge || '없음'}`
+			);
+		}
+		if (contractCustomerName !== undefined && contractCustomerName !== contract.customerName) {
+			contractUpdateData.customerName = contractCustomerName;
+			changes.push(
+				`고객 이름: ${contract.customerName || '없음'} → ${contractCustomerName || '없음'}`
+			);
+		}
+		if (contractCustomerPhone !== undefined && contractCustomerPhone !== contract.customerPhone) {
+			contractUpdateData.customerPhone = contractCustomerPhone;
+			changes.push(
+				`고객 연락처: ${contract.customerPhone || '없음'} → ${contractCustomerPhone || '없음'}`
+			);
+		}
+		if (contractCustomerGender !== undefined && contractCustomerGender !== contract.customerGender) {
+			contractUpdateData.customerGender = contractCustomerGender;
+			changes.push(
+				`고객 성별: ${contract.customerGender || '없음'} → ${contractCustomerGender || '없음'}`
+			);
+		}
+		if (contractCustomerAge !== undefined && contractCustomerAge !== contract.customerAge) {
+			contractUpdateData.customerAge = contractCustomerAge;
+			changes.push(
+				`고객 나이: ${contract.customerAge || '없음'} → ${contractCustomerAge || '없음'}`
 			);
 		}
 
