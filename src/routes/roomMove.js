@@ -56,8 +56,14 @@ const roomMoveController = require('../controllers/roomMove');
  *                 example: '2025-11-06T00:00:00'
  *               adjustmentAmount:
  *                 type: integer
- *                 description: '조정금액 (양수: 추가금액, 음수: 환불비용, 0: 조정없음)'
+ *                 minimum: 0
+ *                 description: '조정금액 (양수만 허용, 0: 조정없음)'
  *                 example: 50000
+ *               adjustmentType:
+ *                 type: string
+ *                 enum: [ADDITION, REFUND]
+ *                 description: '조정타입 (ADDITION: 추가, REFUND: 환불). adjustmentAmount가 0보다 크면 필수, 0이면 자동으로 NULL로 설정됩니다.'
+ *                 example: ADDITION
  *               contactedOwner:
  *                 type: string
  *                 enum: [Y, N]

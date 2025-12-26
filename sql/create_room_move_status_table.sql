@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS `roomMoveStatus` (
   `reason` VARCHAR(50) NOT NULL COMMENT '방이동 사유 (OWNER: 운영자, CUSTOMER: 고객단순변심)',
   `status` VARCHAR(50) NOT NULL DEFAULT 'PENDING' COMMENT '방이동 상태 (PENDING: 신청중, COMPLETED: 처리완료, CANCELLED: 신청취소)',
   `moveDate` DATETIME NOT NULL COMMENT '방이동일자',
-  `adjustmentAmount` INTEGER NOT NULL DEFAULT 0 COMMENT '조정금액 (양수: 추가금액, 음수: 차감금액, 0: 조정없음)',
+  `adjustmentAmount` INTEGER NOT NULL DEFAULT 0 COMMENT '조정금액 (양수만 허용, 0: 조정없음)',
+  `adjustmentType` VARCHAR(50) NULL COMMENT '조정타입 (ADDITION: 추가, REFUND: 환불, adjustmentAmount가 0일 경우 NULL)',
   `memo` TEXT NULL COMMENT '메모',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
@@ -104,9 +105,12 @@ CREATE INDEX `idx_roomMoveStatus_target_room_date` ON `roomMoveStatus` (`targetR
 --     * CANCELLED: 신청취소
 --   - moveDate: 방이동일자
 --   - adjustmentAmount: 조정금액
---     * 양수: 추가금액 (고객이 추가로 지불)
---     * 음수: 차감금액 (고객에게 환불)
+--     * 양수만 허용 (0 이상)
 --     * 0: 조정없음
+--   - adjustmentType: 조정타입
+--     * ADDITION: 추가
+--     * REFUND: 환불
+--     * NULL: 조정없음 (adjustmentAmount = 0일 때)
 --   - memo: 방이동 관련 추가 메모 정보
 -- 
 -- 사용 예시:

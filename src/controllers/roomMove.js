@@ -76,6 +76,7 @@ exports.processRoomMove = async (req, res, next) => {
 			reason, // OWNER, CUSTOMER
 			moveDate,
 			adjustmentAmount,
+			adjustmentType, // ADDITION, REFUND
 			contactedOwner, // Y, N
 			memo,
 			check_basic_sell,
@@ -117,6 +118,31 @@ exports.processRoomMove = async (req, res, next) => {
 		if (contactedOwner && !['Y', 'N'].includes(contactedOwner)) {
 			errorHandler.errorThrow(400, 'contactedOwner는 Y 또는 N이어야 합니다.');
 		}
+
+		// adjustmentAmount와 adjustmentType 유효성 검증
+		const finalAdjustmentAmount = adjustmentAmount || 0;
+		if (finalAdjustmentAmount < 0) {
+			errorHandler.errorThrow(400, 'adjustmentAmount는 0 이상의 값만 허용됩니다.');
+		}
+		
+		// adjustmentType 유효성 검증
+		if (adjustmentType) {
+			const validAdjustmentTypes = ['ADDITION', 'REFUND'];
+			if (!validAdjustmentTypes.includes(adjustmentType)) {
+				errorHandler.errorThrow(
+					400,
+					`adjustmentType은 ${validAdjustmentTypes.join(', ')} 중 하나여야 합니다.`
+				);
+			}
+		}
+		
+		// adjustmentAmount가 0이 아니면 adjustmentType 필수
+		if (finalAdjustmentAmount > 0 && !adjustmentType) {
+			errorHandler.errorThrow(400, 'adjustmentAmount가 0보다 크면 adjustmentType은 필수입니다.');
+		}
+		
+		// adjustmentAmount가 0이면 adjustmentType은 NULL
+		const finalAdjustmentType = finalAdjustmentAmount > 0 ? adjustmentType : null;
 
 		// 계약 정보 및 원래 방 상태 조회
 		const [contractInfo] = await mariaDBSequelize.query(
@@ -263,11 +289,12 @@ exports.processRoomMove = async (req, res, next) => {
 				status,
 				moveDate,
 				adjustmentAmount,
+				adjustmentType,
 				memo,
 				deleteYN,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, 'N', NOW(), NOW())
+			) VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?, 'N', NOW(), NOW())
 		`,
 			{
 				replacements: [
@@ -279,7 +306,8 @@ exports.processRoomMove = async (req, res, next) => {
 					targetRoomEsntlId,
 					reason,
 					new Date(moveDate),
-					adjustmentAmount || 0,
+					finalAdjustmentAmount,
+					finalAdjustmentType,
 					memoWithContact,
 				],
 				type: mariaDBSequelize.QueryTypes.INSERT,
