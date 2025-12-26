@@ -77,18 +77,14 @@ const refundController = require('../controllers/refund');
  *                 type: integer
  *                 description: 총환불금액
  *                 example: 70000
- *               usePeriod:
- *                 type: integer
- *                 description: 사용기간 (일수)
- *                 example: 10
  *               check_basic_sell:
  *                 type: boolean
  *                 description: '기본 판매 설정 사용 여부 (true: 기본 설정 사용, false: 사용자 지정 날짜 사용)'
  *                 example: true
  *               unableCheckInReason:
  *                 type: string
- *                 enum: [퇴실, 점검, 계약중, 방이동, 무료체험, 타업체, 기타]
- *                 description: '입실 불가 사유 (check_basic_sell이 false일 때만 사용, 값이 있으면 BEFORE_SALES 상태로 설정)'
+ *                 enum: [CHECKOUT, CHECK, CONTRACT, ROOM_MOVE, FREE_EXPERIENCE, OTHER, ETC]
+ *                 description: '입실 불가 사유 (check_basic_sell이 false일 때만 사용, 값이 있으면 BEFORE_SALES 상태로 설정. 퇴실:CHECKOUT, 점검:CHECK, 계약중:CONTRACT, 방이동:ROOM_MOVE, 무료체험:FREE_EXPERIENCE, 타업체:OTHER, 기타:ETC)'
  *                 example: null
  *               check_room_only_config:
  *                 type: boolean

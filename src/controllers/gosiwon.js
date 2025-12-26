@@ -581,8 +581,8 @@ exports.createGosiwon = async (req, res, next) => {
 		// il_gosiwon_config 테이블에 데이터 삽입/업데이트 (데이터가 있는 경우)
 		if (ableCheckDays !== undefined || ableContractDays !== undefined || checkInTimeStart !== undefined || checkInTimeEnd !== undefined || checkOutTime !== undefined) {
 			const configData = {};
-			if (ableCheckDays !== undefined) configData.gsc_payment_able_start_date = ableCheckDays;
-			if (ableContractDays !== undefined) configData.gsc_payment_able_end_date = ableContractDays;
+			if (ableCheckDays !== undefined) configData.gsc_checkin_able_date = ableCheckDays;
+			if (ableContractDays !== undefined) configData.gsc_sell_able_period = ableContractDays;
 			if (checkInTimeStart !== undefined) configData.gsc_checkInTimeStart = checkInTimeStart;
 			if (checkInTimeEnd !== undefined) configData.gsc_checkInTimeEnd = checkInTimeEnd;
 			if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;

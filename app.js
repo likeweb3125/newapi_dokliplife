@@ -47,6 +47,7 @@ const historyRoutes = require('./src/routes/history');
 const parkStatusRoutes = require('./src/routes/parkStatus');
 const roomContractRoutes = require('./src/routes/roomContract');
 const refundRoutes = require('./src/routes/refund');
+const roomMoveRoutes = require('./src/routes/roomMove');
 const extraPaymentRoutes = require('./src/routes/extraPayment');
 const parkingManagementRoutes = require('./src/routes/parkingManagement');
 
@@ -132,6 +133,9 @@ app.use('/v1/roomContract', roomContractRoutes);
 
 // 환불 Routes
 app.use('/v1/refund', refundRoutes);
+
+// 방이동 Routes
+app.use('/v1/roomMove', roomMoveRoutes);
 
 // 추가 결제 Routes
 app.use('/v1/roomExtraPayment', extraPaymentRoutes);
