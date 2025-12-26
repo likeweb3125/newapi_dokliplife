@@ -398,8 +398,8 @@ router.get('/detail', roomContractController.getContractDetail);
  *                 example: '2025-11-17'
  *               checkinTime:
  *                 type: string
- *                 description: '입실시간 (예: AM|9|00 형식)'
- *                 example: 'AM|9|00'
+ *                 description: '입실시간 (예: 14:00  24시간 형식)'
+ *                 example: '18"00'
  *               customerName:
  *                 type: string
  *                 description: 입주자명
