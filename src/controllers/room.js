@@ -216,6 +216,7 @@ exports.getRoomInfo = async (req, res, next) => {
 		const query = `
 			SELECT 
 				r.esntlId,
+				r.esntlId AS roomEsntlId,
 				r.gosiwonEsntlId,
 				r.roomType,
 				r.roomCategory,
