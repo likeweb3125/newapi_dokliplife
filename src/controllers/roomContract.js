@@ -350,9 +350,7 @@ exports.updateContract = async (req, res, next) => {
 				RC.*,
 				C.birth AS customerBirth,
 				D.contractorEsntlId,
-				D.accountHolder AS depositAccountHolder,
-				R.agreementType AS roomAgreementType,
-				R.agreementContent AS roomAgreementContent
+				D.accountHolder AS depositAccountHolder
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
@@ -630,46 +628,6 @@ exports.updateContract = async (req, res, next) => {
 					contractEsntlId: contractEsntlId,
 					deleteYN: 'N',
 				},
-				transaction,
-			});
-		}
-
-		// room 테이블 업데이트 (agreementType, agreementContent)
-		const roomUpdateData = {};
-		const { agreementType, agreementContent } = req.body;
-
-		// 특약 타입 유효성 검사
-		if (agreementType !== undefined) {
-			const validTypes = ['GENERAL', 'GOSIWON', 'ROOM'];
-			if (agreementType && !validTypes.includes(agreementType)) {
-				errorHandler.errorThrow(
-					400,
-					'agreementType은 GENERAL, GOSIWON, ROOM 중 하나여야 합니다.'
-				);
-			}
-		}
-
-		if (agreementType !== undefined && agreementType !== contract.roomAgreementType) {
-			roomUpdateData.agreementType = agreementType || null;
-			changes.push(
-				`특약 타입: ${contract.roomAgreementType || '없음'} → ${agreementType || '없음'}`
-			);
-		}
-
-		if (agreementContent !== undefined && agreementContent !== contract.roomAgreementContent) {
-			roomUpdateData.agreementContent = agreementContent || null;
-			const oldContent = contract.roomAgreementContent
-				? contract.roomAgreementContent.substring(0, 50) + '...'
-				: '없음';
-			const newContent = agreementContent
-				? agreementContent.substring(0, 50) + '...'
-				: '없음';
-			changes.push(`특약 내용: ${oldContent} → ${newContent}`);
-		}
-
-		if (Object.keys(roomUpdateData).length > 0) {
-			await room.update(roomUpdateData, {
-				where: { esntlId: contract.roomEsntlId },
 				transaction,
 			});
 		}
