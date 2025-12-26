@@ -9,17 +9,19 @@ CREATE TABLE IF NOT EXISTS `roomStatus` (
   `roomEsntlId` VARCHAR(50) NOT NULL COMMENT '방 고유아이디',
   `gosiwonEsntlId` VARCHAR(50) NOT NULL COMMENT '고시원 고유 아이디',
   `status` VARCHAR(50) NOT NULL COMMENT '방 상태 (BEFORE_SALES: 판매신청전, ON_SALE: 판매중, DEPOSIT_PENDING: 입금대기중, RESERVED: 예약중, IN_USE: 이용중, OVERDUE: 체납상태, CHECKOUT_REQUESTED: 퇴실요청, CHECKOUT_CONFIRMED: 퇴실확정, ROOM_MOVE: 방이동)',
+  `statusName` VARCHAR(30) NULL COMMENT '상태 이름',
+  `statusMemo` TEXT NULL COMMENT '상태 메모',
   `customerEsntlId` VARCHAR(50) NULL COMMENT '입실자 고유아이디',
   `customerName` VARCHAR(100) NULL COMMENT '입실자 이름',
   `reservationEsntlId` VARCHAR(50) NULL COMMENT '예약자 고유아이디',
   `reservationName` VARCHAR(100) NULL COMMENT '예약자 이름',
   `contractorEsntlId` VARCHAR(50) NULL COMMENT '계약자 고유아이디',
   `contractorName` VARCHAR(100) NULL COMMENT '계약자 이름',
+  `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디',
   `statusStartDate` DATETIME NULL COMMENT '계약 시작일',
   `statusEndDate` DATETIME NULL COMMENT '계약 종료일',
   `etcStartDate` DATETIME NULL COMMENT '기타 시작일',
   `etcEndDate` DATETIME NULL COMMENT '기타 종료일',
-  `memo` TEXT NULL COMMENT '메모',
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`esntlId`),
@@ -27,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `roomStatus` (
   INDEX `idx_gosiwonEsntlId` (`gosiwonEsntlId`),
   INDEX `idx_status` (`status`),
   INDEX `idx_customerEsntlId` (`customerEsntlId`),
+  INDEX `idx_contractEsntlId` (`contractEsntlId`),
   CONSTRAINT `fk_roomStatus_room` FOREIGN KEY (`roomEsntlId`) 
     REFERENCES `room` (`esntlId`) 
     ON DELETE CASCADE 
@@ -37,6 +40,10 @@ CREATE TABLE IF NOT EXISTS `roomStatus` (
     ON UPDATE CASCADE,
   CONSTRAINT `fk_roomStatus_customer` FOREIGN KEY (`customerEsntlId`) 
     REFERENCES `customer` (`esntlId`) 
+    ON DELETE SET NULL 
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_roomStatus_roomContract` FOREIGN KEY (`contractEsntlId`) 
+    REFERENCES `roomContract` (`esntlId`) 
     ON DELETE SET NULL 
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci COMMENT='방 현재 상태 관리 테이블';
@@ -53,6 +60,9 @@ CREATE INDEX `idx_roomStatus_room_status` ON `roomStatus` (`roomEsntlId`, `statu
 
 -- 고시원별 상태 조회 최적화
 CREATE INDEX `idx_roomStatus_gosiwon_status` ON `roomStatus` (`gosiwonEsntlId`, `status`);
+
+-- 계약별 상태 조회 최적화
+CREATE INDEX `idx_roomStatus_contract_status` ON `roomStatus` (`contractEsntlId`, `status`);
 
 -- =============================================
 -- 초기 데이터 (선택사항)

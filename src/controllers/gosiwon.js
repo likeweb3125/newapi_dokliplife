@@ -127,7 +127,7 @@ exports.getGosiwonInfo = async (req, res, next) => {
                     ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
                     ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
                     ,GU.deposit,GU.qualified,GU.minAge,GU.maxAge,GU.minUsedDate,GU.gender,GU.foreignLanguage,GU.orderData useOrderData 
-                    ,IGC.gsc_payment_able_start_date ableCheckDays, IGC.gsc_payment_able_end_date ableContractDays, IGC.gsc_checkInTimeStart checkInTimeStart, IGC.gsc_checkInTimeEnd checkInTimeEnd, IGC.gsc_checkOutTime checkOutTime
+                    ,IGC.gsc_checkin_able_date ableCheckDays, IGC.gsc_sell_able_period ableContractDays, IGC.gsc_checkInTimeStart checkInTimeStart, IGC.gsc_checkInTimeEnd checkInTimeEnd, IGC.gsc_checkOutTime checkOutTime
 			FROM gosiwon G 
 			LEFT OUTER JOIN room R 
 				ON G.esntlId = R.gosiwonEsntlId 
@@ -938,8 +938,8 @@ exports.updateGosiwon = async (req, res, next) => {
 		// il_gosiwon_config 테이블 업데이트 (데이터가 있는 경우)
 		if (ableCheckDays !== undefined || ableContractDays !== undefined || checkInTimeStart !== undefined || checkInTimeEnd !== undefined || checkOutTime !== undefined) {
 			const configData = {};
-			if (ableCheckDays !== undefined) configData.gsc_payment_able_start_date = ableCheckDays;
-			if (ableContractDays !== undefined) configData.gsc_payment_able_end_date = ableContractDays;
+			if (ableCheckDays !== undefined) configData.gsc_checkin_able_date = ableCheckDays;
+			if (ableContractDays !== undefined) configData.gsc_sell_able_period = ableContractDays;
 			if (checkInTimeStart !== undefined) configData.gsc_checkInTimeStart = checkInTimeStart;
 			if (checkInTimeEnd !== undefined) configData.gsc_checkInTimeEnd = checkInTimeEnd;
 			if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;
