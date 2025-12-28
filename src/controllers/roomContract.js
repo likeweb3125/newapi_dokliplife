@@ -321,6 +321,32 @@ exports.getContractDetail = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
+		// 방이동 예정 정보 조회 (roomMoveStatus에서 status가 PENDING인 경우)
+		const roomMoveQuery = `
+			SELECT 
+				moveDate
+			FROM roomMoveStatus
+			WHERE contractEsntlId = ?
+				AND status = 'PENDING'
+				AND deleteYN = 'N'
+			ORDER BY moveDate ASC
+			LIMIT 1
+		`;
+
+		const [roomMoveInfo] = await mariaDBSequelize.query(roomMoveQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 방이동 예정 정보를 contractInfo에 추가
+		if (roomMoveInfo && roomMoveInfo.moveDate) {
+			contractInfo.isRoomMoveScheduled = true;
+			contractInfo.roomMoveDate = roomMoveInfo.moveDate;
+		} else {
+			contractInfo.isRoomMoveScheduled = false;
+			contractInfo.roomMoveDate = null;
+		}
+
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
 			contractInfo: contractInfo,
 			paymentList: paymentList || [],

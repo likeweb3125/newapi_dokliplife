@@ -312,6 +312,15 @@ router.get('/list', roomContractController.getContractList);
  *                         contractStatus:
  *                           type: string
  *                           description: 계약 상태
+ *                         isRoomMoveScheduled:
+ *                           type: boolean
+ *                           description: 방이동 예정 여부 (roomMoveStatus 테이블의 status가 PENDING인 경우 true)
+ *                           example: true
+ *                         roomMoveDate:
+ *                           type: string
+ *                           format: date-time
+ *                           description: 방이동 예정 날짜 (moveDate, isRoomMoveScheduled가 true일 때만 반환)
+ *                           example: '2025-11-15T00:00:00'
  *                     paymentList:
  *                       type: array
  *                       description: 결제 내역 목록

@@ -294,7 +294,7 @@ exports.processRoomMove = async (req, res, next) => {
 				deleteYN,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?, 'N', NOW(), NOW())
+			) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, 'N', NOW(), NOW())
 		`,
 			{
 				replacements: [
