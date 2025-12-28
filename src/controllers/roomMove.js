@@ -276,6 +276,9 @@ exports.processRoomMove = async (req, res, next) => {
 			? `${memo}${contactedOwner ? ` [원장님연락: ${contactedOwner === 'Y' ? '연락됨' : '연락안됨'}]` : ''}`
 			: contactedOwner ? `[원장님연락: ${contactedOwner === 'Y' ? '연락됨' : '연락안됨'}]` : null;
 		
+		// adjustmentStatus 설정: adjustmentAmount가 0이 아니면 PENDING, 0이면 NULL
+		const finalAdjustmentStatus = finalAdjustmentAmount !== 0 ? 'PENDING' : null;
+		
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomMoveStatus (
@@ -290,11 +293,12 @@ exports.processRoomMove = async (req, res, next) => {
 				moveDate,
 				adjustmentAmount,
 				adjustmentType,
+				adjustmentStatus,
 				memo,
 				deleteYN,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, 'N', NOW(), NOW())
+			) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, 'N', NOW(), NOW())
 		`,
 			{
 				replacements: [
@@ -308,6 +312,7 @@ exports.processRoomMove = async (req, res, next) => {
 					new Date(moveDate),
 					finalAdjustmentAmount,
 					finalAdjustmentType,
+					finalAdjustmentStatus,
 					memoWithContact,
 				],
 				type: mariaDBSequelize.QueryTypes.INSERT,
@@ -349,6 +354,80 @@ exports.processRoomMove = async (req, res, next) => {
 	} catch (err) {
 		await transaction.rollback();
 		next(err);
+	}
+};
+
+// 방이동 삭제 (소프트 삭제)
+exports.deleteRoomMove = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { roomMoveStatusId } = req.params;
+
+		if (!roomMoveStatusId) {
+			errorHandler.errorThrow(400, '방이동 상태 ID를 입력해주세요.');
+		}
+
+		// 방이동 상태 존재 확인 및 adjustmentStatus 확인
+		const [existingRoomMove] = await mariaDBSequelize.query(
+			`
+			SELECT 
+				esntlId,
+				gosiwonEsntlId,
+				contractEsntlId,
+				adjustmentStatus
+			FROM roomMoveStatus
+			WHERE esntlId = ?
+				AND deleteYN = 'N'
+			LIMIT 1
+		`,
+			{
+				replacements: [roomMoveStatusId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (!existingRoomMove) {
+			errorHandler.errorThrow(404, '방이동 상태를 찾을 수 없습니다.');
+		}
+
+		// adjustmentStatus가 COMPLETED인 경우 삭제 불가
+		if (existingRoomMove.adjustmentStatus === 'COMPLETED') {
+			errorHandler.errorThrow(
+				400,
+				'조정 처리가 완료된 방이동은 삭제할 수 없습니다.'
+			);
+		}
+
+		// 소프트 삭제
+		await mariaDBSequelize.query(
+			`
+			UPDATE roomMoveStatus 
+			SET deleteYN = 'Y',
+				deletedBy = ?,
+				deletedAt = NOW(),
+				updatedAt = NOW()
+			WHERE esntlId = ?
+		`,
+			{
+				replacements: [writerAdminId, roomMoveStatusId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		await transaction.commit();
+
+		res.status(200).json({
+			success: true,
+			message: '방이동 상태가 삭제되었습니다.',
+		});
+	} catch (error) {
+		await transaction.rollback();
+		next(error);
 	}
 };
 

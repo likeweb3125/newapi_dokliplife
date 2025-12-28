@@ -14,8 +14,11 @@ CREATE TABLE IF NOT EXISTS `roomMoveStatus` (
   `moveDate` DATETIME NOT NULL COMMENT '방이동일자',
   `adjustmentAmount` INTEGER NOT NULL DEFAULT 0 COMMENT '조정금액 (양수만 허용, 0: 조정없음)',
   `adjustmentType` VARCHAR(50) NULL COMMENT '조정타입 (ADDITION: 추가, REFUND: 환불, adjustmentAmount가 0일 경우 NULL)',
+  `adjustmentStatus` VARCHAR(50) NULL DEFAULT NULL COMMENT '조정 처리 상태 (PENDING: 대기, COMPLETED: 완료, CANCELLED: 취소, NULL: 해당없음)',
   `memo` TEXT NULL COMMENT '메모',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
+  `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID',
+  `deletedAt` DATETIME NULL COMMENT '삭제 시간',
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`esntlId`),
@@ -28,6 +31,8 @@ CREATE TABLE IF NOT EXISTS `roomMoveStatus` (
   INDEX `idx_status` (`status`),
   INDEX `idx_moveDate` (`moveDate`),
   INDEX `idx_deleteYN` (`deleteYN`),
+  INDEX `idx_deletedBy` (`deletedBy`),
+  INDEX `idx_deletedAt` (`deletedAt`),
   INDEX `idx_gosiwon_delete` (`gosiwonEsntlId`, `deleteYN`),
   INDEX `idx_contract_delete` (`contractEsntlId`, `deleteYN`),
   INDEX `idx_customer_delete` (`customerEsntlId`, `deleteYN`),
@@ -111,6 +116,11 @@ CREATE INDEX `idx_roomMoveStatus_target_room_date` ON `roomMoveStatus` (`targetR
 --     * ADDITION: 추가
 --     * REFUND: 환불
 --     * NULL: 조정없음 (adjustmentAmount = 0일 때)
+  --   - adjustmentStatus: 조정 처리 상태
+  --     * NULL: 해당없음 (adjustmentAmount = 0일 때)
+  --     * PENDING: 대기 (adjustmentAmount != 0일 때 기본값)
+  --     * COMPLETED: 완료
+  --     * CANCELLED: 취소
 --   - memo: 방이동 관련 추가 메모 정보
 -- 
 -- 사용 예시:

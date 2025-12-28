@@ -519,7 +519,11 @@ exports.deleteParking = async (req, res, next) => {
 
 		if (parkStatusInfo) {
 			await parkStatus.update(
-				{ deleteYN: 'Y' },
+				{ 
+					deleteYN: 'Y',
+					deletedBy: writerAdminId,
+					deletedAt: new Date(),
+				},
 				{
 					where: { esntlId: parkStatusInfo.esntlId },
 					transaction,

@@ -146,5 +146,58 @@ const roomMoveController = require('../controllers/roomMove');
  */
 router.post('/process', roomMoveController.processRoomMove);
 
+/**
+ * @swagger
+ * /v1/roomMove/{roomMoveStatusId}:
+ *   delete:
+ *     summary: 방이동 삭제
+ *     description: '방이동 상태를 삭제합니다. 단, adjustmentStatus가 COMPLETED인 경우 삭제할 수 없습니다.'
+ *     tags: [방이동]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: roomMoveStatusId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방이동 상태 고유아이디
+ *         example: RMV0000000001
+ *     responses:
+ *       200:
+ *         description: 방이동 삭제 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: 방이동 상태가 삭제되었습니다.
+ *       400:
+ *         description: 잘못된 요청 (adjustmentStatus가 COMPLETED인 경우 등)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 400
+ *                 message:
+ *                   type: string
+ *                   example: 조정 처리가 완료된 방이동은 삭제할 수 없습니다.
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/:roomMoveStatusId', roomMoveController.deleteRoomMove);
+
 module.exports = router;
 

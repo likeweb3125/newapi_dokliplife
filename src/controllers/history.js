@@ -480,7 +480,8 @@ exports.updateHistory = async (req, res, next) => {
 exports.deleteHistory = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { historyId } = req.params;
 
@@ -505,6 +506,8 @@ exports.deleteHistory = async (req, res, next) => {
 		await history.update(
 			{
 				deleteYN: 'Y',
+				deletedBy: writerAdminId,
+				deletedAt: new Date(),
 			},
 			{
 				where: {

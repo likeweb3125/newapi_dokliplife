@@ -487,6 +487,8 @@ exports.deleteParkStatus = async (req, res, next) => {
 		await parkStatus.update(
 			{
 				deleteYN: 'Y',
+				deletedBy: writerAdminId,
+				deletedAt: new Date(),
 			},
 			{
 				where: {

@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS `refund` (
   `penalty` INT(11) NOT NULL DEFAULT 0 COMMENT '위약금',
   `totalRefundAmount` INT(11) NOT NULL DEFAULT 0 COMMENT '총환불금액',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
+  `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID',
+  `deletedAt` DATETIME NULL COMMENT '삭제 시간',
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`esntlId`),
@@ -34,6 +36,8 @@ CREATE TABLE IF NOT EXISTS `refund` (
   INDEX `idx_cancelDate` (`cancelDate`),
   INDEX `idx_liabilityReason` (`liabilityReason`),
   INDEX `idx_deleteYN` (`deleteYN`),
+  INDEX `idx_deletedBy` (`deletedBy`),
+  INDEX `idx_deletedAt` (`deletedAt`),
   CONSTRAINT `fk_refund_gosiwon` FOREIGN KEY (`gosiwonEsntlId`) 
     REFERENCES `gosiwon` (`esntlId`) 
     ON DELETE CASCADE 

@@ -10,6 +10,7 @@ const {
 } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const { getWriterAdminId } = require('../utils/auth');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -778,8 +779,14 @@ exports.deleteDeposit = async (req, res, next) => {
 		}
 
 		// 보증금 삭제 처리
+		const writerAdminId = getWriterAdminId(decodedToken);
 		await deposit.update(
-			{ deleteYN: 'Y', status: 'DELETED' },
+			{ 
+				deleteYN: 'Y', 
+				status: 'DELETED',
+				deletedBy: writerAdminId,
+				deletedAt: new Date(),
+			},
 			{
 				where: { esntlId: esntlId },
 				transaction,

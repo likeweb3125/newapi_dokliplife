@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   `virtualAccountNumber` VARCHAR(100) NULL COMMENT '가상계좌번호',
   `virtualAccountExpiryDate` DATETIME NULL COMMENT '가상계좌 만료일시',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
+  `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID',
+  `deletedAt` DATETIME NULL COMMENT '삭제 시간',
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`esntlId`),
@@ -34,6 +36,8 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   INDEX `idx_status` (`status`),
   INDEX `idx_contractStatus` (`contractStatus`),
   INDEX `idx_deleteYN` (`deleteYN`),
+  INDEX `idx_deletedBy` (`deletedBy`),
+  INDEX `idx_deletedAt` (`deletedAt`),
   INDEX `idx_moveInDate` (`moveInDate`),
   INDEX `idx_moveOutDate` (`moveOutDate`),
   CONSTRAINT `fk_deposit_room` FOREIGN KEY (`roomEsntlId`) 

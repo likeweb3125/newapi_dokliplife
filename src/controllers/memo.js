@@ -480,7 +480,8 @@ exports.updateMemo = async (req, res, next) => {
 exports.deleteMemo = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { memoId } = req.params;
 
@@ -505,6 +506,8 @@ exports.deleteMemo = async (req, res, next) => {
 		await memo.update(
 			{
 				deleteYN: 'Y',
+				deletedBy: writerAdminId,
+				deletedAt: new Date(),
 			},
 			{
 				where: {
