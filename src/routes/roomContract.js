@@ -255,6 +255,9 @@ router.get('/list', roomContractController.getContractList);
  *                         contractNumber:
  *                           type: string
  *                           description: 계약 고유 아이디
+ *                         roomEsntlId:
+ *                           type: string
+ *                           description: 방 고유 아이디
  *                         gosiwonName:
  *                           type: string
  *                           description: 고시원명
