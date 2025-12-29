@@ -14,12 +14,20 @@ const depositController = require('../controllers/deposit');
  * @swagger
  * /v1/deposit/list:
  *   get:
- *     summary: 보증금 현황 목록 조회
+ *     summary: '보증금(예약금) 현황 목록 조회'
  *     description: 고시원별 보증금 현황 목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다.
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: query
+ *         name: type
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [RESERVATION, DEPOSIT]
+ *         description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금) - 첫 번째 검색 필드'
+ *         example: RESERVATION
  *       - in: query
  *         name: searchType
  *         required: false
@@ -101,7 +109,7 @@ router.get('/list', depositController.getDepositList);
  * @swagger
  * /v1/deposit/info:
  *   get:
- *     summary: 보증금 상세 정보 조회
+ *     summary: '보증금(예약금)  상세 정보 조회'
  *     description: 보증금 ID로 상세 정보와 입금/반환 이력을 조회합니다.
  *     tags: [Deposit]
  *     security:
@@ -188,6 +196,14 @@ router.get('/info', depositController.getDepositInfo);
  *               accountHolder:
  *                 type: string
  *                 description: 예금주명
+ *               expectedOccupantName:
+ *                 type: string
+ *                 description: 입실예정자명 (type이 RESERVATION일 때 사용)
+ *                 example: 홍길동
+ *               expectedOccupantPhone:
+ *                 type: string
+ *                 description: 입실예정자연락처 (type이 RESERVATION일 때 사용)
+ *                 example: 010-1234-5678
  *               moveInDate:
  *                 type: string
  *                 format: date
@@ -278,6 +294,14 @@ router.post('/create', depositController.createDeposit);
  *               accountHolder:
  *                 type: string
  *                 description: 예금주명
+ *               expectedOccupantName:
+ *                 type: string
+ *                 description: 입실예정자명 (type이 RESERVATION일 때 사용)
+ *                 example: 홍길동
+ *               expectedOccupantPhone:
+ *                 type: string
+ *                 description: 입실예정자연락처 (type이 RESERVATION일 때 사용)
+ *                 example: 010-1234-5678
  *               moveInDate:
  *                 type: string
  *                 format: date

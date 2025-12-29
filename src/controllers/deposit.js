@@ -127,6 +127,7 @@ exports.getDepositList = async (req, res, next) => {
 
 		const {
 			gosiwonEsntlId,
+			type, // RESERVATION 또는 DEPOSIT (예약금/보증금 구분)
 			searchType, // gosiwonName | gosiwonCode | roomName | roomEsntlId | reservationName | contractName
 			amount,
 			status,
@@ -173,6 +174,8 @@ exports.getDepositList = async (req, res, next) => {
 		}
 
 		let searchMatchedGosiwon = false;
+		let searchedGosiwonIds = []; // 검색된 고시원 ID 목록
+		let commonGosiwonInfo = null; // 공통 고시원 정보 (고시원이 하나인 경우)
 
 		// searchType에 따른 고시원 검색 처리
 		if (
@@ -180,6 +183,7 @@ exports.getDepositList = async (req, res, next) => {
 			(searchType === 'gosiwonCode' || (!searchType && /^GOSI[0-9]+$/i.test(searchValue)))
 		) {
 			roomWhereCondition.gosiwonEsntlId = searchValue;
+			searchedGosiwonIds = [searchValue];
 			searchMatchedGosiwon = true;
 		} else if (
 			searchValue &&
@@ -193,13 +197,57 @@ exports.getDepositList = async (req, res, next) => {
 						{ esntlId: { [Op.like]: `%${searchValue}%` } },
 					],
 				},
-				attributes: ['esntlId'],
+				attributes: ['esntlId', 'name', 'address'],
 			});
 
-			const gosiwonIds = gosiwonList.map((item) => item.esntlId);
-			if (gosiwonIds.length > 0) {
-				roomWhereCondition.gosiwonEsntlId = { [Op.in]: gosiwonIds };
+			searchedGosiwonIds = gosiwonList.map((item) => item.esntlId);
+			if (searchedGosiwonIds.length > 0) {
+				roomWhereCondition.gosiwonEsntlId = { [Op.in]: searchedGosiwonIds };
 				searchMatchedGosiwon = true;
+			}
+
+			// 고시원명으로 검색한 경우, 검색된 고시원이 하나인 경우 공통 고시원 정보 설정
+			if (gosiwonList.length === 1) {
+				commonGosiwonInfo = {
+					esntlId: gosiwonList[0].esntlId,
+					name: gosiwonList[0].name,
+					address: gosiwonList[0].address,
+				};
+			}
+		}
+
+		// gosiwonEsntlId로 직접 검색한 경우
+		if (gosiwonEsntlId) {
+			searchedGosiwonIds = [gosiwonEsntlId];
+			// gosiwonEsntlId로 직접 검색한 경우 공통 고시원 정보 조회
+			const commonGosiwon = await gosiwon.findOne({
+				where: { esntlId: gosiwonEsntlId },
+				attributes: ['esntlId', 'name', 'address'],
+			});
+			if (commonGosiwon) {
+				commonGosiwonInfo = {
+					esntlId: commonGosiwon.esntlId,
+					name: commonGosiwon.name,
+					address: commonGosiwon.address,
+				};
+			}
+		}
+
+		// gosiwonCode로 검색한 경우 공통 고시원 정보 조회
+		if (
+			searchValue &&
+			(searchType === 'gosiwonCode' || (!searchType && /^GOSI[0-9]+$/i.test(searchValue)))
+		) {
+			const commonGosiwon = await gosiwon.findOne({
+				where: { esntlId: searchValue },
+				attributes: ['esntlId', 'name', 'address'],
+			});
+			if (commonGosiwon) {
+				commonGosiwonInfo = {
+					esntlId: commonGosiwon.esntlId,
+					name: commonGosiwon.name,
+					address: commonGosiwon.address,
+				};
 			}
 		}
 
@@ -229,6 +277,35 @@ exports.getDepositList = async (req, res, next) => {
 			offset: offset,
 		});
 
+		// 공통 고시원이 아닌 경우, 모든 방의 고시원 정보를 한 번에 조회
+		const gosiwonInfoMap = new Map();
+		if (!commonGosiwonInfo && roomRows.length > 0) {
+			const uniqueGosiwonIds = [
+				...new Set(
+					roomRows
+						.map((roomItem) => {
+							const roomData = roomItem.toJSON ? roomItem.toJSON() : roomItem;
+							return roomData.gosiwonEsntlId;
+						})
+						.filter(Boolean)
+				),
+			];
+			if (uniqueGosiwonIds.length > 0) {
+				const gosiwonList = await gosiwon.findAll({
+					where: { esntlId: { [Op.in]: uniqueGosiwonIds } },
+					attributes: ['esntlId', 'name', 'address'],
+				});
+				gosiwonList.forEach((g) => {
+					const gData = g.toJSON ? g.toJSON() : g;
+					gosiwonInfoMap.set(gData.esntlId, {
+						esntlId: gData.esntlId,
+						name: gData.name,
+						address: gData.address,
+					});
+				});
+			}
+		}
+
 		// 2. 각 방에 대한 deposit 정보 조회 및 조합
 		const resultList = await Promise.all(
 			roomRows.map(async (roomItem) => {
@@ -238,6 +315,11 @@ exports.getDepositList = async (req, res, next) => {
 				const depositWhereCondition = {
 					roomEsntlId: roomItem.esntlId,
 				};
+
+				// type 필터 (예약금/보증금 구분)
+				if (type && (type === 'RESERVATION' || type === 'DEPOSIT')) {
+					depositWhereCondition.type = type;
+				}
 
 				// hideDeleted가 true일 때만 삭제된 항목 제외
 				if (hideDeleted === 'true' || hideDeleted === true) {
@@ -305,6 +387,27 @@ exports.getDepositList = async (req, res, next) => {
 
 				}
 
+				// 고시원 정보 조회 (공통 고시원이 아닌 경우에만 각 항목에 추가)
+				let gosiwonInfo = null;
+				if (!commonGosiwonInfo && roomData.gosiwonEsntlId) {
+					gosiwonInfo = gosiwonInfoMap.get(roomData.gosiwonEsntlId);
+					// Map에 없으면 개별 조회 (방어 코드)
+					if (!gosiwonInfo) {
+						const gosiwonData = await gosiwon.findOne({
+							where: { esntlId: roomData.gosiwonEsntlId },
+							attributes: ['esntlId', 'name', 'address'],
+						});
+						if (gosiwonData) {
+							const gData = gosiwonData.toJSON ? gosiwonData.toJSON() : gosiwonData;
+							gosiwonInfo = {
+								esntlId: gData.esntlId,
+								name: gData.name,
+								address: gData.address,
+							};
+						}
+					}
+				}
+
 				// 결과 객체 구성
 				const resultItem = {
 					room: {
@@ -313,6 +416,7 @@ exports.getDepositList = async (req, res, next) => {
 						roomType: roomData.roomType,
 						status: roomData.status,
 					},
+					...(gosiwonInfo && { gosiwon: gosiwonInfo }), // 공통 고시원이 아닌 경우에만 추가
 					deposit: null,
 					latestDepositHistory: null,
 					latestReturnHistory: null,
@@ -332,6 +436,8 @@ exports.getDepositList = async (req, res, next) => {
 						accountBank: depositData.accountBank,
 						accountNumber: depositData.accountNumber,
 						accountHolder: depositData.accountHolder,
+						expectedOccupantName: depositData.expectedOccupantName,
+						expectedOccupantPhone: depositData.expectedOccupantPhone,
 						moveInDate: depositData.moveInDate,
 						moveOutDate: depositData.moveOutDate,
 						contractStatus: depositData.contractStatus,
@@ -432,12 +538,20 @@ exports.getDepositList = async (req, res, next) => {
 				? '예약금 현황 목록 조회 성공'
 				: '보증금 현황 목록 조회 성공';
 
-		return errorHandler.successThrow(res, message, {
+		// 응답 데이터 구성
+		const responseData = {
 			total: finalList.length,
 			page: parseInt(page),
 			limit: parseInt(limit),
 			data: finalList.slice((parseInt(page) - 1) * parseInt(limit), parseInt(page) * parseInt(limit)),
-		});
+		};
+
+		// 공통 고시원 정보가 있는 경우 최상위 레벨에 추가
+		if (commonGosiwonInfo) {
+			responseData.gosiwon = commonGosiwonInfo;
+		}
+
+		return errorHandler.successThrow(res, message, responseData);
 	} catch (error) {
 		next(error);
 	}
@@ -554,6 +668,8 @@ exports.createDeposit = async (req, res, next) => {
 			accountBank,
 			accountNumber,
 			accountHolder,
+			expectedOccupantName, // 입실예정자명 (type이 RESERVATION일 때)
+			expectedOccupantPhone, // 입실예정자연락처 (type이 RESERVATION일 때)
 			moveInDate,
 			moveOutDate,
 			contractStatus,
@@ -610,6 +726,39 @@ exports.createDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
 		}
 
+		// customerEsntlId 존재 여부 확인 (값이 있는 경우만)
+		// type이 RESERVATION인 경우는 아직 customer가 등록되지 않았을 수 있으므로 null로 저장
+		let finalCustomerEsntlId = null;
+		if (customerEsntlId && type !== 'RESERVATION') {
+			// DEPOSIT인 경우만 customer 존재 여부 확인
+			const customerInfo = await customer.findOne({
+				where: { esntlId: customerEsntlId },
+				transaction,
+			});
+			if (!customerInfo) {
+				errorHandler.errorThrow(404, '예약자/입실자 정보를 찾을 수 없습니다.');
+			}
+			finalCustomerEsntlId = customerEsntlId;
+		}
+		// type이 RESERVATION인 경우는 customerEsntlId를 null로 저장 (외래키 제약조건 회피)
+		// 입실예정자 정보는 expectedOccupantName, expectedOccupantPhone에 저장됨
+
+		// contractorEsntlId 존재 여부 확인 (값이 있는 경우만)
+		// type이 RESERVATION인 경우는 아직 customer가 등록되지 않았을 수 있으므로 null로 저장
+		let finalContractorEsntlId = null;
+		if (contractorEsntlId && type !== 'RESERVATION') {
+			// DEPOSIT인 경우만 customer 존재 여부 확인
+			const contractorInfo = await customer.findOne({
+				where: { esntlId: contractorEsntlId },
+				transaction,
+			});
+			if (!contractorInfo) {
+				errorHandler.errorThrow(404, '계약자 정보를 찾을 수 없습니다.');
+			}
+			finalContractorEsntlId = contractorEsntlId;
+		}
+		// type이 RESERVATION인 경우는 contractorEsntlId를 null로 저장 (외래키 제약조건 회피)
+
 		const esntlId = await generateDepositId(transaction);
 
 		const newDeposit = await deposit.create(
@@ -617,8 +766,8 @@ exports.createDeposit = async (req, res, next) => {
 				esntlId,
 				roomEsntlId,
 				gosiwonEsntlId,
-				customerEsntlId: customerEsntlId || null,
-				contractorEsntlId: contractorEsntlId || null,
+				customerEsntlId: finalCustomerEsntlId,
+				contractorEsntlId: finalContractorEsntlId,
 				contractEsntlId: contractEsntlId || null,
 				type: type,
 				amount: finalAmount,
@@ -628,6 +777,8 @@ exports.createDeposit = async (req, res, next) => {
 				accountBank: accountBank || null,
 				accountNumber: accountNumber || null,
 				accountHolder: accountHolder || null,
+				expectedOccupantName: expectedOccupantName || null,
+				expectedOccupantPhone: expectedOccupantPhone || null,
 				moveInDate: moveInDate || null,
 				moveOutDate: moveOutDate || null,
 				contractStatus: contractStatus || null,
@@ -685,6 +836,8 @@ exports.updateDeposit = async (req, res, next) => {
 			accountBank,
 			accountNumber,
 			accountHolder,
+			expectedOccupantName, // 입실예정자명 (type이 RESERVATION일 때)
+			expectedOccupantPhone, // 입실예정자연락처 (type이 RESERVATION일 때)
 			moveInDate,
 			moveOutDate,
 			contractStatus,
@@ -709,12 +862,52 @@ exports.updateDeposit = async (req, res, next) => {
 		const changes = []; // 변경된 항목 추적
 
 		if (customerEsntlId !== undefined && customerEsntlId !== depositInfo.customerEsntlId) {
-			updateData.customerEsntlId = customerEsntlId;
-			changes.push(`예약자/입실자: ${depositInfo.customerEsntlId || '없음'} → ${customerEsntlId || '없음'}`);
+			// customerEsntlId 존재 여부 확인 (값이 있는 경우만)
+			// type이 RESERVATION이거나 변경하려는 type이 RESERVATION인 경우는 null로 저장
+			const currentType = type !== undefined ? type : depositInfo.type;
+			if (currentType === 'RESERVATION') {
+				// RESERVATION인 경우 외래키 제약조건 회피를 위해 null로 저장
+				updateData.customerEsntlId = null;
+				changes.push(`예약자/입실자: ${depositInfo.customerEsntlId || '없음'} → 없음 (예약금은 입실예정자 정보로 관리)`);
+			} else if (customerEsntlId) {
+				// DEPOSIT인 경우만 customer 존재 여부 확인
+				const customerInfo = await customer.findOne({
+					where: { esntlId: customerEsntlId },
+					transaction,
+				});
+				if (!customerInfo) {
+					errorHandler.errorThrow(404, '예약자/입실자 정보를 찾을 수 없습니다.');
+				}
+				updateData.customerEsntlId = customerEsntlId;
+				changes.push(`예약자/입실자: ${depositInfo.customerEsntlId || '없음'} → ${customerEsntlId}`);
+			} else {
+				updateData.customerEsntlId = null;
+				changes.push(`예약자/입실자: ${depositInfo.customerEsntlId || '없음'} → 없음`);
+			}
 		}
 		if (contractorEsntlId !== undefined && contractorEsntlId !== depositInfo.contractorEsntlId) {
-			updateData.contractorEsntlId = contractorEsntlId;
-			changes.push(`계약자: ${depositInfo.contractorEsntlId || '없음'} → ${contractorEsntlId || '없음'}`);
+			// contractorEsntlId 존재 여부 확인 (값이 있는 경우만)
+			// type이 RESERVATION이거나 변경하려는 type이 RESERVATION인 경우는 null로 저장
+			const currentType = type !== undefined ? type : depositInfo.type;
+			if (currentType === 'RESERVATION') {
+				// RESERVATION인 경우 외래키 제약조건 회피를 위해 null로 저장
+				updateData.contractorEsntlId = null;
+				changes.push(`계약자: ${depositInfo.contractorEsntlId || '없음'} → 없음 (예약금은 입실예정자 정보로 관리)`);
+			} else if (contractorEsntlId) {
+				// DEPOSIT인 경우만 customer 존재 여부 확인
+				const contractorInfo = await customer.findOne({
+					where: { esntlId: contractorEsntlId },
+					transaction,
+				});
+				if (!contractorInfo) {
+					errorHandler.errorThrow(404, '계약자 정보를 찾을 수 없습니다.');
+				}
+				updateData.contractorEsntlId = contractorEsntlId;
+				changes.push(`계약자: ${depositInfo.contractorEsntlId || '없음'} → ${contractorEsntlId}`);
+			} else {
+				updateData.contractorEsntlId = null;
+				changes.push(`계약자: ${depositInfo.contractorEsntlId || '없음'} → 없음`);
+			}
 		}
 		if (contractEsntlId !== undefined && contractEsntlId !== depositInfo.contractEsntlId) {
 			updateData.contractEsntlId = contractEsntlId;
@@ -767,6 +960,14 @@ exports.updateDeposit = async (req, res, next) => {
 		if (accountHolder !== undefined && accountHolder !== depositInfo.accountHolder) {
 			updateData.accountHolder = accountHolder;
 			changes.push(`예금주: ${depositInfo.accountHolder || '없음'} → ${accountHolder || '없음'}`);
+		}
+		if (expectedOccupantName !== undefined && expectedOccupantName !== depositInfo.expectedOccupantName) {
+			updateData.expectedOccupantName = expectedOccupantName;
+			changes.push(`입실예정자명: ${depositInfo.expectedOccupantName || '없음'} → ${expectedOccupantName || '없음'}`);
+		}
+		if (expectedOccupantPhone !== undefined && expectedOccupantPhone !== depositInfo.expectedOccupantPhone) {
+			updateData.expectedOccupantPhone = expectedOccupantPhone;
+			changes.push(`입실예정자연락처: ${depositInfo.expectedOccupantPhone || '없음'} → ${expectedOccupantPhone || '없음'}`);
 		}
 		if (moveInDate !== undefined && moveInDate !== depositInfo.moveInDate) {
 			updateData.moveInDate = moveInDate;

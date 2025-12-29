@@ -84,6 +84,18 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'accountHolder',
 				comment: '예금주명',
 			},
+			expectedOccupantName: {
+				type: DataTypes.STRING(100),
+				allowNull: true,
+				field: 'expectedOccupantName',
+				comment: '입실예정자명 (type이 RESERVATION일 때 사용)',
+			},
+			expectedOccupantPhone: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'expectedOccupantPhone',
+				comment: '입실예정자연락처 (type이 RESERVATION일 때 사용)',
+			},
 			moveInDate: {
 				type: DataTypes.DATEONLY,
 				allowNull: true,
