@@ -230,7 +230,7 @@ router.get('/list', roomContractController.getContractList);
  *         schema:
  *           type: string
  *         description: 계약 고유 아이디
- *         example: RCO0000000001
+ *         example: RCTT0000025145
  *     responses:
  *       200:
  *         description: 계약 상세보기 조회 성공
@@ -258,6 +258,9 @@ router.get('/list', roomContractController.getContractList);
  *                         roomEsntlId:
  *                           type: string
  *                           description: 방 고유 아이디
+ *                         gosiwonEsntlId:
+ *                           type: string
+ *                           description: 고시원 고유 아이디
  *                         gosiwonName:
  *                           type: string
  *                           description: 고시원명

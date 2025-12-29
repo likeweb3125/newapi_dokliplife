@@ -243,6 +243,7 @@ exports.getContractDetail = async (req, res, next) => {
 			SELECT 
 				RC.esntlId AS contractNumber,
 				RC.roomEsntlId AS roomEsntlId,
+				RC.gosiwonEsntlId AS gosiwonEsntlId,
 				G.name AS gosiwonName,
 				G.address AS gosiwonAddress,
 				R.roomNumber,
