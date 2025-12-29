@@ -271,6 +271,7 @@ exports.getDepositList = async (req, res, next) => {
 					// 금액 필터 체크
 					if (amount !== undefined && amount !== null && amount !== '') {
 						const matchesAmount =
+							depositData.amount == amount ||
 							depositData.reservationDepositAmount == amount ||
 							depositData.depositAmount == amount;
 						if (!matchesAmount) {
@@ -324,8 +325,10 @@ exports.getDepositList = async (req, res, next) => {
 					const depositData = depositInfo.toJSON();
 					resultItem.deposit = {
 						esntlId: depositData.esntlId,
-						reservationDepositAmount: depositData.reservationDepositAmount,
-						depositAmount: depositData.depositAmount,
+						type: depositData.type,
+						amount: depositData.amount,
+						reservationDepositAmount: depositData.reservationDepositAmount, // 하위 호환성
+						depositAmount: depositData.depositAmount, // 하위 호환성
 						accountBank: depositData.accountBank,
 						accountNumber: depositData.accountNumber,
 						accountHolder: depositData.accountHolder,
@@ -389,7 +392,8 @@ exports.getDepositList = async (req, res, next) => {
 					resultItem.totalDepositAmount = totalDepositAmount || 0;
 					resultItem.unpaidAmount = Math.max(
 						0,
-						(depositData.reservationDepositAmount ||
+						(depositData.amount ||
+							depositData.reservationDepositAmount ||
 							depositData.depositAmount) -
 							(totalDepositAmount || 0)
 					);
@@ -406,9 +410,10 @@ exports.getDepositList = async (req, res, next) => {
 				return true;
 			}
 
-			// 금액 필터 체크 (예약금 또는 보증금 중 하나라도 일치)
+			// 금액 필터 체크 (amount 또는 기존 필드 중 하나라도 일치)
 			if (
 				amount !== undefined &&
+				item.deposit.amount != amount &&
 				item.deposit.reservationDepositAmount != amount &&
 				item.deposit.depositAmount != amount
 			) {
@@ -518,7 +523,8 @@ exports.getDepositInfo = async (req, res, next) => {
 		depositData.totalDepositAmount = totalDepositAmount || 0;
 		depositData.unpaidAmount = Math.max(
 			0,
-			(depositInfo.reservationDepositAmount ||
+			(depositInfo.amount ||
+				depositInfo.reservationDepositAmount ||
 				depositInfo.depositAmount) -
 				(totalDepositAmount || 0)
 		);
@@ -541,8 +547,10 @@ exports.createDeposit = async (req, res, next) => {
 			customerEsntlId,
 			contractorEsntlId,
 			contractEsntlId,
-			reservationDepositAmount,
-			depositAmount,
+			type, // RESERVATION 또는 DEPOSIT
+			amount,
+			reservationDepositAmount, // 하위 호환성
+			depositAmount, // 하위 호환성
 			accountBank,
 			accountNumber,
 			accountHolder,
@@ -555,6 +563,31 @@ exports.createDeposit = async (req, res, next) => {
 
 		if (!roomEsntlId || !gosiwonEsntlId) {
 			errorHandler.errorThrow(400, 'roomEsntlId와 gosiwonEsntlId는 필수입니다.');
+		}
+
+		// type과 amount 검증
+		if (!type || !['RESERVATION', 'DEPOSIT'].includes(type)) {
+			errorHandler.errorThrow(400, 'type은 RESERVATION 또는 DEPOSIT이어야 합니다.');
+		}
+
+		// amount가 없으면 하위 호환성을 위해 기존 필드에서 가져오기
+		let finalAmount = amount;
+		if (!finalAmount || finalAmount === 0) {
+			if (type === 'RESERVATION' && reservationDepositAmount) {
+				finalAmount = reservationDepositAmount;
+			} else if (type === 'DEPOSIT' && depositAmount) {
+				finalAmount = depositAmount;
+			} else if (reservationDepositAmount) {
+				finalAmount = reservationDepositAmount;
+			} else if (depositAmount) {
+				finalAmount = depositAmount;
+			} else {
+				finalAmount = 0;
+			}
+		}
+
+		if (!finalAmount || finalAmount <= 0) {
+			errorHandler.errorThrow(400, 'amount는 0보다 큰 값이어야 합니다.');
 		}
 
 		// 방 존재 여부 확인
@@ -587,8 +620,11 @@ exports.createDeposit = async (req, res, next) => {
 				customerEsntlId: customerEsntlId || null,
 				contractorEsntlId: contractorEsntlId || null,
 				contractEsntlId: contractEsntlId || null,
-				reservationDepositAmount: reservationDepositAmount || 0,
-				depositAmount: depositAmount || 0,
+				type: type,
+				amount: finalAmount,
+				// 하위 호환성을 위해 기존 필드도 저장
+				reservationDepositAmount: type === 'RESERVATION' ? finalAmount : (reservationDepositAmount || 0),
+				depositAmount: type === 'DEPOSIT' ? finalAmount : (depositAmount || 0),
 				accountBank: accountBank || null,
 				accountNumber: accountNumber || null,
 				accountHolder: accountHolder || null,
@@ -642,8 +678,10 @@ exports.updateDeposit = async (req, res, next) => {
 			customerEsntlId,
 			contractorEsntlId,
 			contractEsntlId,
-			reservationDepositAmount,
-			depositAmount,
+			type,
+			amount,
+			reservationDepositAmount, // 하위 호환성
+			depositAmount, // 하위 호환성
 			accountBank,
 			accountNumber,
 			accountHolder,
@@ -682,12 +720,40 @@ exports.updateDeposit = async (req, res, next) => {
 			updateData.contractEsntlId = contractEsntlId;
 			changes.push(`계약서ID: ${depositInfo.contractEsntlId || '없음'} → ${contractEsntlId || '없음'}`);
 		}
+		if (type !== undefined && type !== depositInfo.type) {
+			if (!['RESERVATION', 'DEPOSIT'].includes(type)) {
+				errorHandler.errorThrow(400, 'type은 RESERVATION 또는 DEPOSIT이어야 합니다.');
+			}
+			updateData.type = type;
+			changes.push(`타입: ${depositInfo.type || '없음'} → ${type}`);
+		}
+		if (amount !== undefined && amount !== depositInfo.amount) {
+			if (amount <= 0) {
+				errorHandler.errorThrow(400, 'amount는 0보다 큰 값이어야 합니다.');
+			}
+			updateData.amount = amount;
+			changes.push(`금액: ${depositInfo.amount || 0}원 → ${amount}원`);
+			// 하위 호환성을 위해 기존 필드도 업데이트
+			const currentType = type !== undefined ? type : depositInfo.type;
+			if (currentType === 'RESERVATION') {
+				updateData.reservationDepositAmount = amount;
+			} else {
+				updateData.depositAmount = amount;
+			}
+		}
+		// 하위 호환성: 기존 필드로부터 업데이트
 		if (reservationDepositAmount !== undefined && reservationDepositAmount !== depositInfo.reservationDepositAmount) {
 			updateData.reservationDepositAmount = reservationDepositAmount;
+			if (!updateData.amount && depositInfo.type === 'RESERVATION') {
+				updateData.amount = reservationDepositAmount;
+			}
 			changes.push(`예약금: ${depositInfo.reservationDepositAmount || 0}원 → ${reservationDepositAmount}원`);
 		}
 		if (depositAmount !== undefined && depositAmount !== depositInfo.depositAmount) {
 			updateData.depositAmount = depositAmount;
+			if (!updateData.amount && depositInfo.type === 'DEPOSIT') {
+				updateData.amount = depositAmount;
+			}
 			changes.push(`보증금: ${depositInfo.depositAmount || 0}원 → ${depositAmount}원`);
 		}
 		if (accountBank !== undefined && accountBank !== depositInfo.accountBank) {
@@ -851,7 +917,9 @@ exports.registerDeposit = async (req, res, next) => {
 		const finalContractEsntlId = req.body.contractEsntlId || depositInfo.contractEsntlId || null;
 
 		const targetAmount =
-			depositInfo.reservationDepositAmount || depositInfo.depositAmount;
+			depositInfo.amount ||
+			depositInfo.reservationDepositAmount ||
+			depositInfo.depositAmount;
 
 		// 총 입금액 계산
 		const totalDepositAmount = await depositHistory.sum('amount', {

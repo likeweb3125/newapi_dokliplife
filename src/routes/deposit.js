@@ -145,6 +145,8 @@ router.get('/info', depositController.getDepositInfo);
  *             required:
  *               - roomEsntlId
  *               - gosiwonEsntlId
+ *               - type
+ *               - amount
  *             properties:
  *               roomEsntlId:
  *                 type: string
@@ -162,12 +164,21 @@ router.get('/info', depositController.getDepositInfo);
  *               contractEsntlId:
  *                 type: string
  *                 description: 방계약 고유 아이디
+ *               type:
+ *                 type: string
+ *                 enum: [RESERVATION, DEPOSIT]
+ *                 description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *                 example: DEPOSIT
+ *               amount:
+ *                 type: integer
+ *                 description: 금액 (예약금 또는 보증금)
+ *                 example: 500000
  *               reservationDepositAmount:
  *                 type: integer
- *                 description: 예약금 금액
+ *                 description: 예약금 금액 (하위 호환성, 사용 중단 예정)
  *               depositAmount:
  *                 type: integer
- *                 description: 보증금 금액
+ *                 description: 보증금 금액 (하위 호환성, 사용 중단 예정)
  *               accountBank:
  *                 type: string
  *                 description: 은행명
@@ -243,12 +254,21 @@ router.post('/create', depositController.createDeposit);
  *               contractEsntlId:
  *                 type: string
  *                 description: 방계약 고유 아이디
+ *               type:
+ *                 type: string
+ *                 enum: [RESERVATION, DEPOSIT]
+ *                 description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *                 example: DEPOSIT
+ *               amount:
+ *                 type: integer
+ *                 description: 금액 (예약금 또는 보증금)
+ *                 example: 500000
  *               reservationDepositAmount:
  *                 type: integer
- *                 description: 예약금 금액
+ *                 description: 예약금 금액 (하위 호환성, 사용 중단 예정)
  *               depositAmount:
  *                 type: integer
- *                 description: 보증금 금액
+ *                 description: 보증금 금액 (하위 호환성, 사용 중단 예정)
  *               accountBank:
  *                 type: string
  *                 description: 은행명

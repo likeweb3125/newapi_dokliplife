@@ -352,6 +352,13 @@ exports.createRoom = async (req, res, next) => {
 			return dateValue;
 		};
 
+		// monthlyRent를 만단위로 나눠서 저장
+		let monthlyRentValue = null;
+		if (monthlyRent !== undefined && monthlyRent !== null && monthlyRent !== '') {
+			const rentNum = parseFloat(monthlyRent) || 0;
+			monthlyRentValue = rentNum > 0 ? (rentNum / 10000).toString() : null;
+		}
+
 		await room.create(
 			{
 				esntlId: roomId,
@@ -360,7 +367,7 @@ exports.createRoom = async (req, res, next) => {
 				roomType: roomType || null,
 				roomCategory: roomCategory || null,
 				deposit: deposit !== undefined ? parseInt(deposit, 10) : null,
-				monthlyRent: monthlyRent || null,
+				monthlyRent: monthlyRentValue,
 				startDate: validateDate(startDate, 'startDate'),
 				endDate: validateDate(endDate, 'endDate'),
 				rom_checkout_expected_date: validateDate(rom_checkout_expected_date, 'rom_checkout_expected_date'),
@@ -509,9 +516,15 @@ exports.updateRoom = async (req, res, next) => {
 			updateData.deposit = parseInt(deposit, 10);
 			changes.push(`보증금: ${roomInfo.deposit || 0} → ${deposit}`);
 		}
-		if (monthlyRent !== undefined && monthlyRent !== roomInfo.monthlyRent) {
-			updateData.monthlyRent = monthlyRent;
-			changes.push(`월세: ${roomInfo.monthlyRent || 0} → ${monthlyRent}`);
+		if (monthlyRent !== undefined && monthlyRent !== null && monthlyRent !== '') {
+			// monthlyRent를 만단위로 나눠서 저장
+			const rentNum = parseFloat(monthlyRent) || 0;
+			const monthlyRentValue = rentNum > 0 ? (rentNum / 10000).toString() : null;
+			
+			if (monthlyRentValue !== roomInfo.monthlyRent) {
+				updateData.monthlyRent = monthlyRentValue;
+				changes.push(`월세: ${roomInfo.monthlyRent || 0} → ${monthlyRentValue}`);
+			}
 		}
 		if (status !== undefined && status !== roomInfo.status) {
 			updateData.status = status;
@@ -1568,7 +1581,16 @@ exports.getFreeRoomList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		errorHandler.successThrow(res, '빈 방 목록 조회 성공', roomList);
+		// monthlyRent를 만단위로 변환하여 리턴
+		const formattedRoomList = roomList.map((room) => {
+			if (room.monthlyRent) {
+				const rentValue = parseFloat(room.monthlyRent) || 0;
+				room.monthlyRent = (rentValue * 10000).toString();
+			}
+			return room;
+		});
+
+		errorHandler.successThrow(res, '빈 방 목록 조회 성공', formattedRoomList);
 	} catch (err) {
 		next(err);
 	}

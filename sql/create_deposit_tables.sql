@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   `customerEsntlId` VARCHAR(50) NULL COMMENT '예약자/입실자 고유아이디',
   `contractorEsntlId` VARCHAR(50) NULL COMMENT '계약자 고유아이디',
   `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디',
-  `reservationDepositAmount` INT(11) NULL DEFAULT 0 COMMENT '예약금 금액',
-  `depositAmount` INT(11) NULL DEFAULT 0 COMMENT '보증금 금액',
+  `type` VARCHAR(50) NOT NULL COMMENT '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)',
+  `amount` INT(11) NOT NULL DEFAULT 0 COMMENT '금액 (예약금 또는 보증금)',
+  `reservationDepositAmount` INT(11) NULL DEFAULT 0 COMMENT '예약금 금액 (하위 호환성, 사용 중단 예정)',
+  `depositAmount` INT(11) NULL DEFAULT 0 COMMENT '보증금 금액 (하위 호환성, 사용 중단 예정)',
   `accountBank` VARCHAR(50) NULL COMMENT '은행명',
   `accountNumber` VARCHAR(50) NULL COMMENT '계좌번호',
   `accountHolder` VARCHAR(100) NULL COMMENT '예금주명',
@@ -33,6 +35,9 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   INDEX `idx_customerEsntlId` (`customerEsntlId`),
   INDEX `idx_contractorEsntlId` (`contractorEsntlId`),
   INDEX `idx_contractEsntlId` (`contractEsntlId`),
+  INDEX `idx_type` (`type`),
+  INDEX `idx_amount` (`amount`),
+  INDEX `idx_type_amount` (`type`, `amount`),
   INDEX `idx_status` (`status`),
   INDEX `idx_contractStatus` (`contractStatus`),
   INDEX `idx_deleteYN` (`deleteYN`),
@@ -132,6 +137,7 @@ CREATE TABLE IF NOT EXISTS `depositDeduction` (
 CREATE INDEX `idx_deposit_gosiwon_status` ON `deposit` (`gosiwonEsntlId`, `status`, `deleteYN`);
 CREATE INDEX `idx_deposit_room_status` ON `deposit` (`roomEsntlId`, `status`, `deleteYN`);
 CREATE INDEX `idx_deposit_customer_status` ON `deposit` (`customerEsntlId`, `status`, `deleteYN`);
+CREATE INDEX `idx_deposit_type_status` ON `deposit` (`type`, `status`, `deleteYN`);
 
 -- depositHistory 테이블 복합 인덱스
 CREATE INDEX `idx_depositHistory_deposit_type` ON `depositHistory` (`depositEsntlId`, `type`, `createdAt`);
