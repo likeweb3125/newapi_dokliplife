@@ -326,6 +326,7 @@ exports.getContractDetail = async (req, res, next) => {
 		// 방이동 예정 정보 조회 (roomMoveStatus에서 status가 PENDING인 경우)
 		const roomMoveQuery = `
 			SELECT 
+				esntlId,
 				moveDate
 			FROM roomMoveStatus
 			WHERE contractEsntlId = ?
@@ -344,9 +345,11 @@ exports.getContractDetail = async (req, res, next) => {
 		if (roomMoveInfo && roomMoveInfo.moveDate) {
 			contractInfo.isRoomMoveScheduled = true;
 			contractInfo.roomMoveDate = roomMoveInfo.moveDate;
+			contractInfo.roomMoveEsntlId = roomMoveInfo.esntlId;
 		} else {
 			contractInfo.isRoomMoveScheduled = false;
 			contractInfo.roomMoveDate = null;
+			contractInfo.roomMoveEsntlId = null;
 		}
 
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
