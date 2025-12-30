@@ -103,6 +103,7 @@ const generateRoomStatusId = async (transaction) => {
 };
 
 // 방 사용 후 상태 설정 함수
+// 반환값: 생성된 roomStatus ID 배열
 const roomAfterUse = async (
 	{
 		gosiwonEsntlId,
@@ -114,10 +115,97 @@ const roomAfterUse = async (
 		sell_able_end_date,
 		can_checkin_start_date,
 		can_checkin_end_date,
+		baseDate, // 기준 날짜 (방이동의 경우 moveDate, 퇴실의 경우 현재 날짜)
 	},
 	transaction
 ) => {
-	if (check_basic_sell === true) {
+	const createdStatusIds = []; // 생성된 상태 ID들을 저장
+	// check_room_only_config가 true이면 전달된 날짜를 그대로 사용
+	if (check_room_only_config === true) {
+		// unableCheckInReason이 없고 check_room_only_config가 true인 경우: ON_SALE과 CAN_CHECKIN 상태 생성
+		if (!sell_able_start_date || !sell_able_end_date) {
+			errorHandler.errorThrow(
+				400,
+				'check_room_only_config가 true일 경우 sell_able_start_date와 sell_able_end_date가 필요합니다.'
+			);
+		}
+		if (!can_checkin_start_date || !can_checkin_end_date) {
+			errorHandler.errorThrow(
+				400,
+				'check_room_only_config가 true일 경우 can_checkin_start_date와 can_checkin_end_date가 필요합니다.'
+			);
+		}
+
+		// ON_SALE 상태 레코드 생성
+		const onSaleId = await generateRoomStatusId(transaction);
+		createdStatusIds.push(onSaleId);
+		const onSaleStartDate = new Date(sell_able_start_date);
+		const onSaleEndDate = new Date(sell_able_end_date);
+		await mariaDBSequelize.query(
+			`
+			INSERT INTO roomStatus (
+				esntlId,
+				roomEsntlId,
+				gosiwonEsntlId,
+				status,
+				statusStartDate,
+				statusEndDate,
+				etcStartDate,
+				etcEndDate,
+				createdAt,
+				updatedAt
+			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			`,
+			{
+				replacements: [
+					onSaleId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					onSaleStartDate,
+					onSaleEndDate,
+					onSaleStartDate, // etcStartDate: statusStartDate와 동일
+					onSaleEndDate, // etcEndDate: statusEndDate와 동일
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+
+		// CAN_CHECKIN 상태 레코드 생성
+		const canCheckinId = await generateRoomStatusId(transaction);
+		createdStatusIds.push(canCheckinId);
+		const canCheckinStartDate = new Date(can_checkin_start_date);
+		const canCheckinEndDate = new Date(can_checkin_end_date);
+		await mariaDBSequelize.query(
+			`
+			INSERT INTO roomStatus (
+				esntlId,
+				roomEsntlId,
+				gosiwonEsntlId,
+				status,
+				statusStartDate,
+				statusEndDate,
+				etcStartDate,
+				etcEndDate,
+				createdAt,
+				updatedAt
+			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			`,
+			{
+				replacements: [
+					canCheckinId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					canCheckinStartDate,
+					canCheckinEndDate,
+					canCheckinStartDate, // etcStartDate: statusStartDate와 동일
+					canCheckinEndDate, // etcEndDate: statusEndDate와 동일
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+	} else if (check_basic_sell === true) {
 		// il_gosiwon_config에서 설정값 조회
 		const [config] = await mariaDBSequelize.query(
 			`
@@ -140,9 +228,9 @@ const roomAfterUse = async (
 		const checkinAbleDate = config.gsc_checkin_able_date || 0; // 일수
 		const sellAblePeriod = config.gsc_sell_able_period || 0; // 일수
 
-		// 현재 날짜 계산
-		const now = new Date();
-		const checkinStartDate = new Date(now);
+		// 기준 날짜 계산 (baseDate가 있으면 사용, 없으면 현재 날짜)
+		const base = baseDate ? new Date(baseDate) : new Date();
+		const checkinStartDate = new Date(base);
 		checkinStartDate.setDate(checkinStartDate.getDate() + checkinAbleDate);
 
 		const sellStartDate = new Date(checkinStartDate);
@@ -154,6 +242,7 @@ const roomAfterUse = async (
 
 		// CAN_CHECKIN 상태 레코드 생성
 		const canCheckinId = await generateRoomStatusId(transaction);
+		createdStatusIds.push(canCheckinId);
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomStatus (
@@ -163,9 +252,11 @@ const roomAfterUse = async (
 				status,
 				statusStartDate,
 				statusEndDate,
+				etcStartDate,
+				etcEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, NOW(), NOW())
+			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
 			`,
 			{
 				replacements: [
@@ -174,6 +265,8 @@ const roomAfterUse = async (
 					gosiwonEsntlId,
 					checkinStartDate,
 					infiniteDate,
+					checkinStartDate, // etcStartDate: statusStartDate와 동일
+					infiniteDate, // etcEndDate: statusEndDate와 동일
 				],
 				type: mariaDBSequelize.QueryTypes.INSERT,
 				transaction,
@@ -182,6 +275,7 @@ const roomAfterUse = async (
 
 		// ON_SALE 상태 레코드 생성
 		const onSaleId = await generateRoomStatusId(transaction);
+		createdStatusIds.push(onSaleId);
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomStatus (
@@ -191,9 +285,11 @@ const roomAfterUse = async (
 				status,
 				statusStartDate,
 				statusEndDate,
+				etcStartDate,
+				etcEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, NOW(), NOW())
+			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
 			`,
 			{
 				replacements: [
@@ -202,6 +298,8 @@ const roomAfterUse = async (
 					gosiwonEsntlId,
 					sellStartDate,
 					sellEndDate,
+					sellStartDate, // etcStartDate: statusStartDate와 동일
+					sellEndDate, // etcEndDate: statusEndDate와 동일
 				],
 				type: mariaDBSequelize.QueryTypes.INSERT,
 				transaction,
@@ -211,6 +309,7 @@ const roomAfterUse = async (
 		if (unableCheckInReason) {
 			// unableCheckInReason이 있는 경우: BEFORE_SALES 상태 생성
 			const beforeSalesId = await generateRoomStatusId(transaction);
+			createdStatusIds.push(beforeSalesId);
 			const now = new Date();
 			const infiniteDate = new Date('9999-12-31 23:59:59');
 
@@ -224,10 +323,12 @@ const roomAfterUse = async (
 					subStatus,
 					statusStartDate,
 					statusEndDate,
+					etcStartDate,
+					etcEndDate,
 					statusMemo,
 					createdAt,
 					updatedAt
-				) VALUES (?, ?, ?, 'BEFORE_SALES', ?, ?, ?, ?, NOW(), NOW())
+				) VALUES (?, ?, ?, 'BEFORE_SALES', ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
 				`,
 				{
 					replacements: [
@@ -237,77 +338,9 @@ const roomAfterUse = async (
 						unableCheckInReason,
 						now,
 						infiniteDate,
+						now, // etcStartDate: statusStartDate와 동일
+						infiniteDate, // etcEndDate: statusEndDate와 동일
 						unableCheckInReason,
-					],
-					type: mariaDBSequelize.QueryTypes.INSERT,
-					transaction,
-				}
-			);
-		} else if (check_room_only_config === true) {
-			// unableCheckInReason이 없고 check_room_only_config가 true인 경우: ON_SALE과 CAN_CHECKIN 상태 생성
-			if (!sell_able_start_date || !sell_able_end_date) {
-				errorHandler.errorThrow(
-					400,
-					'check_basic_sell가 false이고 check_room_only_config가 true일 경우 sell_able_start_date와 sell_able_end_date가 필요합니다.'
-				);
-			}
-			if (!can_checkin_start_date || !can_checkin_end_date) {
-				errorHandler.errorThrow(
-					400,
-					'check_basic_sell가 false이고 check_room_only_config가 true일 경우 can_checkin_start_date와 can_checkin_end_date가 필요합니다.'
-				);
-			}
-
-			// ON_SALE 상태 레코드 생성
-			const onSaleId = await generateRoomStatusId(transaction);
-			await mariaDBSequelize.query(
-				`
-				INSERT INTO roomStatus (
-					esntlId,
-					roomEsntlId,
-					gosiwonEsntlId,
-					status,
-					statusStartDate,
-					statusEndDate,
-					createdAt,
-					updatedAt
-				) VALUES (?, ?, ?, 'ON_SALE', ?, ?, NOW(), NOW())
-				`,
-				{
-					replacements: [
-						onSaleId,
-						roomEsntlId,
-						gosiwonEsntlId,
-						new Date(sell_able_start_date),
-						new Date(sell_able_end_date),
-					],
-					type: mariaDBSequelize.QueryTypes.INSERT,
-					transaction,
-				}
-			);
-
-			// CAN_CHECKIN 상태 레코드 생성
-			const canCheckinId = await generateRoomStatusId(transaction);
-			await mariaDBSequelize.query(
-				`
-				INSERT INTO roomStatus (
-					esntlId,
-					roomEsntlId,
-					gosiwonEsntlId,
-					status,
-					statusStartDate,
-					statusEndDate,
-					createdAt,
-					updatedAt
-				) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, NOW(), NOW())
-				`,
-				{
-					replacements: [
-						canCheckinId,
-						roomEsntlId,
-						gosiwonEsntlId,
-						new Date(can_checkin_start_date),
-						new Date(can_checkin_end_date),
 					],
 					type: mariaDBSequelize.QueryTypes.INSERT,
 					transaction,
@@ -315,6 +348,8 @@ const roomAfterUse = async (
 			);
 		}
 	}
+	
+	return createdStatusIds; // 생성된 상태 ID 배열 반환
 };
 
 // roomAfterUse 함수를 다른 곳에서도 사용할 수 있도록 export
@@ -442,7 +477,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			`
 			UPDATE roomStatus 
 			SET status = 'CHECKOUT_CONFIRMED',
-				updatedAt = NOW()
+				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
 			WHERE contractEsntlId = ?
 		`,
 			{
@@ -459,7 +494,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			`
 			UPDATE roomContract 
 			SET status = ?,
-				updatedAt = NOW()
+				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
 			WHERE esntlId = ?
 		`,
 			{

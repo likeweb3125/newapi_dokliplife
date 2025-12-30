@@ -652,5 +652,154 @@ router.get(
  */
 router.get('/history', depositController.getDepositHistory);
 
+/**
+ * @swagger
+ * /v1/deposit/contract-coupon-info:
+ *   get:
+ *     summary: 계약서 쿠폰 정보 조회
+ *     description: 계약서 ID로 해당 계약의 쿠폰 사용 여부, 사용된 쿠폰 정보, 계약 기간을 조회합니다.
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: contractEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 계약서 고유 아이디
+ *         example: CONT0000000001
+ *     responses:
+ *       200:
+ *         description: 계약서 쿠폰 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 계약서 쿠폰 정보 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     contractEsntlId:
+ *                       type: string
+ *                       description: 계약서 고유 아이디
+ *                       example: CONT0000000001
+ *                     period:
+ *                       type: object
+ *                       description: 계약 기간
+ *                       properties:
+ *                         startDate:
+ *                           type: string
+ *                           description: 계약 시작일
+ *                           example: '2024-01-01'
+ *                         endDate:
+ *                           type: string
+ *                           description: 계약 종료일
+ *                           example: '2024-12-31'
+ *                     hasCoupon:
+ *                       type: boolean
+ *                       description: 쿠폰 사용 여부
+ *                       example: true
+ *                     coupon:
+ *                       type: object
+ *                       nullable: true
+ *                       description: 쿠폰 정보 (쿠폰을 사용한 경우에만 반환)
+ *                       properties:
+ *                         esntId:
+ *                           type: string
+ *                           description: 쿠폰 고유 아이디
+ *                           example: CPON0000000001
+ *                         name:
+ *                           type: string
+ *                           description: 쿠폰명
+ *                           example: 신규가입 쿠폰
+ *                         description:
+ *                           type: string
+ *                           description: 쿠폰 설명
+ *                           example: 10% 할인 쿠폰
+ *                         value:
+ *                           type: string
+ *                           description: 쿠폰 가격/할인 금액
+ *                           example: '10000'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/contract-coupon-info', depositController.getContractCouponInfo);
+
+/**
+ * @swagger
+ * /v1/deposit/gosiwonList:
+ *   get:
+ *     summary: 고시원 목록 조회 (입금대기 건수 포함)
+ *     description: 'status가 OPERATE인 고시원 목록을 조회하고, 지정된 type(RESERVATION/DEPOSIT)의 입금대기(DEPOSIT_PENDING) 건수를 카운트하여 건수가 많은 순서대로 반환합니다.'
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [RESERVATION, DEPOSIT]
+ *         description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *         example: RESERVATION
+ *     responses:
+ *       200:
+ *         description: 고시원 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 고시원 목록 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 고시원 고유 아이디
+ *                         example: GOSI0000000001
+ *                       name:
+ *                         type: string
+ *                         description: 고시원 이름
+ *                         example: 성수 고시원
+ *                       type:
+ *                         type: string
+ *                         enum: [RESERVATION, DEPOSIT]
+ *                         description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *                         example: RESERVATION
+ *                       pendingCount:
+ *                         type: integer
+ *                         description: 입금대기 건수 (카운트가 많은 순서대로 정렬됨)
+ *                         example: 5
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/gosiwonList', depositController.getGosiwonList);
+
 module.exports = router;
 

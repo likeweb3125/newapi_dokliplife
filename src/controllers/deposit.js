@@ -1389,3 +1389,148 @@ exports.getDepositHistoryReturnList = async (req, res, next) => {
 	return exports.getDepositHistory(req, res, next);
 };
 
+// 계약서 쿠폰 정보 조회
+exports.getContractCouponInfo = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { contractEsntlId } = req.query;
+
+		if (!contractEsntlId) {
+			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
+		}
+
+		// roomContract에서 계약 기간 조회
+		const contractQuery = `
+			SELECT 
+				startDate,
+				endDate
+			FROM roomContract
+			WHERE esntlId = ?
+			LIMIT 1
+		`;
+
+		const [contractResult] = await mariaDBSequelize.query(contractQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		if (!contractResult) {
+			errorHandler.errorThrow(404, '계약서 정보를 찾을 수 없습니다.');
+		}
+
+		// paymentLog에서 쿠폰 사용 정보 조회 (ucp_eid가 NULL이 아닌 경우만)
+		const paymentQuery = `
+			SELECT DISTINCT
+				ucp_eid
+			FROM paymentLog
+			WHERE contractEsntlId = ?
+				AND ucp_eid IS NOT NULL
+				AND ucp_eid != ''
+			LIMIT 1
+		`;
+
+		const [paymentResult] = await mariaDBSequelize.query(paymentQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const hasCoupon = !!paymentResult && !!paymentResult.ucp_eid;
+		let couponInfo = null;
+
+		// 쿠폰을 사용한 경우 userCoupon을 통해 coupon 테이블에서 쿠폰 정보 조회
+		if (hasCoupon) {
+			const couponQuery = `
+				SELECT 
+					C.esntlId,
+					C.name,
+					C.description,
+					C.value
+				FROM userCoupon UC
+				JOIN coupon C ON UC.couponEsntlId = C.esntlId
+				WHERE UC.esntlId = ?
+				LIMIT 1
+			`;
+
+			const [couponResult] = await mariaDBSequelize.query(couponQuery, {
+				replacements: [paymentResult.ucp_eid],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			});
+
+			if (couponResult) {
+				couponInfo = {
+					esntId: couponResult.esntlId,
+					name: couponResult.name,
+					description: couponResult.description,
+					value: couponResult.value,
+				};
+			}
+		}
+
+		const result = {
+			contractEsntlId: contractEsntlId,
+			period: {
+				startDate: contractResult.startDate,
+				endDate: contractResult.endDate,
+			},
+			hasCoupon: hasCoupon,
+			coupon: couponInfo,
+		};
+
+		return errorHandler.successThrow(res, '계약서 쿠폰 정보 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 고시원 목록 조회 (입금대기 건수 포함)
+exports.getGosiwonList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { type } = req.query;
+
+		// type 유효성 검증
+		if (!type || !['RESERVATION', 'DEPOSIT'].includes(type)) {
+			errorHandler.errorThrow(400, 'type은 RESERVATION 또는 DEPOSIT이어야 합니다.');
+		}
+
+		// 1. status가 'OPERATE'인 고시원 목록과 해당 type의 DEPOSIT_PENDING 개수를 함께 조회
+		// 카운트가 많은 순서대로 정렬
+		const gosiwonList = await mariaDBSequelize.query(
+			`
+			SELECT 
+				g.esntlId,
+				g.name,
+				COALESCE(COUNT(d.esntlId), 0) as pendingCount
+			FROM gosiwon g
+			LEFT JOIN deposit d ON g.esntlId = d.gosiwonEsntlId 
+				AND d.type = ?
+				AND d.status = 'DEPOSIT_PENDING'
+				AND d.deleteYN = 'N'
+			WHERE g.status = 'OPERATE'
+			GROUP BY g.esntlId, g.name
+			ORDER BY pendingCount DESC, g.name ASC
+		`,
+			{
+				replacements: [type],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+
+		// 2. 결과 구성
+		const result = gosiwonList.map((row) => {
+			return {
+				esntlId: row.esntlId,
+				name: row.name,
+				type: type,
+				pendingCount: parseInt(row.pendingCount) || 0,
+			};
+		});
+
+		return errorHandler.successThrow(res, '고시원 목록 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
