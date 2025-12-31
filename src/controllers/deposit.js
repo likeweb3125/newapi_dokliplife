@@ -120,443 +120,6 @@ const generateDepositDeductionId = async (transaction) => {
 	)}`;
 };
 
-// 보증금 현황 목록 조회 (고시원별)
-exports.getDepositList = async (req, res, next) => {
-	try {
-		verifyAdminToken(req);
-
-		const {
-			gosiwonEsntlId,
-			type, // RESERVATION 또는 DEPOSIT (예약금/보증금 구분)
-			searchType, // gosiwonName | gosiwonCode | roomName | roomEsntlId | reservationName | contractName
-			amount,
-			status,
-			contractStatus,
-			hideDeleted,
-			hideCompleted,
-			search,
-			page = 1,
-			limit = 50,
-		} = req.query;
-
-		const searchValue = search ? String(search).trim() : '';
-
-		const allowedSearchTypes = [
-			'gosiwonName',
-			'gosiwonCode',
-			'roomName',
-			'roomEsntlId',
-			'reservationName',
-			'contractName',
-			'constractName', // 오타 대응
-		];
-
-		if (searchType && !allowedSearchTypes.includes(searchType)) {
-			errorHandler.errorThrow(
-				400,
-				"searchType은 'gosiwonName', 'gosiwonCode', 'roomName', 'reservationName', 'contractName' 중 하나여야 합니다."
-			);
-		}
-		if (searchType && !searchValue) {
-			errorHandler.errorThrow(400, 'searchType 사용 시 search 값은 필수입니다.');
-		}
-
-		// 1. 먼저 고시원의 방 목록을 조회
-		const roomWhereCondition = {};
-
-		if (gosiwonEsntlId) {
-			roomWhereCondition.gosiwonEsntlId = gosiwonEsntlId;
-		}
-
-		// 삭제 숨기기 옵션이 있을 때만 deleteYN 적용
-		if (hideDeleted === 'true' || hideDeleted === true) {
-			roomWhereCondition.deleteYN = 'N';
-		}
-
-		let searchMatchedGosiwon = false;
-		let searchedGosiwonIds = []; // 검색된 고시원 ID 목록
-		let commonGosiwonInfo = null; // 공통 고시원 정보 (고시원이 하나인 경우)
-
-		// searchType에 따른 고시원 검색 처리
-		if (
-			searchValue &&
-			(searchType === 'gosiwonCode' || (!searchType && /^GOSI[0-9]+$/i.test(searchValue)))
-		) {
-			roomWhereCondition.gosiwonEsntlId = searchValue;
-			searchedGosiwonIds = [searchValue];
-			searchMatchedGosiwon = true;
-		} else if (
-			searchValue &&
-			(searchType === 'gosiwonName' || (!searchType && !searchMatchedGosiwon))
-		) {
-			// 고시원명을 LIKE로 검색하여 ID 목록을 얻고 필터
-			const gosiwonList = await gosiwon.findAll({
-				where: {
-					[Op.or]: [
-						{ name: { [Op.like]: `%${searchValue}%` } },
-						{ esntlId: { [Op.like]: `%${searchValue}%` } },
-					],
-				},
-				attributes: ['esntlId', 'name', 'address'],
-			});
-
-			searchedGosiwonIds = gosiwonList.map((item) => item.esntlId);
-			if (searchedGosiwonIds.length > 0) {
-				roomWhereCondition.gosiwonEsntlId = { [Op.in]: searchedGosiwonIds };
-				searchMatchedGosiwon = true;
-			}
-
-			// 고시원명으로 검색한 경우, 검색된 고시원이 하나인 경우 공통 고시원 정보 설정
-			if (gosiwonList.length === 1) {
-				commonGosiwonInfo = {
-					esntlId: gosiwonList[0].esntlId,
-					name: gosiwonList[0].name,
-					address: gosiwonList[0].address,
-				};
-			}
-		}
-
-		// gosiwonEsntlId로 직접 검색한 경우
-		if (gosiwonEsntlId) {
-			searchedGosiwonIds = [gosiwonEsntlId];
-			// gosiwonEsntlId로 직접 검색한 경우 공통 고시원 정보 조회
-			const commonGosiwon = await gosiwon.findOne({
-				where: { esntlId: gosiwonEsntlId },
-				attributes: ['esntlId', 'name', 'address'],
-			});
-			if (commonGosiwon) {
-				commonGosiwonInfo = {
-					esntlId: commonGosiwon.esntlId,
-					name: commonGosiwon.name,
-					address: commonGosiwon.address,
-				};
-			}
-		}
-
-		// gosiwonCode로 검색한 경우 공통 고시원 정보 조회
-		if (
-			searchValue &&
-			(searchType === 'gosiwonCode' || (!searchType && /^GOSI[0-9]+$/i.test(searchValue)))
-		) {
-			const commonGosiwon = await gosiwon.findOne({
-				where: { esntlId: searchValue },
-				attributes: ['esntlId', 'name', 'address'],
-			});
-			if (commonGosiwon) {
-				commonGosiwonInfo = {
-					esntlId: commonGosiwon.esntlId,
-					name: commonGosiwon.name,
-					address: commonGosiwon.address,
-				};
-			}
-		}
-
-		// roomEsntlId 직접 검색
-		if (searchValue && searchType === 'roomEsntlId') {
-			roomWhereCondition.esntlId = searchValue;
-		}
-
-		// 검색 조건 (방번호)
-		if (
-			searchValue &&
-			!searchMatchedGosiwon &&
-			(searchType === 'roomName' || !searchType)
-		) {
-			roomWhereCondition.roomNumber = {
-				[Op.like]: `%${searchValue}%`,
-			};
-		}
-
-		const offset = (parseInt(page) - 1) * parseInt(limit);
-
-		// 방 목록 조회
-		const { count: roomCount, rows: roomRows } = await room.findAndCountAll({
-			where: roomWhereCondition,
-			order: [['orderNo', 'ASC'], ['roomNumber', 'ASC']],
-			limit: parseInt(limit),
-			offset: offset,
-		});
-
-		// 공통 고시원이 아닌 경우, 모든 방의 고시원 정보를 한 번에 조회
-		const gosiwonInfoMap = new Map();
-		if (!commonGosiwonInfo && roomRows.length > 0) {
-			const uniqueGosiwonIds = [
-				...new Set(
-					roomRows
-						.map((roomItem) => {
-							const roomData = roomItem.toJSON ? roomItem.toJSON() : roomItem;
-							return roomData.gosiwonEsntlId;
-						})
-						.filter(Boolean)
-				),
-			];
-			if (uniqueGosiwonIds.length > 0) {
-				const gosiwonList = await gosiwon.findAll({
-					where: { esntlId: { [Op.in]: uniqueGosiwonIds } },
-					attributes: ['esntlId', 'name', 'address'],
-				});
-				gosiwonList.forEach((g) => {
-					const gData = g.toJSON ? g.toJSON() : g;
-					gosiwonInfoMap.set(gData.esntlId, {
-						esntlId: gData.esntlId,
-						name: gData.name,
-						address: gData.address,
-					});
-				});
-			}
-		}
-
-		// 2. 각 방에 대한 deposit 정보 조회 및 조합
-		const resultList = await Promise.all(
-			roomRows.map(async (roomItem) => {
-				const roomData = roomItem.toJSON();
-
-				// deposit 조회 조건 - 기본적으로 해당 방의 모든 deposit 조회
-				const depositWhereCondition = {
-					roomEsntlId: roomItem.esntlId,
-				};
-
-				// type 필터 (예약금/보증금 구분)
-				if (type && (type === 'RESERVATION' || type === 'DEPOSIT')) {
-					depositWhereCondition.type = type;
-				}
-
-				// hideDeleted가 true일 때만 삭제된 항목 제외
-				if (hideDeleted === 'true' || hideDeleted === true) {
-					depositWhereCondition.deleteYN = 'N';
-				}
-
-				// 해당 방의 deposit 정보 조회 (필터 없이 먼저 조회)
-				let depositInfo = await deposit.findOne({
-					where: depositWhereCondition,
-					include: [
-						{
-							model: customer,
-							as: 'customer',
-							attributes: ['esntlId', 'name', 'phone'],
-							required: false,
-						},
-						{
-							model: customer,
-							as: 'contractor',
-							attributes: ['esntlId', 'name', 'phone'],
-							required: false,
-						},
-					],
-					order: [['createdAt', 'DESC']],
-				});
-
-				// deposit이 있고, 필터 조건이 있는 경우에만 필터링
-				if (depositInfo) {
-					const depositData = depositInfo.toJSON();
-
-					// 금액 필터 체크
-					if (amount !== undefined && amount !== null && amount !== '') {
-						const matchesAmount =
-							depositData.amount == amount ||
-							depositData.reservationDepositAmount == amount ||
-							depositData.depositAmount == amount;
-						if (!matchesAmount) {
-							depositInfo = null; // 조건에 맞지 않으면 null
-						}
-					}
-
-					// status 필터 체크
-					if (depositInfo && status) {
-						if (depositData.status !== status) {
-							depositInfo = null;
-						}
-					}
-
-					// contractStatus 필터 체크
-					if (depositInfo && contractStatus) {
-						if (depositData.contractStatus !== contractStatus) {
-							depositInfo = null;
-						}
-					}
-
-					// hideCompleted 필터 체크
-					if (
-						depositInfo &&
-						(hideCompleted === 'true' || hideCompleted === true)
-					) {
-						if (depositData.status === 'RETURN_COMPLETED') {
-							depositInfo = null;
-						}
-					}
-
-				}
-
-				// 고시원 정보 조회 (공통 고시원이 아닌 경우에만 각 항목에 추가)
-				let gosiwonInfo = null;
-				if (!commonGosiwonInfo && roomData.gosiwonEsntlId) {
-					gosiwonInfo = gosiwonInfoMap.get(roomData.gosiwonEsntlId);
-					// Map에 없으면 개별 조회 (방어 코드)
-					if (!gosiwonInfo) {
-						const gosiwonData = await gosiwon.findOne({
-							where: { esntlId: roomData.gosiwonEsntlId },
-							attributes: ['esntlId', 'name', 'address'],
-						});
-						if (gosiwonData) {
-							const gData = gosiwonData.toJSON ? gosiwonData.toJSON() : gosiwonData;
-							gosiwonInfo = {
-								esntlId: gData.esntlId,
-								name: gData.name,
-								address: gData.address,
-							};
-						}
-					}
-				}
-
-				// 결과 객체 구성
-				const resultItem = {
-					room: {
-						esntlId: roomData.esntlId,
-						roomNumber: roomData.roomNumber,
-						roomType: roomData.roomType,
-						status: roomData.status,
-					},
-					...(gosiwonInfo && { gosiwon: gosiwonInfo }), // 공통 고시원이 아닌 경우에만 추가
-					deposit: null,
-					latestDepositHistory: null,
-					latestReturnHistory: null,
-					totalDepositAmount: 0,
-					unpaidAmount: 0,
-				};
-
-				// deposit 정보가 있는 경우
-				if (depositInfo) {
-					const depositData = depositInfo.toJSON();
-					resultItem.deposit = {
-						esntlId: depositData.esntlId,
-						type: depositData.type,
-						amount: depositData.amount,
-						reservationDepositAmount: depositData.reservationDepositAmount, // 하위 호환성
-						depositAmount: depositData.depositAmount, // 하위 호환성
-						accountBank: depositData.accountBank,
-						accountNumber: depositData.accountNumber,
-						accountHolder: depositData.accountHolder,
-						expectedOccupantName: depositData.expectedOccupantName,
-						expectedOccupantPhone: depositData.expectedOccupantPhone,
-						moveInDate: depositData.moveInDate,
-						moveOutDate: depositData.moveOutDate,
-						contractStatus: depositData.contractStatus,
-						status: depositData.status,
-						virtualAccountNumber: depositData.virtualAccountNumber,
-						virtualAccountExpiryDate: depositData.virtualAccountExpiryDate,
-						customer: depositData.customer,
-						contractor: depositData.contractor,
-					};
-
-					// 최신 입금 이력 조회
-					const latestDepositHistory = await depositHistory.findOne({
-						where: {
-							depositEsntlId: depositData.esntlId,
-							type: 'DEPOSIT',
-						},
-						order: [['createdAt', 'DESC']],
-						attributes: [
-							'status',
-							'amount',
-							'depositorName',
-							'depositDate',
-							'createdAt',
-							'manager',
-						],
-					});
-
-					// 최신 반환 이력 조회
-					const latestReturnHistory = await depositHistory.findOne({
-						where: {
-							depositEsntlId: depositData.esntlId,
-							type: 'RETURN',
-						},
-						order: [['createdAt', 'DESC']],
-						attributes: [
-							'status',
-							'refundAmount',
-							'deductionAmount',
-							'refundDate',
-							'createdAt',
-							'manager',
-						],
-					});
-
-					// 총 입금액 계산
-					const totalDepositAmount = await depositHistory.sum('amount', {
-						where: {
-							depositEsntlId: depositData.esntlId,
-							type: 'DEPOSIT',
-							status: {
-								[Op.in]: ['DEPOSIT_COMPLETED', 'PARTIAL_DEPOSIT'],
-							},
-						},
-					});
-
-					resultItem.latestDepositHistory = latestDepositHistory;
-					resultItem.latestReturnHistory = latestReturnHistory;
-					resultItem.totalDepositAmount = totalDepositAmount || 0;
-					resultItem.unpaidAmount = Math.max(
-						0,
-						(depositData.amount ||
-							depositData.reservationDepositAmount ||
-							depositData.depositAmount) -
-							(totalDepositAmount || 0)
-					);
-				}
-
-				return resultItem;
-			})
-		);
-
-		// 검색 조건에 맞는 항목만 필터링 (deposit이 없거나 조건에 맞지 않는 경우 제외)
-		const filteredList = resultList.filter((item) => {
-			// deposit이 없으면 포함 (방 목록은 항상 보여줌)
-			if (!item.deposit) {
-				return true;
-			}
-
-			// 금액 필터 체크 (amount 또는 기존 필드 중 하나라도 일치)
-			if (
-				amount !== undefined &&
-				item.deposit.amount != amount &&
-				item.deposit.reservationDepositAmount != amount &&
-				item.deposit.depositAmount != amount
-			) {
-				return false;
-			}
-
-			return true;
-		});
-
-		// 검색 필터
-		const finalList = filteredList;
-
-		// searchType에 따라 메시지 변경
-		const message =
-			searchType === 'reservation'
-				? '예약금 현황 목록 조회 성공'
-				: '보증금 현황 목록 조회 성공';
-
-		// 응답 데이터 구성
-		const responseData = {
-			total: finalList.length,
-			page: parseInt(page),
-			limit: parseInt(limit),
-			data: finalList.slice((parseInt(page) - 1) * parseInt(limit), parseInt(page) * parseInt(limit)),
-		};
-
-		// 공통 고시원 정보가 있는 경우 최상위 레벨에 추가
-		if (commonGosiwonInfo) {
-			responseData.gosiwon = commonGosiwonInfo;
-		}
-
-		return errorHandler.successThrow(res, message, responseData);
-	} catch (error) {
-		next(error);
-	}
-};
-
 // 보증금 상세 정보 조회
 exports.getDepositInfo = async (req, res, next) => {
 	try {
@@ -1488,47 +1051,231 @@ exports.getGosiwonList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { type } = req.query;
-
-		// type 유효성 검증
-		if (!type || !['RESERVATION', 'DEPOSIT'].includes(type)) {
-			errorHandler.errorThrow(400, 'type은 RESERVATION 또는 DEPOSIT이어야 합니다.');
-		}
-
-		// 1. status가 'OPERATE'인 고시원 목록과 해당 type의 DEPOSIT_PENDING 개수를 함께 조회
-		// 카운트가 많은 순서대로 정렬
+		// status가 'OPERATE'인 고시원 목록과 RESERVATION, DEPOSIT 타입의 DEPOSIT_PENDING 개수를 함께 조회
+		// 하나라도 카운트가 있으면 상단으로 정렬
 		const gosiwonList = await mariaDBSequelize.query(
 			`
 			SELECT 
-				g.esntlId,
-				g.name,
-				COALESCE(COUNT(d.esntlId), 0) as pendingCount
-			FROM gosiwon g
-			LEFT JOIN deposit d ON g.esntlId = d.gosiwonEsntlId 
-				AND d.type = ?
-				AND d.status = 'DEPOSIT_PENDING'
-				AND d.deleteYN = 'N'
-			WHERE g.status = 'OPERATE'
-			GROUP BY g.esntlId, g.name
-			ORDER BY pendingCount DESC, g.name ASC
+				esntlId,
+				name,
+				reservePendingCount,
+				depositPendingCount
+			FROM (
+				SELECT 
+					g.esntlId,
+					g.name,
+					COALESCE(SUM(CASE WHEN d.type = 'RESERVATION' AND d.status = 'DEPOSIT_PENDING' AND (d.deleteYN IS NULL OR d.deleteYN = 'N') THEN 1 ELSE 0 END), 0) as reservePendingCount,
+					COALESCE(SUM(CASE WHEN d.type = 'DEPOSIT' AND d.status = 'DEPOSIT_PENDING' AND (d.deleteYN IS NULL OR d.deleteYN = 'N') THEN 1 ELSE 0 END), 0) as depositPendingCount
+				FROM gosiwon g
+				LEFT JOIN deposit d ON g.esntlId = d.gosiwonEsntlId
+				WHERE g.status = 'OPERATE'
+				GROUP BY g.esntlId, g.name
+			) as gosiwonCounts
+			ORDER BY (reservePendingCount + depositPendingCount) DESC, name ASC
 		`,
 			{
-				replacements: [type],
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}
 		);
 
-		// 2. 결과 구성
+		// 결과 구성
 		const result = gosiwonList.map((row) => {
+			const reserveCount = parseInt(row.reservePendingCount) || 0;
+			const depositCount = parseInt(row.depositPendingCount) || 0;
 			return {
 				esntlId: row.esntlId,
 				name: row.name,
-				type: type,
-				pendingCount: parseInt(row.pendingCount) || 0,
+				reservePendingCount: reserveCount,
+				depositPendingCount: depositCount,
 			};
 		});
 
 		return errorHandler.successThrow(res, '고시원 목록 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 예약금 예약 목록 조회
+exports.getReservationList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const {
+			searchType, // gosiwonName, gosiwonCode, etc
+			searchString, // 검색어
+			canCheckin, // 입실가능한 방만 보기 (checkbox)
+			reservationStatus, // 예약금요청상태만보기 (checkbox)
+			page = 1,
+			limit = 50,
+		} = req.query;
+
+		const searchValue = searchString ? String(searchString).trim() : '';
+
+		// 검색 조건 구성
+		const whereConditions = [];
+		const replacements = [];
+
+		// searchType에 따른 검색 처리
+		if (searchValue) {
+			if (searchType === 'gosiwonName') {
+				// 고시원명으로 검색
+				const gosiwonList = await gosiwon.findAll({
+					where: {
+						name: { [Op.like]: `%${searchValue}%` },
+					},
+					attributes: ['esntlId'],
+				});
+				const gosiwonIds = gosiwonList.map((g) => g.esntlId);
+				if (gosiwonIds.length > 0) {
+					whereConditions.push('R.gosiwonEsntlId IN (' + gosiwonIds.map(() => '?').join(',') + ')');
+					replacements.push(...gosiwonIds);
+				} else {
+					// 검색 결과가 없으면 빈 결과 반환
+					return errorHandler.successThrow(res, '예약금 예약 목록 조회 성공', {
+						total: 0,
+						page: parseInt(page),
+						limit: parseInt(limit),
+						data: [],
+					});
+				}
+			} else if (searchType === 'gosiwonCode') {
+				// 고시원 코드로 검색
+				whereConditions.push('R.gosiwonEsntlId = ?');
+				replacements.push(searchValue);
+			} else if (searchType === 'etc' || !searchType) {
+				// etc인 경우: roomName, roomEsntlId, reservationName, contractName을 like 검색
+				whereConditions.push(`(
+					R.roomNumber LIKE ? OR
+					R.esntlId LIKE ? OR
+					RS.reservationName LIKE ? OR
+					RS.contractorName LIKE ?
+				)`);
+				replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
+			}
+		}
+
+		// canCheckin 필터: roomStatus.status가 CAN_CHECKIN이고 subStatus가 END가 아닌 경우
+		if (canCheckin === 'true' || canCheckin === true) {
+			whereConditions.push(`(
+				RS.status = 'CAN_CHECKIN' AND
+				(RS.subStatus IS NULL OR RS.subStatus != 'END')
+			)`);
+		}
+		
+		// reservationStatus 필터: deposit.type이 RESERVATION이고 deposit.status가 DEPOSIT_PENDING인 경우만 보기
+		if (reservationStatus === 'true' || reservationStatus === true) {
+			whereConditions.push(`(
+				D.type = 'RESERVATION' AND
+				D.status = 'DEPOSIT_PENDING' AND
+				(D.deleteYN IS NULL OR D.deleteYN = 'N')
+			)`);
+		}
+
+		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
+		// 기본적으로 모든 방이 나와야 하므로 LEFT JOIN 사용
+		// 정렬 기준: roomStatus.status가 ON_SALE이고 subStatus가 END가 아닌 경우의 statusStartDate 기준 내림차순
+		// 각 방별로 최신 deposit.status를 가져오기 위해 서브쿼리 사용
+		// roomStatus가 여러 개일 경우를 처리하기 위해 서브쿼리로 최신 roomStatus만 가져옴
+		const query = `
+			SELECT
+				R.esntlId as roomEsntlId,
+				R.roomNumber,
+				R.gosiwonEsntlId,
+				RS.status as roomStatus,
+				RS.reservationName,
+				RS.contractorName,
+				DATE(RS.statusStartDate) as moveInDate,
+				DATE(RS.statusEndDate) as moveOutDate,
+				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
+				(
+					SELECT D2.status
+					FROM deposit D2
+					WHERE D2.roomEsntlId = R.esntlId
+						AND D2.type = 'RESERVATION'
+						AND (D2.deleteYN IS NULL OR D2.deleteYN = 'N')
+					ORDER BY D2.createdAt DESC
+					LIMIT 1
+				) as depositStatus
+			FROM room R
+			LEFT JOIN (
+				SELECT RS1.*
+				FROM roomStatus RS1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
+					FROM roomStatus
+					GROUP BY roomEsntlId
+				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
+			) RS ON R.esntlId = RS.roomEsntlId
+			LEFT JOIN deposit D ON R.esntlId = D.roomEsntlId
+				AND D.type = 'RESERVATION'
+				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
+			${whereClause}
+			ORDER BY 
+				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN 0 ELSE 1 END,
+				sortDate DESC, 
+				R.roomNumber ASC
+			LIMIT ? OFFSET ?
+		`;
+
+		// 전체 개수 조회 (메인 쿼리와 동일한 조건으로 필터링)
+		const countWhereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
+		const countQuery = `
+			SELECT COUNT(DISTINCT R.esntlId) as total
+			FROM room R
+			LEFT JOIN (
+				SELECT RS1.*
+				FROM roomStatus RS1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
+					FROM roomStatus
+					GROUP BY roomEsntlId
+				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
+			) RS ON R.esntlId = RS.roomEsntlId
+			LEFT JOIN deposit D ON R.esntlId = D.roomEsntlId
+				AND D.type = 'RESERVATION'
+				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
+			${countWhereClause}
+		`;
+
+		const offset = (parseInt(page) - 1) * parseInt(limit);
+		const queryReplacements = [...replacements, parseInt(limit), offset];
+		const countReplacements = [...replacements];
+
+		const rows = await mariaDBSequelize.query(query, {
+			replacements: queryReplacements,
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const countResult = await mariaDBSequelize.query(countQuery, {
+			replacements: countReplacements,
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const total = countResult && countResult[0] ? parseInt(countResult[0].total) : 0;
+
+		// 결과 포맷팅
+		const resultList = (rows || []).map((row) => {
+			return {
+				roomEsntlId: row.roomEsntlId,
+				roomNumber: row.roomNumber,
+				roomStatus: row.roomStatus,
+				reservationName: row.reservationName || null,
+				contractorName: row.contractorName || null,
+				moveInDate: row.moveInDate || null,
+				moveOutDate: row.moveOutDate || null,
+				depositStatus: row.depositStatus || null,
+			};
+		});
+
+		return errorHandler.successThrow(res, '예약금 예약 목록 조회 성공', {
+			total: total,
+			page: parseInt(page),
+			limit: parseInt(limit),
+			data: resultList,
+		});
 	} catch (error) {
 		next(error);
 	}

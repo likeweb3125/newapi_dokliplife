@@ -12,101 +12,6 @@ const depositController = require('../controllers/deposit');
 
 /**
  * @swagger
- * /v1/deposit/list:
- *   get:
- *     summary: '보증금(예약금) 현황 목록 조회'
- *     description: 고시원별 보증금 현황 목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다.
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: type
- *         required: false
- *         schema:
- *           type: string
- *           enum: [RESERVATION, DEPOSIT]
- *         description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금) - 첫 번째 검색 필드'
- *         example: RESERVATION
- *       - in: query
- *         name: searchType
- *         required: false
- *         schema:
- *           type: string
- *           enum:
- *             - gosiwonName
- *             - gosiwonCode
- *             - roomName
- *             - roomEsntlId
- *             - reservationName
- *             - contractName
- *         description: "검색 대상 종류 (고시원명/코드, 방이름/방ID, 예약자명, 계약자명)"
- *       - in: query
- *         name: search
- *         required: false
- *         schema:
- *           type: string
- *         description: "검색어 (searchType별 필드: gosiwonName→gosiwon.name, gosiwonCode→gosiwon.esntlId, roomName→room.roomNumber, roomEsntlId→room.esntlId, reservationName→roomStatus.reservationName, contractName→roomStatus.contractorName)"
- *       - in: query
- *         name: amount
- *         required: false
- *         schema:
- *           type: integer
- *           example: 20000
- *         description: "금액 필터 (예약금/보증금 중 하나 일치)"
- *       - in: query
- *         name: status
- *         required: false
- *         schema:
- *           type: string
- *           enum: [DEPOSIT_PENDING, PARTIAL_DEPOSIT, DEPOSIT_COMPLETED, RETURN_COMPLETED, DELETED]
- *         description: 입금상태
- *       - in: query
- *         name: contractStatus
- *         required: false
- *         schema:
- *           type: string
- *         description: 계약상태
- *       - in: query
- *         name: hideDeleted
- *         required: false
- *         schema:
- *           type: boolean
- *         description: 삭제된 항목 숨기기
- *       - in: query
- *         name: hideCompleted
- *         required: false
- *         schema:
- *           type: boolean
- *         description: 입금완료된 항목 숨기기
- *       - in: query
- *         name: page
- *         required: false
- *         schema:
- *           type: integer
- *           default: 1
- *         description: 페이지 번호
- *       - in: query
- *         name: limit
- *         required: false
- *         schema:
- *           type: integer
- *           default: 50
- *         description: 페이지당 항목 수
- *     responses:
- *       200:
- *         description: 보증금 현황 목록 조회 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.get('/list', depositController.getDepositList);
-
-/**
- * @swagger
  * /v1/deposit/info:
  *   get:
  *     summary: '보증금(예약금)  상세 정보 조회'
@@ -135,233 +40,10 @@ router.get('/list', depositController.getDepositList);
  */
 router.get('/info', depositController.getDepositInfo);
 
-/**
- * @swagger
- * /v1/deposit/create:
- *   post:
- *     summary: 보증금 등록
- *     description: 새로운 보증금(예약금) 정보를 등록합니다.
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - roomEsntlId
- *               - gosiwonEsntlId
- *               - type
- *               - amount
- *             properties:
- *               roomEsntlId:
- *                 type: string
- *                 description: 방 고유 아이디
- *               gosiwonEsntlId:
- *                 type: string
- *                 description: 고시원 고유 아이디
- *                 example: GOSI0000002130
- *               customerEsntlId:
- *                 type: string
- *                 description: 예약자/입실자 고유 아이디
- *               contractorEsntlId:
- *                 type: string
- *                 description: 계약자 고유 아이디
- *               contractEsntlId:
- *                 type: string
- *                 description: 방계약 고유 아이디
- *               type:
- *                 type: string
- *                 enum: [RESERVATION, DEPOSIT]
- *                 description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *                 example: DEPOSIT
- *               amount:
- *                 type: integer
- *                 description: 금액 (예약금 또는 보증금)
- *                 example: 500000
- *               reservationDepositAmount:
- *                 type: integer
- *                 description: 예약금 금액 (하위 호환성, 사용 중단 예정)
- *               depositAmount:
- *                 type: integer
- *                 description: 보증금 금액 (하위 호환성, 사용 중단 예정)
- *               accountBank:
- *                 type: string
- *                 description: 은행명
- *               accountNumber:
- *                 type: string
- *                 description: 계좌번호
- *               accountHolder:
- *                 type: string
- *                 description: 예금주명
- *               expectedOccupantName:
- *                 type: string
- *                 description: 입실예정자명 (type이 RESERVATION일 때 사용)
- *                 example: 홍길동
- *               expectedOccupantPhone:
- *                 type: string
- *                 description: 입실예정자연락처 (type이 RESERVATION일 때 사용)
- *                 example: 010-1234-5678
- *               moveInDate:
- *                 type: string
- *                 format: date
- *                 description: 입실일
- *               moveOutDate:
- *                 type: string
- *                 format: date
- *                 description: 퇴실일
- *               contractStatus:
- *                 type: string
- *                 description: 계약상태
- *               virtualAccountNumber:
- *                 type: string
- *                 description: 가상계좌번호
- *               virtualAccountExpiryDate:
- *                 type: string
- *                 format: date-time
- *                 description: 가상계좌 만료일시
- *     responses:
- *       200:
- *         description: 보증금 등록 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
 router.post('/create', depositController.createDeposit);
 
-/**
- * @swagger
- * /v1/deposit/update:
- *   put:
- *     summary: 보증금 수정
- *     description: 보증금 정보를 수정합니다.
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - esntlId
- *             properties:
- *               esntlId:
- *                 type: string
- *                 description: 보증금 고유 아이디
- *               gosiwonEsntlId:
- *                 type: string
- *                 description: 고시원 고유 아이디
- *                 example: GOSI0000002130
- *               customerEsntlId:
- *                 type: string
- *                 description: 예약자/입실자 고유 아이디
- *               contractorEsntlId:
- *                 type: string
- *                 description: 계약자 고유 아이디
- *               contractEsntlId:
- *                 type: string
- *                 description: 방계약 고유 아이디
- *               type:
- *                 type: string
- *                 enum: [RESERVATION, DEPOSIT]
- *                 description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *                 example: DEPOSIT
- *               amount:
- *                 type: integer
- *                 description: 금액 (예약금 또는 보증금)
- *                 example: 500000
- *               reservationDepositAmount:
- *                 type: integer
- *                 description: 예약금 금액 (하위 호환성, 사용 중단 예정)
- *               depositAmount:
- *                 type: integer
- *                 description: 보증금 금액 (하위 호환성, 사용 중단 예정)
- *               accountBank:
- *                 type: string
- *                 description: 은행명
- *               accountNumber:
- *                 type: string
- *                 description: 계좌번호
- *               accountHolder:
- *                 type: string
- *                 description: 예금주명
- *               expectedOccupantName:
- *                 type: string
- *                 description: 입실예정자명 (type이 RESERVATION일 때 사용)
- *                 example: 홍길동
- *               expectedOccupantPhone:
- *                 type: string
- *                 description: 입실예정자연락처 (type이 RESERVATION일 때 사용)
- *                 example: 010-1234-5678
- *               moveInDate:
- *                 type: string
- *                 format: date
- *                 description: 입실일
- *               moveOutDate:
- *                 type: string
- *                 format: date
- *                 description: 퇴실일
- *               contractStatus:
- *                 type: string
- *                 description: 계약상태
- *               virtualAccountNumber:
- *                 type: string
- *                 description: 가상계좌번호
- *               virtualAccountExpiryDate:
- *                 type: string
- *                 format: date-time
- *                 description: 가상계좌 만료일시
- *     responses:
- *       200:
- *         description: 보증금 수정 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
 router.put('/update', depositController.updateDeposit);
 
-/**
- * @swagger
- * /v1/deposit/delete:
- *   delete:
- *     summary: 보증금 삭제
- *     description: 보증금 정보를 삭제합니다 (논리 삭제).
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: esntlId
- *         required: true
- *         schema:
- *           type: string
- *         description: 보증금 고유 아이디
- *     responses:
- *       200:
- *         description: 보증금 삭제 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
 router.delete('/delete', depositController.deleteDeposit);
 
 /**
@@ -743,19 +425,10 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  * /v1/deposit/gosiwonList:
  *   get:
  *     summary: 고시원 목록 조회 (입금대기 건수 포함)
- *     description: 'status가 OPERATE인 고시원 목록을 조회하고, 지정된 type(RESERVATION/DEPOSIT)의 입금대기(DEPOSIT_PENDING) 건수를 카운트하여 건수가 많은 순서대로 반환합니다.'
+ *     description: 'status가 OPERATE인 고시원 목록을 조회하고, 예약금(RESERVATION)과 보증금(DEPOSIT)의 입금대기(DEPOSIT_PENDING) 건수를 각각 카운트하여 반환합니다. 하나라도 카운트가 있으면 상단으로 정렬됩니다.'
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: type
- *         required: true
- *         schema:
- *           type: string
- *           enum: [RESERVATION, DEPOSIT]
- *         description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *         example: RESERVATION
  *     responses:
  *       200:
  *         description: 고시원 목록 조회 성공
@@ -783,15 +456,147 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *                         type: string
  *                         description: 고시원 이름
  *                         example: 성수 고시원
- *                       type:
- *                         type: string
- *                         enum: [RESERVATION, DEPOSIT]
- *                         description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *                         example: RESERVATION
- *                       pendingCount:
+ *                       reservePendingCount:
  *                         type: integer
- *                         description: 입금대기 건수 (카운트가 많은 순서대로 정렬됨)
+ *                         description: 예약금 입금대기 건수
  *                         example: 5
+ *                       depositPendingCount:
+ *                         type: integer
+ *                         description: 보증금 입금대기 건수
+ *                         example: 3
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/gosiwonList', depositController.getGosiwonList);
+
+/**
+ * @swagger
+ * /v1/deposit/reservationList:
+ *   get:
+ *     summary: 예약금 예약 목록 조회
+ *     description: 예약금 예약 목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다. roomStatus.status가 ON_SALE이고 subStatus가 END가 아닌 경우의 statusStartDate 기준 내림차순으로 정렬됩니다.
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: searchType
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - gosiwonName
+ *             - gosiwonCode
+ *             - etc
+ *         description: "검색 대상 종류 (gosiwonName: 고시원명, gosiwonCode: 고시원코드, etc: roomName, roomEsntlId, reservationName, contractName을 like 검색)"
+ *       - in: query
+ *         name: searchString
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "검색어"
+ *       - in: query
+ *         name: canCheckin
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: "입실가능한 방만 보기 (roomStatus.status가 CAN_CHECKIN이고 subStatus가 END가 아닌 경우)"
+ *       - in: query
+ *         name: reservationStatus
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: "예약금요청상태만보기 (deposit.type이 RESERVATION이고 deposit.status가 DEPOSIT_PENDING인 경우만)"
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: 페이지당 항목 수
+ *     responses:
+ *       200:
+ *         description: 예약금 예약 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 예약금 예약 목록 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: 전체 항목 수
+ *                       example: 100
+ *                     page:
+ *                       type: integer
+ *                       description: 현재 페이지 번호
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       description: 페이지당 항목 수
+ *                       example: 50
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
+ *                             example: ROOM0000000001
+ *                           roomNumber:
+ *                             type: string
+ *                             description: 방 이름(방번호)
+ *                             example: 101호
+ *                           roomStatus:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 방 상태 (없으면 null)
+ *                             example: ON_SALE
+ *                           reservationName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 입실자 정보(예약자 이름)
+ *                             example: 홍길동
+ *                           contractorName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 계약자 정보(계약자 이름)
+ *                             example: 홍길동
+ *                           moveInDate:
+ *                             type: string
+ *                             format: date
+ *                             nullable: true
+ *                             description: 입실일
+ *                             example: '2024-01-01'
+ *                           moveOutDate:
+ *                             type: string
+ *                             format: date
+ *                             nullable: true
+ *                             description: 퇴실일
+ *                             example: '2024-12-31'
+ *                           depositStatus:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 예약금상태 (해당방의 마지막 상태값, 없으면 null)
+ *                             example: DEPOSIT_PENDING
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -799,7 +604,7 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.get('/gosiwonList', depositController.getGosiwonList);
+router.get('/reservationList', depositController.getReservationList);
 
 module.exports = router;
 
