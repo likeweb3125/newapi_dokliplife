@@ -595,7 +595,7 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *                           depositStatus:
  *                             type: string
  *                             nullable: true
- *                             description: 예약금상태 (해당방의 마지막 상태값, 없으면 null)
+ *                             description: 예약금상태 (deposit.type이 RESERVATION인 경우의 deposit.status, 해당방의 마지막 상태값, 없으면 null)
  *                             example: DEPOSIT_PENDING
  *       400:
  *         $ref: '#/components/responses/BadRequest'

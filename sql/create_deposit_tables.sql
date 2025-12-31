@@ -11,19 +11,16 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   `customerEsntlId` VARCHAR(50) NULL COMMENT '예약자/입실자 고유아이디',
   `contractorEsntlId` VARCHAR(50) NULL COMMENT '계약자 고유아이디',
   `contractEsntlId` VARCHAR(50) NULL COMMENT '방계약 고유아이디',
-  `type` VARCHAR(50) NOT NULL COMMENT '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)',
   `amount` INT(11) NOT NULL DEFAULT 0 COMMENT '금액 (예약금 또는 보증금)',
-  `reservationDepositAmount` INT(11) NULL DEFAULT 0 COMMENT '예약금 금액 (하위 호환성, 사용 중단 예정)',
   `depositAmount` INT(11) NULL DEFAULT 0 COMMENT '보증금 금액 (하위 호환성, 사용 중단 예정)',
+  `paidAmount` INT(11) NULL DEFAULT 0 COMMENT '입금액',
+  `unpaidAmount` INT(11) NULL DEFAULT 0 COMMENT '미납금액',
   `accountBank` VARCHAR(50) NULL COMMENT '은행명',
   `accountNumber` VARCHAR(50) NULL COMMENT '계좌번호',
   `accountHolder` VARCHAR(100) NULL COMMENT '예금주명',
-  `expectedOccupantName` VARCHAR(100) NULL COMMENT '입실예정자명 (type이 RESERVATION일 때 사용)',
-  `expectedOccupantPhone` VARCHAR(50) NULL COMMENT '입실예정자연락처 (type이 RESERVATION일 때 사용)',
-  `moveInDate` DATE NULL COMMENT '입실일',
-  `moveOutDate` DATE NULL COMMENT '퇴실일',
-  `contractStatus` VARCHAR(50) NULL COMMENT '계약상태 (이용중, 결제대기중, 체납상대, 퇴실확정 등)',
   `status` VARCHAR(50) NOT NULL DEFAULT 'DEPOSIT_PENDING' COMMENT '입금상태 (DEPOSIT_PENDING: 입금대기, PARTIAL_DEPOSIT: 부분입금, DEPOSIT_COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DELETED: 삭제됨)',
+  `depositDate` DATETIME NULL COMMENT '입금일자',
+  `depositorName` VARCHAR(100) NULL COMMENT '입금자명',
   `virtualAccountNumber` VARCHAR(100) NULL COMMENT '가상계좌번호',
   `virtualAccountExpiryDate` DATETIME NULL COMMENT '가상계좌 만료일시',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
@@ -37,17 +34,13 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   INDEX `idx_customerEsntlId` (`customerEsntlId`),
   INDEX `idx_contractorEsntlId` (`contractorEsntlId`),
   INDEX `idx_contractEsntlId` (`contractEsntlId`),
-  INDEX `idx_type` (`type`),
   INDEX `idx_amount` (`amount`),
-  INDEX `idx_type_amount` (`type`, `amount`),
-  INDEX `idx_expectedOccupantPhone` (`expectedOccupantPhone`),
   INDEX `idx_status` (`status`),
-  INDEX `idx_contractStatus` (`contractStatus`),
+  INDEX `idx_depositDate` (`depositDate`),
+  INDEX `idx_depositorName` (`depositorName`),
   INDEX `idx_deleteYN` (`deleteYN`),
   INDEX `idx_deletedBy` (`deletedBy`),
   INDEX `idx_deletedAt` (`deletedAt`),
-  INDEX `idx_moveInDate` (`moveInDate`),
-  INDEX `idx_moveOutDate` (`moveOutDate`),
   CONSTRAINT `fk_deposit_room` FOREIGN KEY (`roomEsntlId`) 
     REFERENCES `room` (`esntlId`) 
     ON DELETE CASCADE 
@@ -140,7 +133,6 @@ CREATE TABLE IF NOT EXISTS `depositDeduction` (
 CREATE INDEX `idx_deposit_gosiwon_status` ON `deposit` (`gosiwonEsntlId`, `status`, `deleteYN`);
 CREATE INDEX `idx_deposit_room_status` ON `deposit` (`roomEsntlId`, `status`, `deleteYN`);
 CREATE INDEX `idx_deposit_customer_status` ON `deposit` (`customerEsntlId`, `status`, `deleteYN`);
-CREATE INDEX `idx_deposit_type_status` ON `deposit` (`type`, `status`, `deleteYN`);
 
 -- depositHistory 테이블 복합 인덱스
 CREATE INDEX `idx_depositHistory_deposit_type` ON `depositHistory` (`depositEsntlId`, `type`, `createdAt`);
