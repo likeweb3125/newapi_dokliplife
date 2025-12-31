@@ -576,13 +576,13 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *                             nullable: true
  *                             description: 계약자 정보(계약자 이름)
  *                             example: 홍길동
- *                           moveInDate:
+ *                           checkInDate:
  *                             type: string
  *                             format: date
  *                             nullable: true
  *                             description: 입실일
  *                             example: '2024-01-01'
- *                           moveOutDate:
+ *                           checkOutDate:
  *                             type: string
  *                             format: date
  *                             nullable: true
