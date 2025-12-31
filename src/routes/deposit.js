@@ -425,7 +425,7 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  * /v1/deposit/gosiwonList:
  *   get:
  *     summary: 고시원 목록 조회 (입금대기 건수 포함)
- *     description: 'status가 OPERATE인 고시원 목록을 조회하고, 예약금(RESERVATION)과 보증금(DEPOSIT)의 입금대기(DEPOSIT_PENDING) 건수를 각각 카운트하여 반환합니다. 하나라도 카운트가 있으면 상단으로 정렬됩니다.'
+ *     description: 'status가 OPERATE인 고시원 목록을 조회하고, 입금대기(PENDING) 건수를 카운트하여 반환합니다. 카운트가 있으면 상단으로 정렬됩니다.'
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -456,14 +456,10 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *                         type: string
  *                         description: 고시원 이름
  *                         example: 성수 고시원
- *                       reservePendingCount:
+ *                       pendingCount:
  *                         type: integer
- *                         description: 예약금 입금대기 건수
- *                         example: 5
- *                       depositPendingCount:
- *                         type: integer
- *                         description: 보증금 입금대기 건수
- *                         example: 3
+ *                         description: 입금대기 건수
+ *                         example: 8
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       500:

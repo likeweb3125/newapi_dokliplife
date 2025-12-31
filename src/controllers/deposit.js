@@ -1145,27 +1145,36 @@ exports.getGosiwonList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		// status가 'OPERATE'인 고시원 목록과 RESERVATION, DEPOSIT 타입의 DEPOSIT_PENDING 개수를 함께 조회
+		// status가 'OPERATE'인 고시원 목록과 COMPLETED 상태가 없는 계약서 개수를 함께 조회
 		// 하나라도 카운트가 있으면 상단으로 정렬
 		const gosiwonList = await mariaDBSequelize.query(
 			`
 			SELECT 
 				esntlId,
 				name,
-				reservePendingCount,
-				depositPendingCount
+				pendingCount
 			FROM (
 				SELECT 
 					g.esntlId,
 					g.name,
-					COALESCE(SUM(CASE WHEN d.type = 'RESERVATION' AND d.status = 'DEPOSIT_PENDING' AND (d.deleteYN IS NULL OR d.deleteYN = 'N') THEN 1 ELSE 0 END), 0) as reservePendingCount,
-					COALESCE(SUM(CASE WHEN d.type = 'DEPOSIT' AND d.status = 'DEPOSIT_PENDING' AND (d.deleteYN IS NULL OR d.deleteYN = 'N') THEN 1 ELSE 0 END), 0) as depositPendingCount
+					COUNT(DISTINCT CASE 
+						WHEN d.contractEsntlId IS NOT NULL 
+						AND NOT EXISTS (
+							SELECT 1 
+							FROM deposit d2 
+							WHERE d2.contractEsntlId = d.contractEsntlId 
+							AND d2.status = 'COMPLETED' 
+							AND (d2.deleteYN IS NULL OR d2.deleteYN = 'N')
+						)
+						AND (d.deleteYN IS NULL OR d.deleteYN = 'N')
+						THEN d.contractEsntlId 
+					END) as pendingCount
 				FROM gosiwon g
 				LEFT JOIN deposit d ON g.esntlId = d.gosiwonEsntlId
 				WHERE g.status = 'OPERATE'
 				GROUP BY g.esntlId, g.name
 			) as gosiwonCounts
-			ORDER BY (reservePendingCount + depositPendingCount) DESC, name ASC
+			ORDER BY pendingCount DESC, name ASC
 		`,
 			{
 				type: mariaDBSequelize.QueryTypes.SELECT,
@@ -1174,13 +1183,10 @@ exports.getGosiwonList = async (req, res, next) => {
 
 		// 결과 구성
 		const result = gosiwonList.map((row) => {
-			const reserveCount = parseInt(row.reservePendingCount) || 0;
-			const depositCount = parseInt(row.depositPendingCount) || 0;
 			return {
 				esntlId: row.esntlId,
 				name: row.name,
-				reservePendingCount: reserveCount,
-				depositPendingCount: depositCount,
+				pendingCount: parseInt(row.pendingCount) || 0,
 			};
 		});
 
