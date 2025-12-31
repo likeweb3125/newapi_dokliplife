@@ -671,7 +671,8 @@ exports.registerDeposit = async (req, res, next) => {
 			SELECT 
 				RC.esntlId as contractEsntlId,
 				RC.gosiwonEsntlId,
-				RC.roomEsntlId
+				RC.roomEsntlId,
+				RC.customerEsntlId
 			FROM roomContract RC
 			WHERE RC.esntlId = ?
 			LIMIT 1
@@ -687,7 +688,27 @@ exports.registerDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(404, '계약서 정보를 찾을 수 없습니다.');
 		}
 
-		const { gosiwonEsntlId, roomEsntlId } = contractInfo[0];
+		const { gosiwonEsntlId, roomEsntlId, customerEsntlId } = contractInfo[0];
+		
+		// roomStatus에서 contractorEsntlId 가져오기
+		let contractorEsntlId = null;
+		const roomStatusInfo = await mariaDBSequelize.query(
+			`
+			SELECT contractorEsntlId
+			FROM roomStatus
+			WHERE contractEsntlId = ?
+			ORDER BY updatedAt DESC
+			LIMIT 1
+			`,
+			{
+				replacements: [contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (roomStatusInfo && roomStatusInfo.length > 0) {
+			contractorEsntlId = roomStatusInfo[0].contractorEsntlId || null;
+		}
 
 		// 3. deposit 테이블에 같은 계약서 id로 기존에 등록된 보증금 정보를 조회한다.
 		const existingDeposit = await deposit.findOne({
@@ -699,11 +720,22 @@ exports.registerDeposit = async (req, res, next) => {
 			transaction,
 		});
 
-		if (!existingDeposit) {
-			errorHandler.errorThrow(404, '해당 계약서에 등록된 보증금 정보를 찾을 수 없습니다.');
-		}
+		let depositAmount = 0;
+		let isNewDeposit = false;
 
-		const depositAmount = existingDeposit.depositAmount || existingDeposit.amount || 0;
+		if (!existingDeposit) {
+			// 기존 보증금 정보가 없으면 PENDING 상태로 새로운 deposit 레코드 생성
+			isNewDeposit = true;
+			// room 테이블에서 보증금 정보 가져오기
+			const roomInfo = await room.findOne({
+				where: { esntlId: roomEsntlId },
+				attributes: ['deposit'],
+				transaction,
+			});
+			depositAmount = roomInfo?.deposit || 0;
+		} else {
+			depositAmount = existingDeposit.depositAmount || existingDeposit.amount || 0;
+		}
 		const paidAmountInt = parseInt(paidAmount);
 
 		// 같은 계약서 ID의 모든 deposit 레코드에서 paidAmount 합계 계산
@@ -722,8 +754,8 @@ exports.registerDeposit = async (req, res, next) => {
 
 		const currentTotalPaid = totalPaidAmount + paidAmountInt;
 
-		// paidAmount의 합계가 depositAmount보다 클 수 없음
-		if (currentTotalPaid > depositAmount) {
+		// paidAmount의 합계가 depositAmount보다 클 수 없음 (depositAmount가 0보다 큰 경우만 검증)
+		if (depositAmount > 0 && currentTotalPaid > depositAmount) {
 			errorHandler.errorThrow(
 				400,
 				`입금액 합계(${currentTotalPaid}원)가 보증금액(${depositAmount}원)을 초과할 수 없습니다.`
@@ -734,35 +766,41 @@ exports.registerDeposit = async (req, res, next) => {
 		const unpaidAmount = depositAmount > currentTotalPaid ? depositAmount - currentTotalPaid : 0;
 
 		// 4, 6. 상태 결정
+		// 기존 보증금 정보가 없으면 PENDING 상태로 생성
 		// 기존 depositAmount에 비해 납입금액이 작으면 PARTIAL
 		// 기존 depositAmount에 비해 납입금액이 같거나, paidAmount 들의 합과 depositAmount의 차액이 없으면 COMPLETED
-		let newStatus = 'PARTIAL';
-		if (currentTotalPaid >= depositAmount || unpaidAmount === 0) {
-			newStatus = 'COMPLETED';
+		let newStatus = 'PENDING';
+		if (!isNewDeposit) {
+			newStatus = 'PARTIAL';
+			if (currentTotalPaid >= depositAmount || unpaidAmount === 0) {
+				newStatus = 'COMPLETED';
+			}
 		}
 
 		// 새로운 deposit 레코드 생성 (기존 값을 수정하는게 아니라 추가)
+		const managerId = getWriterAdminId(decodedToken);
 		const newDepositId = await generateDepositId(transaction);
 		const newDeposit = await deposit.create(
 			{
 				esntlId: newDepositId,
 				roomEsntlId: roomEsntlId,
 				gosiwonEsntlId: gosiwonEsntlId,
-				customerEsntlId: existingDeposit.customerEsntlId || null,
-				contractorEsntlId: existingDeposit.contractorEsntlId || null,
+				customerEsntlId: isNewDeposit ? (customerEsntlId || null) : (existingDeposit.customerEsntlId || null),
+				contractorEsntlId: isNewDeposit ? (contractorEsntlId || null) : (existingDeposit.contractorEsntlId || null),
 				contractEsntlId: contractEsntlId,
 				amount: depositAmount,
 				depositAmount: depositAmount,
 				paidAmount: paidAmountInt,
 				unpaidAmount: unpaidAmount,
-				accountBank: existingDeposit.accountBank || null,
-				accountNumber: existingDeposit.accountNumber || null,
-				accountHolder: existingDeposit.accountHolder || null,
+				accountBank: isNewDeposit ? null : (existingDeposit.accountBank || null),
+				accountNumber: isNewDeposit ? null : (existingDeposit.accountNumber || null),
+				accountHolder: isNewDeposit ? null : (existingDeposit.accountHolder || null),
 				status: newStatus,
+				manager: managerId,
 				depositDate: depositDate,
 				depositorName: depositorName || null,
-				virtualAccountNumber: existingDeposit.virtualAccountNumber || null,
-				virtualAccountExpiryDate: existingDeposit.virtualAccountExpiryDate || null,
+				virtualAccountNumber: isNewDeposit ? null : (existingDeposit.virtualAccountNumber || null),
+				virtualAccountExpiryDate: isNewDeposit ? null : (existingDeposit.virtualAccountExpiryDate || null),
 				deleteYN: 'N',
 			},
 			{ transaction }

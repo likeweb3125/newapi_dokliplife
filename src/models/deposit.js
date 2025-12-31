@@ -92,6 +92,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'status',
 				comment: '입금상태 (PENDING: 입금대기, PARTIAL: 부분입금, COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DELETED: 삭제됨)',
 			},
+			manager: {
+				type: DataTypes.STRING(100),
+				allowNull: true,
+				field: 'manager',
+				comment: '담당자',
+			},
 			depositDate: {
 				type: DataTypes.DATE,
 				allowNull: true,
