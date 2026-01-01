@@ -54,4 +54,28 @@ module.exports = {
 			seconds: parts.find(p => p.type === 'second').value,
 		};
 	},
+
+	// 한국 시간으로 변환한 Date 객체 반환 (DB 저장용)
+	getKoreaDate: () => {
+		const now = new Date();
+		// UTC 시간에 9시간을 더해서 한국 시간으로 변환
+		const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000) - (now.getTimezoneOffset() * 60 * 1000));
+		return koreaTime;
+	},
+
+	// 한국 시간을 MySQL/MariaDB DATETIME 형식 문자열로 반환 (YYYY-MM-DD HH:mm:ss)
+	getKoreaDateTimeString: () => {
+		const now = new Date();
+		// 한국 시간대로 변환
+		const koreaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+		
+		const year = koreaTime.getFullYear();
+		const month = String(koreaTime.getMonth() + 1).padStart(2, '0');
+		const day = String(koreaTime.getDate()).padStart(2, '0');
+		const hours = String(koreaTime.getHours()).padStart(2, '0');
+		const minutes = String(koreaTime.getMinutes()).padStart(2, '0');
+		const seconds = String(koreaTime.getSeconds()).padStart(2, '0');
+		
+		return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+	},
 };

@@ -827,7 +827,7 @@ exports.reserveCancel = async (req, res, next) => {
 		const updateReservationQuery = `
 			UPDATE il_room_reservation 
 			SET ror_status_cd = 'CANCEL',
-				ror_update_dtm = NOW(),
+				ror_update_dtm = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
 				ror_updater_sn = ?
 			WHERE rom_sn = ?
 				AND ror_status_cd = 'WAIT'
@@ -1119,9 +1119,9 @@ exports.roomReserve = async (req, res, next) => {
 				?,
 				?,
 				'WAIT',
-				NOW(),
+				DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
 				?,
-				NOW(),
+				DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
 				?,
 				?,
 				?,
@@ -1436,7 +1436,7 @@ exports.startRoomSell = async (req, res, next) => {
 								statusEndDate = ?,
 								etcStartDate = ?,
 								etcEndDate = ?,
-								updatedAt = NOW()
+								updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
 							WHERE roomEsntlId = ?`,
 							{
 								replacements: [
@@ -1475,7 +1475,7 @@ exports.startRoomSell = async (req, res, next) => {
 							etcEndDate,
 							createdAt,
 							updatedAt
-						) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())`,
+						) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
 						{
 							replacements: [
 								newStatusId,
