@@ -656,6 +656,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				pl.pDate,
 				pl.pTime,
 				pl.paymentType,
+				pl.isExtra,
 				pl.contractEsntlId AS contractEsntlId,
 				pl.gosiwonEsntlId,
 				(SELECT name FROM gosiwon WHERE esntlId = pl.gosiwonEsntlId) AS gosiwonName,
@@ -725,7 +726,15 @@ exports.getRealTimeList = async (req, res, next) => {
 
 		const totalCount = countResult[0]?.total || 0;
 
-		// deposit 필드 계산
+		// 오늘 날짜 (YYYYMMDD 형식)
+		const now = new Date();
+		const seoulTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+		const todayYear = seoulTime.getUTCFullYear();
+		const todayMonth = String(seoulTime.getUTCMonth() + 1).padStart(2, '0');
+		const todayDay = String(seoulTime.getUTCDate()).padStart(2, '0');
+		const todayDateStr = `${todayYear}${todayMonth}${todayDay}`;
+
+		// deposit 필드 계산 및 고유값 생성
 		const data = rows.map((ele) => {
 			let deposit = 0;
 			if (ele.roomDeposit === null && ele.gosiwonDeposit === null) {
@@ -736,8 +745,74 @@ exports.getRealTimeList = async (req, res, next) => {
 				deposit = ele.roomDeposit;
 			}
 
+			// esntlId에서 숫자 부분 추출 (예: PYLG0000048259 → 48259)
+			const esntlIdNumeric = ele.esntlId ? ele.esntlId.replace(/\D/g, '') : '';
+			const uniqueId = esntlIdNumeric ? `${todayDateStr}${esntlIdNumeric}` : null;
+
+			// pTime 바로 뒤에 paymentType, isExtra, uniqueId를 배치
+			const {
+				esntlId,
+				pDate,
+				pTime,
+				paymentType,
+				isExtra,
+				contractEsntlId,
+				gosiwonEsntlId,
+				gosiwonName,
+				roomEsntlId,
+				roomName,
+				customerEsntlId,
+				customerName,
+				age,
+				gender,
+				roomDeposit,
+				gosiwonDeposit,
+				paymentAmount,
+				paymentPoint,
+				paymentCoupon,
+				collectPoint,
+				code,
+				reason,
+				calAmount,
+				imp_uid,
+				cAmount,
+				cPercent,
+				calculateStatus,
+				tid,
+				contractType,
+			} = ele;
+
 			return {
-				...ele,
+				esntlId,
+				pDate,
+				pTime,
+				paymentType: paymentType || null,
+				isExtra: isExtra !== null && isExtra !== undefined ? isExtra : null,
+				uniqueId: uniqueId,
+				contractEsntlId,
+				gosiwonEsntlId,
+				gosiwonName,
+				roomEsntlId,
+				roomName,
+				customerEsntlId,
+				customerName,
+				age,
+				gender,
+				roomDeposit,
+				gosiwonDeposit,
+				paymentAmount,
+				paymentPoint,
+				paymentCoupon,
+				collectPoint,
+				code,
+				reason,
+				calAmount,
+				imp_uid,
+				cAmount,
+				cPercent,
+				calculateStatus,
+				tid,
+				contractType,
 				deposit: deposit,
 			};
 		});

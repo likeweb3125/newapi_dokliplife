@@ -188,7 +188,16 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                             example: '14:30:00'
  *                           paymentType:
  *                             type: string
+ *                             description: '결제 타입 (Payment: 결제, Refund: 환불)'
  *                             example: Payment
+ *                           isExtra:
+ *                             type: integer
+ *                             description: '추가 결제 여부 (0: 일반 연장 결제, 1: 옵션에서 발생한 추가 결제)'
+ *                             example: 0
+ *                           uniqueId:
+ *                             type: string
+ *                             description: '고유값 (오늘 날짜 YYYYMMDD + esntlId의 숫자 부분)'
+ *                             example: '2025010548259'
  *                           contractEsntlId:
  *                             type: string
  *                             example: RCTT0000000001

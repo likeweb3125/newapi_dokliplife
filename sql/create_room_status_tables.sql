@@ -41,11 +41,13 @@ CREATE TABLE IF NOT EXISTS `roomStatus` (
   CONSTRAINT `fk_roomStatus_customer` FOREIGN KEY (`customerEsntlId`) 
     REFERENCES `customer` (`esntlId`) 
     ON DELETE SET NULL 
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_roomStatus_roomContract` FOREIGN KEY (`contractEsntlId`) 
-    REFERENCES `roomContract` (`esntlId`) 
-    ON DELETE SET NULL 
     ON UPDATE CASCADE
+  -- 주의: fk_roomStatus_roomContract 외래키 제약조건은 제거되었습니다.
+  -- roomStatus.contractEsntlId에 roomContract에 존재하지 않는 값도 허용합니다.
+  -- CONSTRAINT `fk_roomStatus_roomContract` FOREIGN KEY (`contractEsntlId`) 
+  --   REFERENCES `roomContract` (`esntlId`) 
+  --   ON DELETE SET NULL 
+  --   ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci COMMENT='방 현재 상태 관리 테이블';
 
 

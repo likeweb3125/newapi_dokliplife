@@ -955,6 +955,26 @@ exports.getDepositHistory = async (req, res, next) => {
 			offset: offset,
 		});
 
+		// roomStatus에서 status가 IN_USE인 contractEsntlId 조회
+		const roomEsntlIds = rows.map((row) => row.roomEsntlId).filter((id) => id);
+		let roomStatusMap = {};
+		if (roomEsntlIds.length > 0) {
+			const roomStatusQuery = `
+				SELECT roomEsntlId, contractEsntlId
+				FROM roomStatus
+				WHERE roomEsntlId IN (:roomEsntlIds)
+					AND status = 'IN_USE'
+			`;
+			const roomStatusRows = await mariaDBSequelize.query(roomStatusQuery, {
+				replacements: { roomEsntlIds: roomEsntlIds },
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			});
+			roomStatusMap = roomStatusRows.reduce((acc, row) => {
+				acc[row.roomEsntlId] = row.contractEsntlId;
+				return acc;
+			}, {});
+		}
+
 		// 시간 형식을 서울 시간(+9) 기준으로 변환하는 헬퍼 함수
 		const formatToSeoulTime = (dateValue) => {
 			if (!dateValue) return null;
@@ -969,7 +989,7 @@ exports.getDepositHistory = async (req, res, next) => {
 			return `${year}-${month}-${day} ${hours}:${minutes}`;
 		};
 
-		// 시간 형식을 서울 시간(+9) 기준으로 변환
+		// 시간 형식을 서울 시간(+9) 기준으로 변환 및 contractEsntlId 교체
 		const formattedRows = rows.map((row) => {
 			const rowData = row.toJSON();
 			if (rowData.createdAt) {
@@ -983,6 +1003,12 @@ exports.getDepositHistory = async (req, res, next) => {
 			}
 			if (rowData.refundDate) {
 				rowData.refundDate = formatToSeoulTime(rowData.refundDate);
+			}
+			// roomStatus에서 status가 IN_USE인 contractEsntlId로 교체 (없으면 null)
+			if (rowData.roomEsntlId && roomStatusMap[rowData.roomEsntlId]) {
+				rowData.contractEsntlId = roomStatusMap[rowData.roomEsntlId];
+			} else {
+				rowData.contractEsntlId = null;
 			}
 			return rowData;
 		});
@@ -1313,13 +1339,13 @@ exports.getReservationList = async (req, res, next) => {
 			}
 		}
 
-		// searchString 검색 처리 (roomName, roomEsntlId, reservationName, contractName을 like 검색)
+		// searchString 검색 처리 (roomName, roomEsntlId, checkinName, customerName을 like 검색)
 		if (searchValue) {
 			whereConditions.push(`(
 				R.roomNumber LIKE ? OR
 				R.esntlId LIKE ? OR
-				RS.reservationName LIKE ? OR
-				RS.contractorName LIKE ?
+				RC.checkinName LIKE ? OR
+				RC.customerName LIKE ?
 			)`);
 			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
@@ -1353,10 +1379,10 @@ exports.getReservationList = async (req, res, next) => {
 				R.gosiwonEsntlId,
 				G.name as gosiwonName,
 				RS.status as roomStatus,
-				RS.reservationName,
-				CR.phone as reservationPhone,
-				RS.contractorName,
-				C.phone as contractorPhone,
+				RC.checkinName as reservationName,
+				RC.checkinPhone as reservationPhone,
+				RC.customerName as contractorName,
+				RC.customerPhone as contractorPhone,
 				DATE(RC.startDate) as checkInDate,
 				DATE(RC.endDate) as checkOutDate,
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
@@ -1379,9 +1405,18 @@ exports.getReservationList = async (req, res, next) => {
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
 			) RS ON R.esntlId = RS.roomEsntlId
-			LEFT JOIN roomContract RC ON RS.contractEsntlId = RC.esntlId
-			LEFT JOIN customer CR ON RS.reservationEsntlId = CR.esntlId
-			LEFT JOIN customer C ON RS.contractorEsntlId = C.esntlId
+			LEFT JOIN (
+				SELECT RC1.*
+				FROM roomContract RC1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(contractDate) as maxContractDate
+					FROM roomContract
+					WHERE status = 'CONTRACT'
+					GROUP BY roomEsntlId
+				) RC2 ON RC1.roomEsntlId = RC2.roomEsntlId 
+					AND RC1.contractDate = RC2.maxContractDate
+					AND RC1.status = 'CONTRACT'
+			) RC ON R.esntlId = RC.roomEsntlId
 			LEFT JOIN deposit D ON R.esntlId = D.roomEsntlId
 				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
 			${whereClause}
@@ -1407,6 +1442,18 @@ exports.getReservationList = async (req, res, next) => {
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
 			) RS ON R.esntlId = RS.roomEsntlId
+			LEFT JOIN (
+				SELECT RC1.*
+				FROM roomContract RC1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(contractDate) as maxContractDate
+					FROM roomContract
+					WHERE status = 'CONTRACT'
+					GROUP BY roomEsntlId
+				) RC2 ON RC1.roomEsntlId = RC2.roomEsntlId 
+					AND RC1.contractDate = RC2.maxContractDate
+					AND RC1.status = 'CONTRACT'
+			) RC ON R.esntlId = RC.roomEsntlId
 			LEFT JOIN deposit D ON R.esntlId = D.roomEsntlId
 				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
 			${countWhereClause}
