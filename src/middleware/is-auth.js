@@ -2,6 +2,7 @@ const { accessVerify } = require('../middleware/jwt');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const boardAuth = require('../middleware/boardAuth');
+const jwt = require('jsonwebtoken');
 
 // 회원 인증 함수
 const authenticate = (req, level = null) => {
@@ -21,22 +22,46 @@ const authenticate = (req, level = null) => {
 	let decodedToken = null;
 
 	decodedToken = accessVerify(token);
-	if (decodedToken.decoded !== null) {
-		req.user = decodedToken.decoded.user;
-		req.level = decodedToken.decoded.level;
-	}
-
+	
+	// accessVerify가 실패한 경우 (관리자 토큰일 수 있음), jwt.decode 시도
 	if (!decodedToken.decoded) {
-		errorHandler.errorThrow(
-			enumConfig.statusErrorCode._401_ERROR[0],
-			'Access token authentication failed.'
-		);
-
-		if (decodedToken.err.name === 'TokenExpiredError') {
+		try {
+			const decoded = jwt.decode(token);
+			if (decoded && decoded.admin) {
+				// 관리자 토큰인 경우
+				req.user = decoded.admin;
+				req.level = enumConfig.userLevel.USER_LV9;
+				decodedToken = { decoded: decoded };
+			} else {
+				// 일반 토큰도 아니고 관리자 토큰도 아닌 경우
+				if (decodedToken.err && decodedToken.err.name === 'TokenExpiredError') {
+					errorHandler.errorThrow(
+						enumConfig.statusErrorCode._401_ERROR[0],
+						'Access token authentication expiration.'
+					);
+				} else {
+					errorHandler.errorThrow(
+						enumConfig.statusErrorCode._401_ERROR[0],
+						'Access token authentication failed.'
+					);
+				}
+			}
+		} catch (err) {
 			errorHandler.errorThrow(
 				enumConfig.statusErrorCode._401_ERROR[0],
-				'Access token authentication expiration.'
+				'Access token authentication failed.'
 			);
+		}
+	} else {
+		// accessVerify가 성공한 경우
+		if (decodedToken.decoded.admin) {
+			// 관리자 토큰인 경우
+			req.user = decodedToken.decoded.admin;
+			req.level = enumConfig.userLevel.USER_LV9;
+		} else {
+			// 일반 회원 토큰인 경우
+			req.user = decodedToken.decoded.user;
+			req.level = decodedToken.decoded.level;
 		}
 	}
 

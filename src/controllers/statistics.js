@@ -530,3 +530,107 @@ exports.getStatAgent = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 실시간 매출 현황 조회
+exports.getRealTimeStats = async (req, res, next) => {
+	try {
+		const { year, month, day } = req.body;
+
+		if (!year || !month || !day) {
+			errorHandler.errorThrow(400, 'year, month, day는 필수입니다.');
+		}
+
+		// 월, 일을 2자리로 포맷팅
+		const monthFormatted = String(month).padStart(2, '0');
+		const dayFormatted = String(day).padStart(2, '0');
+
+		// 오늘 날짜 (서울 시간 기준)
+		const now = new Date();
+		const seoulTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+		const todayYear = seoulTime.getUTCFullYear();
+		const todayMonth = String(seoulTime.getUTCMonth() + 1).padStart(2, '0');
+		const todayDay = String(seoulTime.getUTCDate()).padStart(2, '0');
+		const todayDateStr = `${todayYear}-${todayMonth}-${todayDay}`;
+
+		const targetDateStr = `${year}-${monthFormatted}-${dayFormatted}`;
+		const yearInt = parseInt(year);
+		const monthInt = parseInt(monthFormatted);
+
+		// SQL 쿼리: paymentLog 테이블에서 결제/환불 통계 조회
+		// 기존 selectPaymentSummery 함수와 동일한 로직 사용
+		// paymentType 컬럼 사용 (REFUND면 'Refund', 아니면 'Payment')
+		const query = `
+			SELECT 
+				'TODAY' AS type,
+				IF(pl.paymentType = 'REFUND', 'Refund', 'Payment') AS paymentType,
+				COUNT(pl.paymentAmount) AS paymentTypeCnt,
+				CAST(SUM(CAST(pl.paymentAmount AS DECIMAL(20, 0))) AS UNSIGNED) AS paymentAmount,
+				CAST(SUM(CAST(COALESCE(NULLIF(pl.calAmount, ''), '0') AS DECIMAL(20, 0))) AS UNSIGNED) AS calAmount
+			FROM paymentLog pl
+			WHERE 1=1
+				AND pl.pDate = CURDATE()
+				AND pl.calculateStatus = 'SUCCESS'
+				AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+			GROUP BY IF(pl.paymentType = 'REFUND', 'Refund', 'Payment')
+			
+			UNION ALL
+			
+			SELECT 
+				'YEAR' AS type,
+				IF(pl.paymentType = 'REFUND', 'Refund', 'Payment') AS paymentType,
+				COUNT(pl.paymentAmount) AS paymentTypeCnt,
+				CAST(SUM(CAST(pl.paymentAmount AS DECIMAL(20, 0))) AS UNSIGNED) AS paymentAmount,
+				CAST(SUM(CAST(COALESCE(NULLIF(pl.calAmount, ''), '0') AS DECIMAL(20, 0))) AS UNSIGNED) AS calAmount
+			FROM paymentLog pl
+			WHERE 1=1
+				AND pl.pDate LIKE CONCAT(?, '%')
+				AND pl.calculateStatus = 'SUCCESS'
+				AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+			GROUP BY IF(pl.paymentType = 'REFUND', 'Refund', 'Payment')
+			
+			UNION ALL
+			
+			SELECT 
+				'MONTH' AS type,
+				IF(pl.paymentType = 'REFUND', 'Refund', 'Payment') AS paymentType,
+				COUNT(pl.paymentAmount) AS paymentTypeCnt,
+				CAST(SUM(CAST(pl.paymentAmount AS DECIMAL(20, 0))) AS UNSIGNED) AS paymentAmount,
+				CAST(SUM(CAST(COALESCE(NULLIF(pl.calAmount, ''), '0') AS DECIMAL(20, 0))) AS UNSIGNED) AS calAmount
+			FROM paymentLog pl
+			WHERE 1=1
+				AND pl.pDate LIKE CONCAT(?, '%')
+				AND pl.calculateStatus = 'SUCCESS'
+				AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+			GROUP BY IF(pl.paymentType = 'REFUND', 'Refund', 'Payment')
+			
+			UNION ALL
+			
+			SELECT 
+				'DAY' AS type,
+				IF(pl.paymentType = 'REFUND', 'Refund', 'Payment') AS paymentType,
+				COUNT(pl.paymentAmount) AS paymentTypeCnt,
+				CAST(SUM(CAST(pl.paymentAmount AS DECIMAL(20, 0))) AS UNSIGNED) AS paymentAmount,
+				CAST(SUM(CAST(COALESCE(NULLIF(pl.calAmount, ''), '0') AS DECIMAL(20, 0))) AS UNSIGNED) AS calAmount
+			FROM paymentLog pl
+			WHERE 1=1
+				AND pl.pDate = ?
+				AND pl.calculateStatus = 'SUCCESS'
+				AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+			GROUP BY IF(pl.paymentType = 'REFUND', 'Refund', 'Payment')
+			ORDER BY type, paymentType
+		`;
+
+		const rows = await mariaDBSequelize.query(query, {
+			replacements: [
+				`${year}`, // YEAR: LIKE '2025%'
+				`${year}-${monthFormatted}`, // MONTH: LIKE '2025-07%'
+				targetDateStr, // DAY: = '2025-07-01'
+			],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		errorHandler.successThrow(res, '실시간 매출 현황 조회 성공', rows);
+	} catch (err) {
+		next(err);
+	}
+};

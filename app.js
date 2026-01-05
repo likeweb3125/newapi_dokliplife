@@ -103,6 +103,7 @@ app.use('/v1/admin/banner', adminBannerRoutes);
 app.use('/v1/admin/popup', adminPopupRoutes);
 app.use('/v1/admin/config', adminConfigRoutes);
 app.use('/v1/admin/stat', adminStatisticsRoutes);
+app.use('/v1/stats', adminStatisticsRoutes);
 
 // 유지보수 Routes
 app.use('/v1/admin/maintenance', adminMaintenanceRoutes);
