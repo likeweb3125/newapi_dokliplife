@@ -634,3 +634,124 @@ exports.getRealTimeStats = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 실시간 매출 현황 상세 목록 조회
+exports.getRealTimeList = async (req, res, next) => {
+	try {
+		const { date, page = 1, limit = 10, start = 0, length = 10 } = req.body;
+
+		if (!date) {
+			errorHandler.errorThrow(400, 'date는 필수입니다.');
+		}
+
+		// DataTables 파라미터 처리
+		const pageNum = parseInt(page) || Math.floor(parseInt(start) / parseInt(length)) + 1 || 1;
+		const limitNum = parseInt(limit) || parseInt(length) || 10;
+		const offset = (pageNum - 1) * limitNum;
+
+		// 메인 쿼리
+		const mainQuery = `
+			SELECT 
+				pl.esntlId,
+				pl.pDate,
+				pl.pTime,
+				pl.paymentType,
+				pl.contractEsntlId AS contractEsntlId,
+				pl.gosiwonEsntlId,
+				(SELECT name FROM gosiwon WHERE esntlId = pl.gosiwonEsntlId) AS gosiwonName,
+				pl.roomEsntlId AS roomEsntlId,
+				(SELECT roomNumber FROM room WHERE esntlId = pl.roomEsntlId) AS roomName,
+				pl.customerEsntlId,
+				c.name AS customerName,
+				ROUND((TO_DAYS(NOW()) - (TO_DAYS(c.birth))) / 365) AS age,
+				c.gender,
+				r.deposit AS roomDeposit,
+				gu.deposit AS gosiwonDeposit,
+				pl.paymentAmount,
+				pl.paymentPoint,
+				pl.paymentCoupon,
+				pl.collectPoint,
+				pl.code,
+				pl.reason,
+				pl.calAmount,
+				pl.imp_uid,
+				pl.cAmount,
+				pl.cPercent,
+				pl.calculateStatus,
+				pl.tid,
+				CASE
+					WHEN pl.paymentType = 'REFUND' THEN rc.cancelStatus
+					WHEN (SELECT COUNT(*)
+						FROM roomContract rc2
+						WHERE pl.contractEsntlId = rc2.esntlId
+							AND rc2.checkInTime LIKE 'RCTT%') = 0 THEN '입실료'
+					ELSE '추가결제'
+				END AS contractType
+			FROM paymentLog pl
+			LEFT JOIN customer c ON pl.customerEsntlId = c.esntlId
+			JOIN room r ON pl.roomEsntlId = r.esntlId
+			JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
+			JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
+			WHERE 1=1
+				AND pl.calculateStatus = 'SUCCESS'
+				AND pl.pDate LIKE CONCAT(?, '%')
+			ORDER BY pl.esntlId DESC
+			LIMIT ? OFFSET ?
+		`;
+
+		// 전체 개수 조회 쿼리
+		const countQuery = `
+			SELECT COUNT(*) AS total
+			FROM paymentLog pl
+			LEFT JOIN customer c ON pl.customerEsntlId = c.esntlId
+			JOIN room r ON pl.roomEsntlId = r.esntlId
+			JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
+			JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
+			WHERE 1=1
+				AND pl.calculateStatus = 'SUCCESS'
+				AND pl.pDate LIKE CONCAT(?, '%')
+		`;
+
+		const [rows, countResult] = await Promise.all([
+			mariaDBSequelize.query(mainQuery, {
+				replacements: [date, limitNum, offset],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(countQuery, {
+				replacements: [date],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+		]);
+
+		const totalCount = countResult[0]?.total || 0;
+
+		// deposit 필드 계산
+		const data = rows.map((ele) => {
+			let deposit = 0;
+			if (ele.roomDeposit === null && ele.gosiwonDeposit === null) {
+				deposit = 0;
+			} else if (ele.roomDeposit === null && ele.gosiwonDeposit !== null) {
+				deposit = ele.gosiwonDeposit * 10000;
+			} else {
+				deposit = ele.roomDeposit;
+			}
+
+			return {
+				...ele,
+				deposit: deposit,
+			};
+		});
+
+		// DataTables 형식으로 응답
+		const result = {
+			data: data,
+			recordsTotal: totalCount,
+			recordsFiltered: totalCount,
+			draw: req.body.draw || 1,
+		};
+
+		errorHandler.successThrow(res, '실시간 매출 현황 상세 목록 조회 성공', result);
+	} catch (err) {
+		next(err);
+	}
+};

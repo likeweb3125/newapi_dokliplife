@@ -1351,6 +1351,7 @@ exports.getReservationList = async (req, res, next) => {
 				R.esntlId as roomEsntlId,
 				R.roomNumber,
 				R.gosiwonEsntlId,
+				G.name as gosiwonName,
 				RS.status as roomStatus,
 				RS.reservationName,
 				CR.phone as reservationPhone,
@@ -1368,6 +1369,7 @@ exports.getReservationList = async (req, res, next) => {
 					LIMIT 1
 				) as depositStatus
 			FROM room R
+			LEFT JOIN gosiwon G ON R.gosiwonEsntlId = G.esntlId
 			LEFT JOIN (
 				SELECT RS1.*
 				FROM roomStatus RS1
@@ -1431,6 +1433,8 @@ exports.getReservationList = async (req, res, next) => {
 			return {
 				roomEsntlId: row.roomEsntlId,
 				roomNumber: row.roomNumber,
+				gosiwonEsntlId: row.gosiwonEsntlId || null,
+				gosiwonName: row.gosiwonName || null,
 				roomStatus: row.roomStatus || null,
 				reservationName: row.reservationName || null,
 				reservationPhone: row.reservationPhone || null,
