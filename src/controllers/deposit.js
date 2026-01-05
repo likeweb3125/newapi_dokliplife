@@ -1263,7 +1263,8 @@ exports.getReservationList = async (req, res, next) => {
 		verifyAdminToken(req);
 
 		const {
-			searchType, // gosiwonName, gosiwonCode, etc
+			gosiwonName, // 고시원명 필터
+			gosiwonCode, // 고시원코드 필터
 			searchString, // 검색어
 			canCheckin, // 입실가능한 방만 보기 (checkbox)
 			reservationStatus, // 예약금요청상태만보기 (checkbox)
@@ -1277,13 +1278,13 @@ exports.getReservationList = async (req, res, next) => {
 		const whereConditions = [];
 		const replacements = [];
 
-		// searchType에 따른 검색 처리
-		if (searchValue) {
-			if (searchType === 'gosiwonName') {
-				// 고시원명으로 검색
+		// gosiwonName 필터 처리 (값이 있으면 WHERE 절에 추가)
+		if (gosiwonName) {
+			const gosiwonNameValue = String(gosiwonName).trim();
+			if (gosiwonNameValue) {
 				const gosiwonList = await gosiwon.findAll({
 					where: {
-						name: { [Op.like]: `%${searchValue}%` },
+						name: { [Op.like]: `%${gosiwonNameValue}%` },
 					},
 					attributes: ['esntlId'],
 				});
@@ -1300,20 +1301,27 @@ exports.getReservationList = async (req, res, next) => {
 						data: [],
 					});
 				}
-			} else if (searchType === 'gosiwonCode') {
-				// 고시원 코드로 검색
-				whereConditions.push('R.gosiwonEsntlId = ?');
-				replacements.push(searchValue);
-			} else if (searchType === 'etc' || !searchType) {
-				// etc인 경우: roomName, roomEsntlId, reservationName, contractName을 like 검색
-				whereConditions.push(`(
-					R.roomNumber LIKE ? OR
-					R.esntlId LIKE ? OR
-					RS.reservationName LIKE ? OR
-					RS.contractorName LIKE ?
-				)`);
-				replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 			}
+		}
+
+		// gosiwonCode 필터 처리 (값이 있으면 WHERE 절에 추가)
+		if (gosiwonCode) {
+			const gosiwonCodeValue = String(gosiwonCode).trim();
+			if (gosiwonCodeValue) {
+				whereConditions.push('R.gosiwonEsntlId = ?');
+				replacements.push(gosiwonCodeValue);
+			}
+		}
+
+		// searchString 검색 처리 (roomName, roomEsntlId, reservationName, contractName을 like 검색)
+		if (searchValue) {
+			whereConditions.push(`(
+				R.roomNumber LIKE ? OR
+				R.esntlId LIKE ? OR
+				RS.reservationName LIKE ? OR
+				RS.contractorName LIKE ?
+			)`);
+			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
 
 		// canCheckin 필터: roomStatus.status가 CAN_CHECKIN이고 subStatus가 END가 아닌 경우
