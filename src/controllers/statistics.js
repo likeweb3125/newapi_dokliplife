@@ -726,14 +726,6 @@ exports.getRealTimeList = async (req, res, next) => {
 
 		const totalCount = countResult[0]?.total || 0;
 
-		// 오늘 날짜 (YYYYMMDD 형식)
-		const now = new Date();
-		const seoulTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-		const todayYear = seoulTime.getUTCFullYear();
-		const todayMonth = String(seoulTime.getUTCMonth() + 1).padStart(2, '0');
-		const todayDay = String(seoulTime.getUTCDate()).padStart(2, '0');
-		const todayDateStr = `${todayYear}${todayMonth}${todayDay}`;
-
 		// deposit 필드 계산 및 고유값 생성
 		const data = rows.map((ele) => {
 			let deposit = 0;
@@ -745,11 +737,24 @@ exports.getRealTimeList = async (req, res, next) => {
 				deposit = ele.roomDeposit;
 			}
 
-			// esntlId에서 숫자 부분 추출 (예: PYLG0000048259 → 48259)
-			const esntlIdNumeric = ele.esntlId ? ele.esntlId.replace(/\D/g, '') : '';
-			const uniqueId = esntlIdNumeric ? `${todayDateStr}${esntlIdNumeric}` : null;
+			// pDate에서 날짜 추출 (YYYY-MM-DD 형식 → YYYYMMDD)
+			let dateStr = '';
+			if (ele.pDate) {
+				// pDate가 "2025-07-31" 형식이면 "20250731"로 변환
+				dateStr = ele.pDate.replace(/-/g, '');
+			}
 
-			// pTime 바로 뒤에 paymentType, isExtra, uniqueId를 배치
+			// esntlId에서 숫자 부분 추출하고 앞의 0 제거 (예: PYLG0000048259 → 48259)
+			let esntlIdNumeric = '';
+			if (ele.esntlId) {
+				const numericPart = ele.esntlId.replace(/\D/g, '');
+				// 앞의 0 제거
+				esntlIdNumeric = numericPart.replace(/^0+/, '') || '0';
+			}
+
+			// uniqueId 생성: 날짜(YYYYMMDD) + 숫자 부분(앞의 0 제거)
+			const uniqueId = dateStr && esntlIdNumeric ? `${dateStr}${esntlIdNumeric}` : null;
+
 			const {
 				esntlId,
 				pDate,
@@ -782,13 +787,19 @@ exports.getRealTimeList = async (req, res, next) => {
 				contractType,
 			} = ele;
 
+			// isExtra 값을 payType으로 변환 (0: checkInPay, 1: extraPay)
+			let payType = null;
+			if (isExtra !== null && isExtra !== undefined) {
+				payType = isExtra === 1 ? 'extraPay' : 'checkInPay';
+			}
+
 			return {
 				esntlId,
+				uniqueId: uniqueId,
 				pDate,
 				pTime,
-				paymentType: paymentType || null,
-				isExtra: isExtra !== null && isExtra !== undefined ? isExtra : null,
-				uniqueId: uniqueId,
+				payMethod: paymentType || null,
+				payType: payType,
 				contractEsntlId,
 				gosiwonEsntlId,
 				gosiwonName,

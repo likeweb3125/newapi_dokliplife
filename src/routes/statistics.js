@@ -180,24 +180,24 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                           esntlId:
  *                             type: string
  *                             example: PAYL0000000001
+ *                           uniqueId:
+ *                             type: string
+ *                             description: '고유값 (등록일 YYYYMMDD + esntlId의 숫자 부분, 앞의 0 제거)'
+ *                             example: '2025073143357'
  *                           pDate:
  *                             type: string
- *                             example: '2025-07-01'
+ *                             example: '2025-07-31'
  *                           pTime:
  *                             type: string
  *                             example: '14:30:00'
- *                           paymentType:
+ *                           payMethod:
  *                             type: string
- *                             description: '결제 타입 (Payment: 결제, Refund: 환불)'
- *                             example: Payment
- *                           isExtra:
- *                             type: integer
- *                             description: '추가 결제 여부 (0: 일반 연장 결제, 1: 옵션에서 발생한 추가 결제)'
- *                             example: 0
- *                           uniqueId:
+ *                             description: '결제 수단 (KAKAO, CARD 등)'
+ *                             example: KAKAO
+ *                           payType:
  *                             type: string
- *                             description: '고유값 (오늘 날짜 YYYYMMDD + esntlId의 숫자 부분)'
- *                             example: '2025010548259'
+ *                             description: '결제 유형 (checkInPay: 입실료, extraPay: 추가결제)'
+ *                             example: checkInPay
  *                           contractEsntlId:
  *                             type: string
  *                             example: RCTT0000000001

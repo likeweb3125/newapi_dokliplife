@@ -1013,11 +1013,74 @@ exports.getDepositHistory = async (req, res, next) => {
 			return rowData;
 		});
 
-		return errorHandler.successThrow(res, '입금/반환 이력 조회 성공', {
+		return 		errorHandler.successThrow(res, '입금/반환 이력 조회 성공', {
 			total: count,
 			page: parseInt(page),
 			limit: parseInt(limit),
 			data: formattedRows,
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 방의 예약금 내역 조회
+exports.getDepositGroupByDepositor = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { roomEsntlId } = req.query;
+
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
+		}
+
+		// 해당 방의 예약금 내역 조회 (입실일, 입실자 정보 포함, 최대 30개)
+		const query = `
+			SELECT 
+				D.roomEsntlId,
+				D.gosiwonEsntlId,
+				D.status,
+				D.amount,
+				DATE(RC.startDate) as checkInDate,
+				D.depositorName as checkinName,
+				D.depositorPhone as checkinPhone,
+				D.manager,
+				DATE(DATE_ADD(D.createdAt, INTERVAL 9 HOUR)) as recordDate,
+				DATE_FORMAT(DATE_ADD(D.createdAt, INTERVAL 9 HOUR), '%H:%i') as recordTime
+			FROM deposit D
+			LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
+			WHERE D.roomEsntlId = ?
+				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
+			ORDER BY D.createdAt DESC
+			LIMIT 30
+		`;
+
+		const rows = await mariaDBSequelize.query(query, {
+			replacements: [roomEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 결과 포맷팅
+		const resultList = rows.map((row) => {
+			return {
+				roomEsntlId: row.roomEsntlId,
+				gosiwonEsntlId: row.gosiwonEsntlId,
+				content: {
+					status: row.status,
+					amount: row.amount,
+					checkInDate: row.checkInDate || null,
+					checkinName: row.checkinName || null,
+					checkinPhone: row.checkinPhone || null,
+				},
+				manager: row.manager || null,
+				recordDate: row.recordDate || null,
+				recordTime: row.recordTime || null,
+			};
+		});
+
+		return errorHandler.successThrow(res, '방의 예약금 내역 조회 성공', {
+			data: resultList,
 		});
 	} catch (error) {
 		next(error);

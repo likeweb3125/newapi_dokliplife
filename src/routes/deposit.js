@@ -261,6 +261,149 @@ router.get(
 	depositController.getDepositHistoryDepositList
 );
 
+/**
+ * @swagger
+ * /v1/deposit/depositor-group:
+ *   get:
+ *     summary: 방의 예약금 내역 히스토리 조회
+ *     description: 방 ID를 입력받아 해당 방의 예약금 요청 내역을 최대 30개까지 조회합니다.
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디
+ *         example: ROOM0000028345
+ *     responses:
+ *       200:
+ *         description: 방의 예약금 내역 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방의 예약금 내역 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
+ *                             example: ROOM0000028345
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             description: 고시원 고유 아이디
+ *                             example: GOSI0000000001
+ *                           content:
+ *                             type: object
+ *                             description: 내용 정보
+ *                             properties:
+ *                               status:
+ *                                 type: string
+ *                                 description: 상태값
+ *                                 example: PENDING
+ *                               amount:
+ *                                 type: integer
+ *                                 description: 금액
+ *                                 example: 500000
+ *                               checkInDate:
+ *                                 type: string
+ *                                 format: date
+ *                                 description: 입실일
+ *                                 example: '2024-01-01'
+ *                               checkinName:
+ *                                 type: string
+ *                                 description: 입실자 이름 (deposit.depositorName)
+ *                                 example: 홍길동
+ *                               checkinPhone:
+ *                                 type: string
+ *                                 description: 입실자 전화번호 (deposit.depositorPhone)
+ *                                 example: '010-1234-5678'
+ *                           manager:
+ *                             type: string
+ *                             description: 담당자(관리자)
+ *                             example: 관리자
+ *                           recordDate:
+ *                             type: string
+ *                             format: date
+ *                             description: 기록날짜 (서울 시간, YYYY-MM-DD 형식)
+ *                             example: '2024-01-01'
+ *                           recordTime:
+ *                             type: string
+ *                             description: 시간 (서울 시간, HH:MM 형식)
+ *                             example: '14:30'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/depositor-group', depositController.getDepositGroupByDepositor);
+
+/**
+ * @swagger
+ * /v1/deposit/delete:
+ *   delete:
+ *     summary: 예약금 요청 취소
+ *     description: 보증금 정보를 삭제 처리합니다. deleteYN을 'Y'로 설정하고, status를 'DELETED'로 변경하며, 삭제 이력을 depositHistory에 기록합니다.
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 보증금 고유 아이디
+ *         example: DEPO0000000001
+ *     responses:
+ *       200:
+ *         description: 예약금 요청 취소 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 보증금 삭제 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 삭제된 보증금 고유 아이디
+ *                       example: DEPO0000000001
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/delete', depositController.deleteDeposit);
+
 
 /**
  * @swagger

@@ -110,6 +110,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'depositorName',
 				comment: '입금자명',
 			},
+			depositorPhone: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'depositorPhone',
+				comment: '입금자 전화번호',
+			},
 			virtualAccountNumber: {
 				type: DataTypes.STRING(100),
 				allowNull: true,
