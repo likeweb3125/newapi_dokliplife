@@ -467,6 +467,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				rrr_leave_type_cd,
 				rrr_leave_date,
 				rrr_leave_reason,
+				rrr_liability_reason,
 				rrr_payment_amt,
 				rrr_use_period,
 				rrr_use_amt,
@@ -486,6 +487,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 					rrr_leave_type_cd,
 					cancelDate,
 					leaveReason,
+					liabilityReason || null,
 					paymentAmount || 0,
 					null, // rrr_use_period: 일할 기간 정보 없음
 					proratedRent || 0,
