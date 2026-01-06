@@ -946,11 +946,187 @@ router.get(
  */
 router.get('/info', depositController.getDepositInfo);
 
+/**
+ * @swagger
+ * /v1/deposit/create:
+ *   post:
+ *     summary: 보증금 등록 (type=DEPOSIT 고정)
+ *     description: '보증금을 등록합니다. type은 DEPOSIT만 허용되며 다른 값이면 오류를 반환합니다.'
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomEsntlId
+ *               - gosiwonEsntlId
+ *               - amount
+ *               - depositDate
+ *             properties:
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *                 example: ROOM0000025359
+ *               gosiwonEsntlId:
+ *                 type: string
+ *                 description: 고시원 고유 아이디
+ *                 example: GOSI0000000001
+ *               customerEsntlId:
+ *                 type: string
+ *                 description: 예약자/입실자 고유 아이디 (DEPOSIT 타입일 때만 유효)
+ *                 example: CUTR0000000001
+ *               contractorEsntlId:
+ *                 type: string
+ *                 description: 계약자 고유 아이디 (DEPOSIT 타입일 때만 유효)
+ *                 example: CUTR0000000001
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 방계약 고유 아이디 (선택)
+ *                 example: RCO0000000001
+ *               amount:
+ *                 type: integer
+ *                 description: 입금금액
+ *                 example: 500000
+ *               depositDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 입금일시
+ *                 example: '2024-01-01T10:00:00'
+ *               depositorName:
+ *                 type: string
+ *                 description: 입금자명
+ *                 example: 홍길동
+ *               depositorPhone:
+ *                 type: string
+ *                 description: 입금자 전화번호
+ *                 example: '010-1234-5678'
+ *               accountBank:
+ *                 type: string
+ *                 description: 은행명
+ *                 example: '신한은행'
+ *               accountNumber:
+ *                 type: string
+ *                 description: 계좌번호
+ *                 example: '110-123-456789'
+ *               accountHolder:
+ *                 type: string
+ *                 description: 예금주명
+ *                 example: '홍길동'
+ *               virtualAccountNumber:
+ *                 type: string
+ *                 description: 가상계좌번호
+ *                 example: '1234567890'
+ *               virtualAccountExpiryDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 가상계좌 만료일시
+ *                 example: '2024-01-31T23:59:59'
+ *     responses:
+ *       200:
+ *         description: 보증금 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 보증금 등록 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     depositEsntlId:
+ *                       type: string
+ *                       description: 생성된 보증금 고유 아이디
+ *                       example: DEPO0000000001
+ *                     historyId:
+ *                       type: string
+ *                       description: 생성된 이력 고유 아이디
+ *                       example: HIST0000000001
+ *                     status:
+ *                       type: string
+ *                       description: 입금 상태
+ *                       example: PENDING
+ *                     paidAmount:
+ *                       type: integer
+ *                       description: 입금액
+ *                       example: 500000
+ *                     unpaidAmount:
+ *                       type: integer
+ *                       description: 미납금액
+ *                       example: 0
+ *                     amount:
+ *                       type: integer
+ *                       description: 총 보증금액
+ *                       example: 500000
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 router.post('/create', depositController.createDeposit);
 
 router.put('/update', depositController.updateDeposit);
 
-router.delete('/delete', depositController.deleteDeposit);
+/**
+ * @swagger
+ * /v1/deposit/delete-deposit:
+ *   delete:
+ *     summary: 보증금 삭제 (type=DEPOSIT만)
+ *     description: '보증금 정보를 삭제합니다. type이 DEPOSIT인 경우만 삭제 가능합니다. deleteYN을 Y로 설정하고, status를 DELETED로 변경하며, 삭제 이력을 depositHistory에 기록합니다.'
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 보증금 고유 아이디
+ *         example: DEPO0000000001
+ *     responses:
+ *       200:
+ *         description: 보증금 삭제 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 보증금 삭제 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 삭제된 보증금 고유 아이디
+ *                       example: DEPO0000000001
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/delete-deposit', depositController.deleteDepositOnly);
 
 
 router.get('/history', depositController.getDepositHistory);

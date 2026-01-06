@@ -251,15 +251,14 @@ exports.createDeposit = async (req, res, next) => {
 			customerEsntlId,
 			contractorEsntlId,
 			contractEsntlId,
-			type, // RESERVATION 또는 DEPOSIT
 			amount,
 			reservationDepositAmount, // 하위 호환성
 			depositAmount, // 하위 호환성
 			accountBank,
 			accountNumber,
 			accountHolder,
-			expectedOccupantName, // 입실예정자명 (type이 RESERVATION일 때)
-			expectedOccupantPhone, // 입실예정자연락처 (type이 RESERVATION일 때)
+			expectedOccupantName,
+			expectedOccupantPhone,
 			moveInDate,
 			moveOutDate,
 			contractStatus,
@@ -267,21 +266,17 @@ exports.createDeposit = async (req, res, next) => {
 			virtualAccountExpiryDate,
 		} = req.body;
 
+		// type은 DEPOSIT으로 고정
+		const type = 'DEPOSIT';
+
 		if (!roomEsntlId || !gosiwonEsntlId) {
 			errorHandler.errorThrow(400, 'roomEsntlId와 gosiwonEsntlId는 필수입니다.');
-		}
-
-		// type과 amount 검증
-		if (!type || !['RESERVATION', 'DEPOSIT'].includes(type)) {
-			errorHandler.errorThrow(400, 'type은 RESERVATION 또는 DEPOSIT이어야 합니다.');
 		}
 
 		// amount가 없으면 하위 호환성을 위해 기존 필드에서 가져오기
 		let finalAmount = amount;
 		if (!finalAmount || finalAmount === 0) {
-			if (type === 'RESERVATION' && reservationDepositAmount) {
-				finalAmount = reservationDepositAmount;
-			} else if (depositAmount) {
+			if (depositAmount) {
 				finalAmount = depositAmount;
 			} else if (reservationDepositAmount) {
 				finalAmount = reservationDepositAmount;
@@ -315,10 +310,8 @@ exports.createDeposit = async (req, res, next) => {
 		}
 
 		// customerEsntlId 존재 여부 확인 (값이 있는 경우만)
-		// type이 RESERVATION인 경우는 아직 customer가 등록되지 않았을 수 있으므로 null로 저장
 		let finalCustomerEsntlId = null;
-		if (customerEsntlId && type !== 'RESERVATION') {
-			// DEPOSIT인 경우만 customer 존재 여부 확인
+		if (customerEsntlId) {
 			const customerInfo = await customer.findOne({
 				where: { esntlId: customerEsntlId },
 				transaction,
@@ -328,14 +321,10 @@ exports.createDeposit = async (req, res, next) => {
 			}
 			finalCustomerEsntlId = customerEsntlId;
 		}
-		// type이 RESERVATION인 경우는 customerEsntlId를 null로 저장 (외래키 제약조건 회피)
-		// 입실예정자 정보는 expectedOccupantName, expectedOccupantPhone에 저장됨
 
 		// contractorEsntlId 존재 여부 확인 (값이 있는 경우만)
-		// type이 RESERVATION인 경우는 아직 customer가 등록되지 않았을 수 있으므로 null로 저장
 		let finalContractorEsntlId = null;
-		if (contractorEsntlId && type !== 'RESERVATION') {
-			// DEPOSIT인 경우만 customer 존재 여부 확인
+		if (contractorEsntlId) {
 			const contractorInfo = await customer.findOne({
 				where: { esntlId: contractorEsntlId },
 				transaction,
@@ -345,7 +334,6 @@ exports.createDeposit = async (req, res, next) => {
 			}
 			finalContractorEsntlId = contractorEsntlId;
 		}
-		// type이 RESERVATION인 경우는 contractorEsntlId를 null로 저장 (외래키 제약조건 회피)
 
 		const esntlId = await generateDepositId(transaction);
 
@@ -360,7 +348,7 @@ exports.createDeposit = async (req, res, next) => {
 				type: type,
 				amount: finalAmount,
 				// 하위 호환성을 위해 기존 필드도 저장
-				reservationDepositAmount: type === 'RESERVATION' ? finalAmount : (reservationDepositAmount || 0),
+				reservationDepositAmount: reservationDepositAmount || 0,
 				accountBank: accountBank || null,
 				accountNumber: accountNumber || null,
 				accountHolder: accountHolder || null,
@@ -625,6 +613,73 @@ exports.deleteDeposit = async (req, res, next) => {
 
 		if (!depositInfo) {
 			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
+		}
+
+		// 보증금 삭제 처리
+		const writerAdminId = getWriterAdminId(decodedToken);
+		await deposit.update(
+			{ 
+				deleteYN: 'Y', 
+				status: 'DELETED',
+				deletedBy: writerAdminId,
+				deletedAt: new Date(),
+			},
+			{
+				where: { esntlId: esntlId },
+				transaction,
+			}
+		);
+
+		// 삭제 이력 생성
+		const historyId = await generateDepositHistoryId(transaction);
+		await depositHistory.create(
+			{
+				esntlId: historyId,
+				depositEsntlId: esntlId,
+				roomEsntlId: depositInfo.roomEsntlId, // 방 고유아이디 저장
+					contractEsntlId: depositInfo.contractEsntlId || null,
+				type: 'DEPOSIT', // 삭제는 DEPOSIT 타입으로 기록
+				amount: 0,
+				status: 'DELETED',
+				manager: decodedToken.admin?.name || '관리자',
+				memo: '보증금 정보 삭제',
+			},
+			{ transaction }
+		);
+
+		await transaction.commit();
+
+		return errorHandler.successThrow(res, '보증금 삭제 성공');
+	} catch (error) {
+		await transaction.rollback();
+		next(error);
+	}
+};
+
+// 보증금 삭제 (type=DEPOSIT만)
+exports.deleteDepositOnly = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+
+		const { esntlId } = req.query;
+
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+
+		const depositInfo = await deposit.findOne({
+			where: { esntlId: esntlId },
+			transaction,
+		});
+
+		if (!depositInfo) {
+			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
+		}
+
+		// type이 DEPOSIT이 아닌 경우 오류
+		if (depositInfo.type !== 'DEPOSIT') {
+			errorHandler.errorThrow(400, 'type이 DEPOSIT인 보증금만 삭제할 수 있습니다.');
 		}
 
 		// 보증금 삭제 처리
@@ -1732,6 +1787,7 @@ exports.getDepositList = async (req, res, next) => {
 		// deposit도 최신 것만 가져옴
 		const query = `
 			SELECT
+				D.esntlId as depositEsntlId,
 				R.esntlId as roomEsntlId,
 				R.roomNumber,
 				R.gosiwonEsntlId,
@@ -1874,6 +1930,7 @@ exports.getDepositList = async (req, res, next) => {
 		// 결과 포맷팅
 		const resultList = (rows || []).map((row) => {
 			return {
+				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
 				roomNumber: row.roomNumber,
 				currentOccupantName: row.currentOccupantName || null,

@@ -4,6 +4,7 @@ const {
 	room,
 	customer,
 	history,
+	ilRoomRefundRequest,
 } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
@@ -574,5 +575,454 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 	} catch (err) {
 		await transaction.rollback();
 		next(err);
+	}
+};
+
+// 환불 요청 등록
+exports.refundInsert = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const {
+			gswId, // gsw_eid
+			romId, // rom_eid
+			mbrId, // mbr_eid
+			contractId, // ctt_eid
+			type, // rrr_leave_type_cd (FULL, INTERIM, CANCEL, ETC)
+			checkoutDate, // rrr_leave_date
+			reason, // rrr_leave_reason
+			paymentAmt, // rrr_payment_amt
+			usePeriod, // rrr_use_period
+			useAmt, // rrr_use_amt
+			penalty, // rrr_penalty_amt
+			refundAmt, // rrr_refund_total_amt
+		} = req.body;
+
+		// 필수 필드 검증
+		if (!gswId) {
+			errorHandler.errorThrow(400, 'gswId는 필수입니다.');
+		}
+		if (!romId) {
+			errorHandler.errorThrow(400, 'romId는 필수입니다.');
+		}
+		if (!mbrId) {
+			errorHandler.errorThrow(400, 'mbrId는 필수입니다.');
+		}
+		if (!contractId) {
+			errorHandler.errorThrow(400, 'contractId는 필수입니다.');
+		}
+		if (!type) {
+			errorHandler.errorThrow(400, 'type은 필수입니다.');
+		}
+		if (!checkoutDate) {
+			errorHandler.errorThrow(400, 'checkoutDate는 필수입니다.');
+		}
+		if (!reason) {
+			errorHandler.errorThrow(400, 'reason은 필수입니다.');
+		}
+
+		// type 유효성 검증
+		const validTypes = ['FULL', 'INTERIM', 'CANCEL', 'ETC'];
+		const upperType = String(type).toUpperCase();
+		if (!validTypes.includes(upperType)) {
+			errorHandler.errorThrow(
+				400,
+				`type은 ${validTypes.join(', ')} 중 하나여야 합니다.`
+			);
+		}
+
+		// 환불 요청 등록
+		const query = `
+			INSERT INTO il_room_refund_request (
+				gsw_eid,
+				rom_eid,
+				mbr_eid,
+				ctt_eid,
+				rrr_leave_type_cd,
+				rrr_leave_date,
+				rrr_leave_reason,
+				rrr_payment_amt,
+				rrr_use_period,
+				rrr_use_amt,
+				rrr_penalty_amt,
+				rrr_refund_total_amt,
+				rrr_registrant_id,
+				rrr_update_dtm,
+				rrr_updater_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+		`;
+
+		const values = [
+			gswId,
+			romId,
+			mbrId,
+			contractId,
+			upperType,
+			checkoutDate,
+			reason,
+			paymentAmt || 0,
+			usePeriod || null,
+			useAmt || 0,
+			penalty || 0,
+			refundAmt || 0,
+			writerAdminId,
+			writerAdminId,
+		];
+
+		const result = await mariaDBSequelize.query(query, {
+			replacements: values,
+			type: mariaDBSequelize.QueryTypes.INSERT,
+			transaction,
+		});
+
+		await transaction.commit();
+
+		return errorHandler.successThrow(res, '환불 요청 등록 성공', {
+			rrr_sno: result[0],
+		});
+	} catch (error) {
+		await transaction.rollback();
+		next(error);
+	}
+};
+
+// 환불 요청 목록 조회
+exports.getRefundRequestList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { eId, year, month, day, search, draw, start, length } = req.query;
+
+		// DataTables 파라미터
+		const limit = length ? parseInt(length) : 20;
+		const offset = start ? parseInt(start) : 0;
+
+		// WHERE 조건 구성
+		let whereClause = "WHERE NOT PL.paymentType = 'REFUND'";
+		const replacements = [];
+
+		// 고시원 ID 필터 (GOSI로 시작하는 경우만)
+		if (eId && eId.includes('GOSI')) {
+			whereClause += ' AND RRR.gsw_eid = ?';
+			replacements.push(eId);
+		}
+
+		// 날짜 필터 (년, 월, 일)
+		if (year && month && day) {
+			const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+			whereClause += ' AND DATE(RRR.rrr_regist_dtm) = ?';
+			replacements.push(dateStr);
+		} else if (year && month) {
+			const dateStr = `${year}-${String(month).padStart(2, '0')}`;
+			whereClause += ' AND DATE_FORMAT(RRR.rrr_regist_dtm, "%Y-%m") = ?';
+			replacements.push(dateStr);
+		} else if (year) {
+			whereClause += ' AND YEAR(RRR.rrr_regist_dtm) = ?';
+			replacements.push(year);
+		}
+
+		// 검색어 필터 (고시원명, 방번호, 입실자명, 연락처)
+		if (search && search.trim()) {
+			const searchValue = `%${search.trim()}%`;
+			whereClause += ` AND (
+				G.name LIKE ? OR
+				R.roomNumber LIKE ? OR
+				C.name LIKE ? OR
+				C.phone LIKE ?
+			)`;
+			replacements.push(searchValue, searchValue, searchValue, searchValue);
+		}
+
+		// 메인 쿼리
+		const query = `
+			SELECT 
+				RRR.rrr_sno,
+				RRR.rrr_regist_dtm,
+				G.name AS gswName,
+				R.roomNumber,
+				R.roomType,
+				R.window,
+				C.name AS userName,
+				ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365) AS age,
+				C.gender,
+				C.phone,
+				PL.pDate,
+				PL.pTime,
+				PL.calAmount,
+				PL.paymentType,
+				PL.paymentAmount,
+				PL.paymentPoint,
+				PL.paymentCoupon,
+				RRR.rrr_use_amt,
+				RRR.rrr_penalty_amt,
+				RRR.rrr_refund_total_amt,
+				RRR.rrr_payment_amt,
+				RRR.rrr_process_status_cd,
+				RRR.rrr_process_reason,
+				RRR.ctt_eid
+			FROM il_room_refund_request RRR
+			LEFT OUTER JOIN gosiwon AS G ON RRR.gsw_eid = G.esntlId
+			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
+			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
+			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
+			LEFT OUTER JOIN paymentLog AS PL ON RC.esntlId = PL.contractEsntlId
+			${whereClause}
+			ORDER BY RRR.rrr_sno DESC
+			LIMIT ? OFFSET ?
+		`;
+
+		// 전체 개수 조회
+		const countQuery = `
+			SELECT COUNT(*) AS total
+			FROM il_room_refund_request RRR
+			LEFT OUTER JOIN gosiwon AS G ON RRR.gsw_eid = G.esntlId
+			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
+			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
+			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
+			LEFT OUTER JOIN paymentLog AS PL ON RC.esntlId = PL.contractEsntlId
+			${whereClause}
+		`;
+
+		const rows = await mariaDBSequelize.query(query, {
+			replacements: [...replacements, limit, offset],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 전체 개수 조회 (필터 없음)
+		const totalCountQuery = `
+			SELECT COUNT(*) AS total
+			FROM il_room_refund_request RRR
+			LEFT OUTER JOIN gosiwon AS G ON RRR.gsw_eid = G.esntlId
+			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
+			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
+			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
+			LEFT OUTER JOIN paymentLog AS PL ON RC.esntlId = PL.contractEsntlId
+			WHERE NOT PL.paymentType = 'REFUND'
+		`;
+
+		const [countResult, totalCountResult] = await Promise.all([
+			mariaDBSequelize.query(countQuery, {
+				replacements: replacements,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(totalCountQuery, {
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+		]);
+
+		const recordsFiltered = countResult[0]?.total || 0;
+		const recordsTotal = totalCountResult[0]?.total || 0;
+		const data = Array.isArray(rows) ? rows : [];
+
+		// DataTables 형식으로 응답
+		const result = {
+			data: data,
+			recordsTotal: recordsTotal,
+			recordsFiltered: recordsFiltered,
+			draw: draw ? parseInt(draw) : 1,
+		};
+
+		return errorHandler.successThrow(res, '환불 요청 목록 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 환불 요청 상태 업데이트
+exports.updateRefundRequestStatus = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { status, processReason, cttEid } = req.body;
+
+		if (!status) {
+			errorHandler.errorThrow(400, 'status는 필수입니다.');
+		}
+		if (!cttEid) {
+			errorHandler.errorThrow(400, 'cttEid는 필수입니다.');
+		}
+
+		// 상태 유효성 검증
+		const validStatuses = ['REQUEST', 'APPROVAL', 'REJECT', 'CANCELLATION'];
+		if (!validStatuses.includes(status)) {
+			errorHandler.errorThrow(
+				400,
+				`status는 ${validStatuses.join(', ')} 중 하나여야 합니다.`
+			);
+		}
+
+		const query = `
+			UPDATE il_room_refund_request 
+			SET rrr_process_status_cd = ?,
+				rrr_process_reason = ?,
+				rrr_update_dtm = NOW(),
+				rrr_updater_id = ?
+			WHERE ctt_eid = ?
+		`;
+
+		await mariaDBSequelize.query(
+			query,
+			{
+				replacements: [status, processReason || null, writerAdminId, cttEid],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		await transaction.commit();
+
+		return errorHandler.successThrow(res, '환불 요청 상태 업데이트 성공');
+	} catch (error) {
+		await transaction.rollback();
+		next(error);
+	}
+};
+
+// 환불 데이터 조회 (결제 정보 포함)
+exports.getRefundData = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { contractId } = req.query;
+
+		if (!contractId) {
+			errorHandler.errorThrow(400, 'contractId는 필수입니다.');
+		}
+
+		const query = `
+			SELECT 
+				RRR.rrr_payment_amt AS paymentAmt,
+				RRR.rrr_refund_total_amt AS refundAmt,
+				PL.tid,
+				PL.paymentType,
+				PL.esntlId AS MOID
+			FROM il_room_refund_request RRR
+			JOIN paymentLog AS PL ON PL.contractEsntlId = RRR.ctt_eid
+			WHERE RRR.ctt_eid = ?
+			LIMIT 1
+		`;
+
+		const [result] = await mariaDBSequelize.query(query, {
+			replacements: [contractId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		if (!result) {
+			errorHandler.errorThrow(404, '환불 데이터를 찾을 수 없습니다.');
+		}
+
+		return errorHandler.successThrow(res, '환불 데이터 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 계약서 기반 환불 데이터 조회
+exports.getRefundRequestData = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { cttEid } = req.query;
+
+		if (!cttEid) {
+			errorHandler.errorThrow(400, 'cttEid는 필수입니다.');
+		}
+
+		const query = `
+			SELECT 
+				RC.esntlId,
+				RC.startDate,
+				RC.endDate,
+				DATEDIFF(NOW(), RC.startDate) AS dateDiff,
+				PL.paymentAmount,
+				PL.paymentType,
+				RC.monthlyRent,
+				C.name,
+				C.phone,
+				R.esntlId AS romId,
+				R.status AS roomStatus,
+				RC.status AS roomContractStatus,
+				RC.contractDate,
+				R.gosiwonEsntlId AS gswId,
+				RC.customerEsntlId AS mbrId,
+				RRR.rrr_leave_type_cd AS leaveType,
+				RRR.rrr_leave_reason AS reason
+			FROM roomContract AS RC
+			JOIN paymentLog AS PL ON PL.contractEsntlId = RC.esntlId
+			JOIN customer AS C ON RC.customerEsntlId = C.esntlId
+			JOIN room AS R ON RC.roomEsntlId = R.esntlId
+			JOIN il_room_refund_request AS RRR ON RRR.ctt_eid = RC.esntlId
+			WHERE RC.esntlId = ?
+			ORDER BY RC.esntlId DESC
+			LIMIT 1
+		`;
+
+		const [result] = await mariaDBSequelize.query(query, {
+			replacements: [cttEid],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		if (!result) {
+			errorHandler.errorThrow(404, '환불 요청 데이터를 찾을 수 없습니다.');
+		}
+
+		return errorHandler.successThrow(res, '환불 요청 데이터 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 환불 요청 정보 업데이트
+exports.updateRefundRequest = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { status, usePeriod, useAmt, penalty, refundAmt, contractId } = req.body;
+
+		if (!contractId) {
+			errorHandler.errorThrow(400, 'contractId는 필수입니다.');
+		}
+
+		const query = `
+			UPDATE il_room_refund_request 
+			SET rrr_process_status_cd = ?,
+				rrr_use_period = ?,
+				rrr_use_amt = ?,
+				rrr_penalty_amt = ?,
+				rrr_refund_total_amt = ?,
+				rrr_update_dtm = NOW(),
+				rrr_updater_id = ?
+			WHERE ctt_eid = ?
+		`;
+
+		await mariaDBSequelize.query(
+			query,
+			{
+				replacements: [
+					status || null,
+					usePeriod || null,
+					useAmt || 0,
+					penalty || 0,
+					refundAmt || 0,
+					writerAdminId,
+					contractId,
+				],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		await transaction.commit();
+
+		return errorHandler.successThrow(res, '환불 요청 정보 업데이트 성공');
+	} catch (error) {
+		await transaction.rollback();
+		next(error);
 	}
 };
