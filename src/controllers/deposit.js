@@ -1437,6 +1437,14 @@ exports.getReservationList = async (req, res, next) => {
 		// roomStatus가 여러 개일 경우를 처리하기 위해 서브쿼리로 최신 roomStatus만 가져옴
 		const query = `
 			SELECT
+				(
+					SELECT D3.esntlId
+					FROM deposit D3
+					WHERE D3.roomEsntlId = R.esntlId
+						AND (D3.deleteYN IS NULL OR D3.deleteYN = 'N')
+					ORDER BY D3.createdAt DESC
+					LIMIT 1
+				) as depositEsntlId,
 				R.esntlId as roomEsntlId,
 				R.roomNumber,
 				R.gosiwonEsntlId,
@@ -1541,6 +1549,7 @@ exports.getReservationList = async (req, res, next) => {
 		// 결과 포맷팅
 		const resultList = (rows || []).map((row) => {
 			return {
+				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
 				roomNumber: row.roomNumber,
 				gosiwonEsntlId: row.gosiwonEsntlId || null,
