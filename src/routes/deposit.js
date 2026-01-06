@@ -579,6 +579,16 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                             nullable: true
  *                             description: 현재 입실자 ID (room.customerEsntlId)
  *                             example: CUSTOMER0000000001
+ *                           customerBank:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 현재 입실자 은행명 (customer.bank)
+ *                             example: 국민은행
+ *                           customerBankAccount:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 현재 입실자 계좌번호 (customer.bankAccount)
+ *                             example: 123-456-789012
  *                           checkinName:
  *                             type: string
  *                             nullable: true
