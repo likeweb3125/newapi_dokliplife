@@ -449,7 +449,15 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			contract.customerName || contract.customerNameFromCustomer || null; // 예약자 이름이 없으면 입실자 이름과 동일
 		const contractorEsntlId = contract.contractorEsntlId || contract.customerEsntlId || null; // 계약자 정보가 없으면 입실자와 동일
 		const contractorName = contract.contractorName || contract.customerName || null; // 계약자 이름이 없으면 입실자 이름과 동일
-
+		// 입실 시작일과 현재일 차이(일수) 계산
+		let usePeriodDays = null;
+		if (contract.startDate) {
+			const start = new Date(contract.startDate);
+			const now = new Date();
+			const diffMs = now.getTime() - start.getTime();
+			const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+			usePeriodDays = diffDays < 0 ? 0 : diffDays;
+		}
 
 		// il_room_refund_request 테이블에 환불 정보 저장 (refund 테이블 사용 안 함)
 		const leaveReason =
@@ -476,7 +484,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				rrr_registrant_id,
 				rrr_update_dtm,
 				rrr_updater_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
 			`,
 			{
 				replacements: [
@@ -489,7 +497,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 					leaveReason,
 					liabilityReason || null,
 					paymentAmount || 0,
-					null, // rrr_use_period: 일할 기간 정보 없음
+					usePeriodDays, // rrr_use_period: 입실 시작일부터 현재일까지 일수
 					proratedRent || 0,
 					penalty || 0,
 					totalRefundAmount || 0,

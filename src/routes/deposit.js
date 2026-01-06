@@ -556,6 +556,11 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                       items:
  *                         type: object
  *                         properties:
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 고시원 고유 아이디 (room.gosiwonEsntlId)
+ *                             example: GOSI0000000001
  *                           roomEsntlId:
  *                             type: string
  *                             description: 방 고유 아이디

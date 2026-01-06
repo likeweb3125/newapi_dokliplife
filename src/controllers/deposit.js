@@ -1932,6 +1932,7 @@ exports.getDepositList = async (req, res, next) => {
 			return {
 				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
+				gosiwonEsntlId: row.gosiwonEsntlId || null,
 				roomNumber: row.roomNumber,
 				currentOccupantName: row.currentOccupantName || null,
 				currentOccupantID: row.currentOccupantID || null,
