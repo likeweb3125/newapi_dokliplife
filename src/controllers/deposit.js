@@ -1421,11 +1421,25 @@ exports.getReservationList = async (req, res, next) => {
 			)`);
 		}
 		
-		// reservationStatus 필터: deposit.status가 PENDING인 경우만 보기
+		// reservationStatus 필터: 해당 방의 가장 최근 deposit의 status가 COMPLETED가 아닌 경우만 보기
 		if (reservationStatus === 'true' || reservationStatus === true) {
 			whereConditions.push(`(
-				D.status = 'PENDING' AND
-				(D.deleteYN IS NULL OR D.deleteYN = 'N')
+				(
+					SELECT D4.status
+					FROM deposit D4
+					WHERE D4.roomEsntlId = R.esntlId
+						AND (D4.deleteYN IS NULL OR D4.deleteYN = 'N')
+					ORDER BY D4.createdAt DESC
+					LIMIT 1
+				) IS NOT NULL
+				AND (
+					SELECT D4.status
+					FROM deposit D4
+					WHERE D4.roomEsntlId = R.esntlId
+						AND (D4.deleteYN IS NULL OR D4.deleteYN = 'N')
+					ORDER BY D4.createdAt DESC
+					LIMIT 1
+				) != 'COMPLETED'
 			)`);
 		}
 
@@ -1438,7 +1452,10 @@ exports.getReservationList = async (req, res, next) => {
 		const query = `
 			SELECT
 				(
-					SELECT D3.esntlId
+					SELECT CASE 
+						WHEN D3.status = 'PENDING' THEN D3.esntlId
+						ELSE NULL
+					END
 					FROM deposit D3
 					WHERE D3.roomEsntlId = R.esntlId
 						AND (D3.deleteYN IS NULL OR D3.deleteYN = 'N')
@@ -1565,11 +1582,66 @@ exports.getReservationList = async (req, res, next) => {
 			};
 		});
 
+		// 각 방의 예약금 내역 조회 (depositor-group 데이터)
+		const depositHistoryList = await Promise.all(
+			resultList.map(async (room) => {
+				const depositQuery = `
+					SELECT 
+						D.roomEsntlId,
+						D.gosiwonEsntlId,
+						D.status,
+						D.amount,
+						DATE(RC.startDate) as checkInDate,
+						D.depositorName as checkinName,
+						D.depositorPhone as checkinPhone,
+						D.manager,
+						DATE(DATE_ADD(D.createdAt, INTERVAL 9 HOUR)) as recordDate,
+						DATE_FORMAT(DATE_ADD(D.createdAt, INTERVAL 9 HOUR), '%H:%i') as recordTime
+					FROM deposit D
+					LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
+					WHERE D.roomEsntlId = ?
+						AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
+					ORDER BY D.createdAt DESC
+					LIMIT 30
+				`;
+
+				const depositRows = await mariaDBSequelize.query(depositQuery, {
+					replacements: [room.roomEsntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				});
+
+				return depositRows.map((depositRow) => {
+					return {
+						roomEsntlId: depositRow.roomEsntlId,
+						gosiwonEsntlId: depositRow.gosiwonEsntlId,
+						content: {
+							status: depositRow.status,
+							amount: depositRow.amount,
+							checkInDate: depositRow.checkInDate || null,
+							checkinName: depositRow.checkinName || null,
+							checkinPhone: depositRow.checkinPhone || null,
+						},
+						manager: depositRow.manager || null,
+						recordDate: depositRow.recordDate || null,
+						recordTime: depositRow.recordTime || null,
+					};
+				});
+			})
+		);
+
+		// 각 방에 예약금 내역 추가
+		const resultListWithHistory = resultList.map((room, index) => {
+			return {
+				...room,
+				depositHistory: depositHistoryList[index] || [],
+			};
+		});
+
 		return errorHandler.successThrow(res, '예약금 예약 목록 조회 성공', {
 			total: total,
 			page: parseInt(page),
 			limit: parseInt(limit),
-			data: resultList,
+			data: resultListWithHistory,
 		});
 	} catch (error) {
 		next(error);

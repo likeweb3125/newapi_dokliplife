@@ -151,6 +151,64 @@ const depositController = require('../controllers/deposit');
  *                             nullable: true
  *                             description: 예약금상태 (deposit.type이 RESERVATION인 경우의 deposit.status, 해당방의 마지막 상태값, 없으면 null)
  *                             example: DEPOSIT_PENDING
+ *                           depositHistory:
+ *                             type: array
+ *                             description: 해당 방의 예약금 내역 히스토리 (최대 30개)
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 roomEsntlId:
+ *                                   type: string
+ *                                   description: 방 고유 아이디
+ *                                   example: ROOM0000000001
+ *                                 gosiwonEsntlId:
+ *                                   type: string
+ *                                   description: 고시원 고유 아이디
+ *                                   example: GOSI0000000001
+ *                                 content:
+ *                                   type: object
+ *                                   description: 내용 정보
+ *                                   properties:
+ *                                     status:
+ *                                       type: string
+ *                                       description: 상태값
+ *                                       example: PENDING
+ *                                     amount:
+ *                                       type: integer
+ *                                       description: 금액
+ *                                       example: 500000
+ *                                     checkInDate:
+ *                                       type: string
+ *                                       format: date
+ *                                       nullable: true
+ *                                       description: 입실일
+ *                                       example: '2024-01-01'
+ *                                     checkinName:
+ *                                       type: string
+ *                                       nullable: true
+ *                                       description: 입실자 이름 (deposit.depositorName)
+ *                                       example: 홍길동
+ *                                     checkinPhone:
+ *                                       type: string
+ *                                       nullable: true
+ *                                       description: 입실자 전화번호 (deposit.depositorPhone)
+ *                                       example: '010-1234-5678'
+ *                                 manager:
+ *                                   type: string
+ *                                   nullable: true
+ *                                   description: 담당자(관리자)
+ *                                   example: 관리자
+ *                                 recordDate:
+ *                                   type: string
+ *                                   format: date
+ *                                   nullable: true
+ *                                   description: 기록날짜 (서울 시간, YYYY-MM-DD 형식)
+ *                                   example: '2024-01-01'
+ *                                 recordTime:
+ *                                   type: string
+ *                                   nullable: true
+ *                                   description: 시간 (서울 시간, HH:MM 형식)
+ *                                   example: '14:30'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
