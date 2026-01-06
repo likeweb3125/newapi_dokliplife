@@ -221,7 +221,7 @@ router.get('/reservationList', depositController.getReservationList);
 
 /**
  * @swagger
- * /v1/deposit/register-deposit:
+ * /v1/deposit/reservationRegist:
  *   post:
  *     summary: 예약금 등록
  *     description: 보증금 입금을 등록합니다. 부분입금과 완전입금을 자동으로 구분합니다.
@@ -270,12 +270,12 @@ router.get('/reservationList', depositController.getReservationList);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/register-deposit', depositController.registerDeposit);
+router.post('/reservationRegist', depositController.registerDeposit);
 
 
 /**
  * @swagger
- * /v1/deposit/register-deposit/list:
+ * /v1/deposit/reservationRegist/list:
  *   get:
  *     summary: 예약금 등록 이력 목록
  *     description: 계약서 ID 또는 방 ID 기준으로 입금(등록) 이력을 조회합니다.
@@ -320,13 +320,13 @@ router.post('/register-deposit', depositController.registerDeposit);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get(
-	'/register-deposit/list',
+	'/reservationRegist/list',
 	depositController.getDepositHistoryDepositList
 );
 
 /**
  * @swagger
- * /v1/deposit/depositor-group:
+ * /v1/deposit/reservationHistoryList:
  *   get:
  *     summary: 방의 예약금 내역 히스토리 조회
  *     description: 방 ID를 입력받아 해당 방의 예약금 요청 내역을 최대 30개까지 조회합니다.
@@ -416,11 +416,11 @@ router.get(
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.get('/depositor-group', depositController.getDepositGroupByDepositor);
+router.get('/reservationHistoryList', depositController.getDepositGroupByDepositor);
 
 /**
  * @swagger
- * /v1/deposit/delete:
+ * /v1/deposit/reservationDelete:
  *   delete:
  *     summary: 예약금 요청 취소
  *     description: 보증금 정보를 삭제 처리합니다. deleteYN을 'Y'로 설정하고, status를 'DELETED'로 변경하며, 삭제 이력을 depositHistory에 기록합니다.
@@ -465,7 +465,7 @@ router.get('/depositor-group', depositController.getDepositGroupByDepositor);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.delete('/delete', depositController.deleteDeposit);
+router.delete('/reservationDelete', depositController.deleteDeposit);
 
 
 /**
@@ -753,7 +753,7 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
 
 /**
  * @swagger
- * /v1/deposit/deposit-refund:
+ * /v1/deposit/depositRefundRegist:
  *   post:
  *     summary: 보증금 환불 등록
  *     description: 보증금 환불 정보를 등록합니다. 환불 금액과 전체 예약금을 비교하여 status를 자동으로 설정합니다.
@@ -863,11 +863,11 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/deposit-refund', depositController.createDepositRefund);
+router.post('/depositRefundRegist', depositController.createDepositRefund);
 
 /**
  * @swagger
- * /v1/deposit/register-return/list:
+ * /v1/deposit/depositReturn/list:
  *   get:
  *     summary: 보증금 반환 이력 목록
  *     description: 계약서 ID 또는 방 ID 기준으로 보증금 환불 이력을 조회합니다. (depositRefund 테이블 사용)
@@ -912,13 +912,13 @@ router.post('/deposit-refund', depositController.createDepositRefund);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get(
-	'/register-return/list',
+	'/depositReturn/list',
 	depositController.getDepositHistoryReturnList
 );
 
 /**
  * @swagger
- * /v1/deposit/info:
+ * /v1/deposit/depositInfo:
  *   get:
  *     summary: '보증금(예약금)  상세 정보 조회'
  *     description: 보증금 ID로 상세 정보와 입금/반환 이력을 조회합니다.
@@ -944,11 +944,11 @@ router.get(
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.get('/info', depositController.getDepositInfo);
+router.get('/depositInfo', depositController.getDepositInfo);
 
 /**
  * @swagger
- * /v1/deposit/create:
+ * /v1/deposit/depositCreate:
  *   post:
  *     summary: 보증금 등록 (type=DEPOSIT 고정)
  *     description: '보증금을 등록합니다. type은 DEPOSIT만 허용되며 다른 값이면 오류를 반환합니다.'
@@ -1075,13 +1075,13 @@ router.get('/info', depositController.getDepositInfo);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/create', depositController.createDeposit);
+router.post('/depositCreate', depositController.createDeposit);
 
 router.put('/update', depositController.updateDeposit);
 
 /**
  * @swagger
- * /v1/deposit/delete-deposit:
+ * /v1/deposit/depositDelete:
  *   delete:
  *     summary: 보증금 삭제 (type=DEPOSIT만)
  *     description: '보증금 정보를 삭제합니다. type이 DEPOSIT인 경우만 삭제 가능합니다. deleteYN을 Y로 설정하고, status를 DELETED로 변경하며, 삭제 이력을 depositHistory에 기록합니다.'
@@ -1126,7 +1126,7 @@ router.put('/update', depositController.updateDeposit);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.delete('/delete-deposit', depositController.deleteDepositOnly);
+router.delete('/depositDelete', depositController.deleteDepositOnly);
 
 
 router.get('/history', depositController.getDepositHistory);
