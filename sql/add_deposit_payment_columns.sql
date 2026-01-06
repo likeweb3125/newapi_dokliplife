@@ -3,10 +3,10 @@
 -- =============================================
 -- 주의: 이미 컬럼이 존재하는 경우 오류가 발생할 수 있습니다.
 
--- 1. 입금액 컬럼 추가 (depositAmount 아래)
+-- 1. 입금액 컬럼 추가 (amount 아래)
 ALTER TABLE `deposit` 
 ADD COLUMN `paidAmount` INT(11) NULL DEFAULT 0 COMMENT '입금액' 
-AFTER `depositAmount`;
+AFTER `amount`;
 
 -- 2. 미납금액 컬럼 추가 (paidAmount 아래)
 ALTER TABLE `deposit` 
@@ -23,9 +23,15 @@ ALTER TABLE `deposit`
 ADD COLUMN `depositorName` VARCHAR(100) NULL COMMENT '입금자명' 
 AFTER `depositDate`;
 
+-- 4. 입금자명 컬럼 추가
+ALTER TABLE `deposit` 
+ADD COLUMN `type` VARCHAR(50) NULL COMMENT '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)' 
+AFTER `contractEsntlId`;
+
 -- 5. 인덱스 추가 (성능 최적화)
 CREATE INDEX `idx_depositDate` ON `deposit` (`depositDate`);
 CREATE INDEX `idx_depositorName` ON `deposit` (`depositorName`);
+CREATE INDEX `idx_type` ON `deposit` (`type`);
 
 -- =============================================
 -- 완료

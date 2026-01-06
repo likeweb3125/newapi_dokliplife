@@ -479,21 +479,23 @@ router.delete('/delete', depositController.deleteDeposit);
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: searchType
+ *         name: gosiwonName
  *         required: false
  *         schema:
  *           type: string
- *           enum:
- *             - gosiwonName
- *             - gosiwonCode
- *             - etc
- *         description: "검색 대상 종류 (gosiwonName: 고시원명, gosiwonCode: 고시원코드, etc: roomName, roomEsntlId, reservationName, contractName을 like 검색)"
+ *         description: "고시원명 필터 (값이 있으면 해당 고시원명으로 필터링)"
+ *       - in: query
+ *         name: gosiwonCode
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "고시원코드 필터 (값이 있으면 해당 고시원코드로 필터링)"
  *       - in: query
  *         name: searchString
  *         required: false
  *         schema:
  *           type: string
- *         description: "검색어"
+ *         description: "검색어 (roomName, roomEsntlId, checkinName, contractorName을 like 검색)"
  *       - in: query
  *         name: disableDeleted
  *         required: false
@@ -595,7 +597,7 @@ router.delete('/delete', depositController.deleteDeposit);
  *                           depositAmount:
  *                             type: integer
  *                             nullable: true
- *                             description: 보증금 (deposit.depositAmount)
+ *                             description: 보증금 (deposit.amount)
  *                             example: 500000
  *                           moveInDate:
  *                             type: string
