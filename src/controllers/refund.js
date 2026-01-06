@@ -365,7 +365,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 
 		const {
 			contractEsntlId,
-			cancelReason, // EXPIRED_CHECKOUT, MIDDLE_CHECKOUT, CONTRACT_CANCEL
+			cancelReason, // FULL, INTERIM, CANCEL, ETC
 			cancelDate,
 			cancelMemo,
 			liabilityReason, // OWNER, OCCUPANT
@@ -397,9 +397,10 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 
 		// 취소사유 유효성 검증 및 매핑
 		const cancelReasonMap = {
-			EXPIRED_CHECKOUT: 'FULL',
-			MIDDLE_CHECKOUT: 'INTERIM',
-			CONTRACT_CANCEL: 'CANCEL',
+			FULL: 'FULL',
+			INTERIM: 'INTERIM',
+			CANCEL: 'CANCEL',
+			ETC: 'ETC',
 		};
 		const validCancelReasons = Object.keys(cancelReasonMap);
 		if (!validCancelReasons.includes(cancelReason)) {
@@ -415,7 +416,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			`
 			SELECT 
 				RC.*,
-				C.name AS customerName,
+				C.name AS customerNameFromCustomer,
 				D.contractorEsntlId,
 				CT.name AS contractorName
 			FROM roomContract RC
@@ -441,37 +442,63 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 
 		// customerName, reservationEsntlId, reservationName, contractorEsntlId, contractorName 설정
 		// 정보가 없다면 모두 customerEsntlId를 기준으로 공통으로 값을 넣어줌
-		const customerName = contract.customerName || null;
+		const customerName =
+			contract.customerName || contract.customerNameFromCustomer || null;
 		const reservationEsntlId = contract.customerEsntlId || null; // 예약자 정보가 없으면 입실자와 동일
-		const reservationName = contract.customerName || null; // 예약자 이름이 없으면 입실자 이름과 동일
+		const reservationName =
+			contract.customerName || contract.customerNameFromCustomer || null; // 예약자 이름이 없으면 입실자 이름과 동일
 		const contractorEsntlId = contract.contractorEsntlId || contract.customerEsntlId || null; // 계약자 정보가 없으면 입실자와 동일
 		const contractorName = contract.contractorName || contract.customerName || null; // 계약자 이름이 없으면 입실자 이름과 동일
 
 
-		// 환불 정보 생성 (refund 테이블 사용)
-		const refundId = await generateRefundId(transaction);
-		const refundRecord = await refund.create(
+		// il_room_refund_request 테이블에 환불 정보 저장 (refund 테이블 사용 안 함)
+		const leaveReason =
+			cancelMemo ||
+			(cancelReasonMap[cancelReason]
+				? `${cancelReasonMap[cancelReason]} 퇴실`
+				: '퇴실 처리');
+		const [refundInsertResult] = await mariaDBSequelize.query(
+			`
+			INSERT INTO il_room_refund_request (
+				gsw_eid,
+				rom_eid,
+				mbr_eid,
+				ctt_eid,
+				rrr_leave_type_cd,
+				rrr_leave_date,
+				rrr_leave_reason,
+				rrr_payment_amt,
+				rrr_use_period,
+				rrr_use_amt,
+				rrr_penalty_amt,
+				rrr_refund_total_amt,
+				rrr_registrant_id,
+				rrr_update_dtm,
+				rrr_updater_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+			`,
 			{
-				esntlId: refundId,
-				gosiwonEsntlId: contract.gosiwonEsntlId,
-				roomEsntlId: contract.roomEsntlId,
-				contractEsntlId: contractEsntlId,
-				contractorEsntlId: contractorEsntlId,
-				customerEsntlId: contract.customerEsntlId,
-				cancelReason: cancelReason,
-				cancelDate: cancelDate,
-				cancelMemo: cancelMemo || null,
-				liabilityReason: liabilityReason || null,
-				contactedOwner: contactedOwner ? 1 : 0,
-				refundMethod: refundMethod || null,
-				paymentAmount: paymentAmount || 0,
-				proratedRent: proratedRent || 0,
-				penalty: penalty || 0,
-				totalRefundAmount: totalRefundAmount || 0,
-				deleteYN: 'N',
-			},
-			{ transaction }
+				replacements: [
+					contract.gosiwonEsntlId,
+					contract.roomEsntlId,
+					contract.customerEsntlId,
+					contractEsntlId,
+					rrr_leave_type_cd,
+					cancelDate,
+					leaveReason,
+					paymentAmount || 0,
+					null, // rrr_use_period: 일할 기간 정보 없음
+					proratedRent || 0,
+					penalty || 0,
+					totalRefundAmount || 0,
+					writerAdminId,
+					writerAdminId,
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
 		);
+		const rrrSno = refundInsertResult?.insertId || refundInsertResult;
 
 		// roomStatus를 CHECKOUT_CONFIRMED로 업데이트 (contractEsntlId 기준)
 		await mariaDBSequelize.query(
@@ -490,12 +517,11 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 
 		// roomContract 테이블의 status 업데이트
 		// cancelReason이 CONTRACT_CANCEL이면 CANCEL, 그 외에는 FIN
-		const contractStatus = cancelReason === 'CONTRACT_CANCEL' ? 'CANCEL' : 'FIN';
+		const contractStatus = cancelReason === 'CANCEL' ? 'CANCEL' : 'FIN';
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomContract 
-			SET status = ?,
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+			SET status = ?
 			WHERE esntlId = ?
 		`,
 			{
@@ -532,9 +558,10 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		// History 기록 생성
 		const historyId = await generateHistoryId(transaction);
 		const cancelReasonText = {
-			EXPIRED_CHECKOUT: '만기퇴실',
-			MIDDLE_CHECKOUT: '중도퇴실',
-			CONTRACT_CANCEL: '계약취소',
+			FULL: '만기퇴실',
+			INTERIM: '중도퇴실',
+			CANCEL: '계약취소',
+			ETC: '기타',
 		};
 		const liabilityReasonText = {
 			OWNER: '사장님',
@@ -553,7 +580,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				contractEsntlId: contractEsntlId,
-				etcEsntlId: String(refundId),
+				etcEsntlId: String(rrrSno),
 				content: historyContent,
 				category: 'REFUND',
 				priority: 'NORMAL',
@@ -568,7 +595,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '환불 및 퇴실처리 성공', {
-			refundId: refundId,
+			rrr_sno: rrrSno,
 			historyId: historyId,
 			roomStatus: 'CHECKOUT_CONFIRMED',
 		});

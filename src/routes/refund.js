@@ -17,7 +17,7 @@ const refundController = require('../controllers/refund');
  * /v1/refund/process:
  *   post:
  *     summary: 환불 및 퇴실처리
- *     description: '계약에 대한 환불 및 퇴실처리를 수행합니다. refund 테이블에 환불 정보를 저장하고, roomStatus를 CHECKOUT_CONFIRMED로 업데이트하며, history에 기록을 남깁니다. 취소사유 (EXPIRED_CHECKOUT: 만기퇴실, MIDDLE_CHECKOUT: 중도퇴실, CONTRACT_CANCEL: 계약취소), liabilityReason: 귀책사유 (OWNER: 사장님, OCCUPANT: 입실자). check_basic_sell이 true인 경우 기본 판매 설정을 사용하고, false인 경우 unableCheckInReason이 있으면 BEFORE_SALES 상태로 설정하며, 없으면 사용자 지정 날짜를 사용합니다.'
+ *     description: '계약에 대한 환불 및 퇴실처리를 수행합니다. 환불 요청을 il_room_refund_request 테이블에 저장하고, roomStatus를 CHECKOUT_CONFIRMED로 업데이트하며, history에 기록을 남깁니다. 취소사유 (FULL: 만기퇴실, INTERIM: 중도퇴실, CANCEL: 계약취소, ETC: 기타), liabilityReason: 귀책사유 (OWNER: 사장님, OCCUPANT: 입실자). check_basic_sell이 true인 경우 기본 판매 설정을 사용하고, false인 경우 unableCheckInReason이 있으면 BEFORE_SALES 상태로 설정하며, 없으면 사용자 지정 날짜를 사용합니다.'
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -38,9 +38,9 @@ const refundController = require('../controllers/refund');
  *                 example: RCO0000000001
  *               cancelReason:
  *                 type: string
- *                 enum: [EXPIRED_CHECKOUT, MIDDLE_CHECKOUT, CONTRACT_CANCEL]
- *                 description: '취소사유 (EXPIRED_CHECKOUT: 만기퇴실, MIDDLE_CHECKOUT: 중도퇴실, CONTRACT_CANCEL: 계약취소)'
- *                 example: MIDDLE_CHECKOUT
+ *                 enum: [FULL, INTERIM, CANCEL, ETC]
+ *                 description: '취소사유 (FULL: 만기퇴실, INTERIM: 중도퇴실, CANCEL: 계약취소, ETC: 기타)'
+ *                 example: FULL
  *               cancelDate:
  *                 type: string
  *                 format: date
