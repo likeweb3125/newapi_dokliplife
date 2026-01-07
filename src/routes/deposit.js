@@ -276,80 +276,6 @@ router.post('/reservationRegist', depositController.registerDeposit);
 
 /**
  * @swagger
- * /v1/deposit/getRoomDepositList:
- *   get:
- *     summary: 방 보증금/예약금 이력 조회
- *     description: 'roomEsntlId와 type(RESERVATION, DEPOSIT)으로 deposit 테이블 이력을 조회합니다.'
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: roomEsntlId
- *         required: true
- *         schema:
- *           type: string
- *         description: 방 고유 아이디
- *         example: ROOM0000000001
- *       - in: query
- *         name: type
- *         required: true
- *         schema:
- *           type: string
- *           enum: [RESERVATION, DEPOSIT]
- *         description: '조회 타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *         example: RESERVATION
- *     responses:
- *       200:
- *         description: 방 보증금/예약금 이력 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 statusCode:
- *                   type: integer
- *                   example: 200
- *                 message:
- *                   type: string
- *                   example: 방 보증금/예약금 이력 조회 성공
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       status:
- *                         type: string
- *                         description: 상태
- *                         example: PENDING
- *                       date:
- *                         type: string
- *                         format: date-time
- *                         description: 날짜 (depositDate)
- *                       amount:
- *                         type: integer
- *                         description: 금액
- *                       paidAmount:
- *                         type: integer
- *                         description: 입금액
- *                       unpaidAmount:
- *                         type: integer
- *                         description: 미납액
- *                       manager:
- *                         type: string
- *                         description: 담당자
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.get('/getRoomDepositList', depositController.getRoomDepositList);
-
-
-/**
- * @swagger
  * /v1/deposit/reservationRegist/list:
  *   get:
  *     summary: 예약금 등록 이력 목록
@@ -749,7 +675,7 @@ router.get('/depositList', depositController.getDepositList);
  * @swagger
  * /v1/deposit/contract-coupon-info:
  *   get:
- *     summary: 사용쿠폰, 계좌정보 확인 (보증근 환불 등록시 사전 조회용)
+ *     summary: 사용쿠폰, 계좌정보 확인 (보증금 환불 등록시 사전 조회용)
  *     description: 계약서 ID로 해당 계약의 쿠폰 사용 여부, 사용된 쿠폰 정보, 계약 기간, 고객 계좌정보를 조회합니다.
  *     tags: [Deposit]
  *     security:
@@ -835,6 +761,10 @@ router.get('/depositList', depositController.getDepositList);
  *                       nullable: true
  *                       description: 고객 계좌번호 (roomContract.customerEsntlId 기준 customer.bankAccount)
  *                       example: '110-123-456789'
+ *                     remainAmount:
+ *                       type: integer
+ *                       description: '잔액 (depositRefund 테이블에서 해당 contractEsntlId의 최신 값의 status가 PARTIAL이면 remainAmount, 아니면 0)'
+ *                       example: 50000
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -1272,6 +1202,79 @@ router.get('/history', depositController.getDepositHistory);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/gosiwonList', depositController.getGosiwonList);
+
+/**
+ * @swagger
+ * /v1/deposit/getRoomDepositList:
+ *   get:
+ *     summary: 방 보증금/예약금 이력 조회
+ *     description: 'roomEsntlId와 type(RESERVATION, DEPOSIT)으로 deposit 테이블 이력을 조회합니다.'
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디
+ *         example: ROOM0000000001
+ *       - in: query
+ *         name: type
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [RESERVATION, DEPOSIT]
+ *         description: '조회 타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *         example: RESERVATION
+ *     responses:
+ *       200:
+ *         description: 방 보증금/예약금 이력 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 보증금/예약금 이력 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                         description: 상태
+ *                         example: PENDING
+ *                       date:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 날짜 (depositDate)
+ *                       amount:
+ *                         type: integer
+ *                         description: 금액
+ *                       paidAmount:
+ *                         type: integer
+ *                         description: 입금액
+ *                       unpaidAmount:
+ *                         type: integer
+ *                         description: 미납액
+ *                       manager:
+ *                         type: string
+ *                         description: 담당자
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/getRoomDepositList', depositController.getRoomDepositList);
 
 module.exports = router;
 

@@ -1264,6 +1264,26 @@ exports.getContractCouponInfo = async (req, res, next) => {
 			}
 		}
 
+		// depositRefund 테이블에서 제일 최근 값 조회 후, status가 PARTIAL이면 remainAmount 반환
+		const depositRefundQuery = `
+			SELECT remainAmount, status
+			FROM depositRefund
+			WHERE contractEsntlId = ?
+				AND (deleteYN IS NULL OR deleteYN = 'N')
+			ORDER BY createdAt DESC
+			LIMIT 1
+		`;
+
+		const [depositRefundResult] = await mariaDBSequelize.query(depositRefundQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 최신 값이 있고 status가 PARTIAL이면 remainAmount 반환, 아니면 0
+		const remainAmount = depositRefundResult && depositRefundResult.status === 'PARTIAL' && depositRefundResult.remainAmount !== null && depositRefundResult.remainAmount !== undefined
+			? parseInt(depositRefundResult.remainAmount) || 0
+			: 0;
+
 		const result = {
 			contractEsntlId: contractEsntlId,
 			period: {
@@ -1275,6 +1295,7 @@ exports.getContractCouponInfo = async (req, res, next) => {
 			customerName: customerName,
 			bank: customerBank,
 			bankAccount: customerBankAccount,
+			remainAmount: remainAmount,
 		};
 
 		return errorHandler.successThrow(res, '사용쿠폰, 계좌정보 확인 성공', result);
