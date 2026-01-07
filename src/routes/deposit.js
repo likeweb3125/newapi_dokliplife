@@ -237,14 +237,16 @@ router.get('/reservationList', depositController.getReservationList);
  *             required:
  *               - depositDate
  *               - amount
+ *               - roomEsntlId
  *             properties:
  *               roomEsntlId:
  *                 type: string
- *                 description: 방 고유 아이디
+ *                 description: 방 고유 아이디 (roomEsntlId로 고시원 정보 자동 조회)
  *                 example: ROOM0000025359
- *               contractEsntlId:
+ *               gosiwonEsntlId:
  *                 type: string
- *                 description: 방계약 고유 아이디(선택)
+ *                 description: 고시원 고유 아이디 (선택, 입력하지 않으면 roomEsntlId로 자동 조회)
+ *                 example: GOSI0000002416
  *               depositDate:
  *                 type: string
  *                 format: date-time

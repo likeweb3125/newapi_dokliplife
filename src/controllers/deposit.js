@@ -729,8 +729,8 @@ exports.registerDeposit = async (req, res, next) => {
 	try {
 		const decodedToken = verifyAdminToken(req);
 
-		// 1. 입금일자, 입금자, 납입금액, 계약서 id를 받는다. (contractEsntlId는 선택)
-		const { depositDate, depositorName, paidAmount, amount, contractEsntlId, roomEsntlId, gosiwonEsntlId } = req.body;
+		// 1. 입금일자, 입금자, 납입금액을 받는다. (contractEsntlId는 받지 않음, type은 RESERVATION 고정)
+		const { depositDate, depositorName, paidAmount, amount, roomEsntlId, gosiwonEsntlId } = req.body;
 
 		// amount 또는 paidAmount 둘 중 하나를 받음 (Swagger 문서는 amount 사용)
 		const inputPaidAmount = paidAmount !== undefined && paidAmount !== null ? paidAmount : amount;
@@ -742,182 +742,75 @@ exports.registerDeposit = async (req, res, next) => {
 			);
 		}
 
-		let finalContractEsntlId = contractEsntlId || null;
-		let finalGosiwonEsntlId = gosiwonEsntlId || null;
-		let finalRoomEsntlId = roomEsntlId || null;
-		let customerEsntlId = null;
-		let contractorEsntlId = null;
-		let isContractEsntlIdProvided = false;
-
-		// 2. contractEsntlId가 제공된 경우 계약서 정보 조회
-		if (contractEsntlId) {
-			isContractEsntlIdProvided = true;
-			const contractInfo = await mariaDBSequelize.query(
-				`
-				SELECT 
-					RC.esntlId as contractEsntlId,
-					RC.gosiwonEsntlId,
-					RC.roomEsntlId,
-					RC.customerEsntlId
-				FROM roomContract RC
-				WHERE RC.esntlId = ?
-				LIMIT 1
-				`,
-				{
-					replacements: [contractEsntlId],
-					type: mariaDBSequelize.QueryTypes.SELECT,
-			transaction,
-				}
-			);
-
-			if (!contractInfo || contractInfo.length === 0) {
-				errorHandler.errorThrow(404, '계약서 정보를 찾을 수 없습니다.');
-			}
-
-			finalGosiwonEsntlId = contractInfo[0].gosiwonEsntlId;
-			finalRoomEsntlId = contractInfo[0].roomEsntlId;
-			customerEsntlId = contractInfo[0].customerEsntlId || null;
-			
-			// roomStatus에서 contractorEsntlId 가져오기
-			const roomStatusInfo = await mariaDBSequelize.query(
-				`
-				SELECT contractorEsntlId
-				FROM roomStatus
-				WHERE contractEsntlId = ?
-				ORDER BY updatedAt DESC
-				LIMIT 1
-				`,
-				{
-					replacements: [contractEsntlId],
-					type: mariaDBSequelize.QueryTypes.SELECT,
-					transaction,
-				}
-			);
-			if (roomStatusInfo && roomStatusInfo.length > 0) {
-				contractorEsntlId = roomStatusInfo[0].contractorEsntlId || null;
-			}
-		} else {
-			// contractEsntlId가 없으면 roomEsntlId와 gosiwonEsntlId가 필수
-			if (!roomEsntlId || !gosiwonEsntlId) {
-				errorHandler.errorThrow(
-					400,
-					'contractEsntlId가 없으면 roomEsntlId와 gosiwonEsntlId는 필수입니다.'
-				);
-			}
+		// 2. roomEsntlId는 필수
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
 		}
 
-		const paidAmountInt = parseInt(inputPaidAmount);
-		let depositAmountValue = 0;
-		let isNewDeposit = false;
-		let existingDeposit = null;
-		let totalPaidAmount = 0;
-		let currentTotalPaid = 0;
-		let unpaidAmount = 0;
-		let newStatus = 'PENDING';
-
-		// 3. contractEsntlId가 있는 경우에만 기존 deposit 조회
-		if (isContractEsntlIdProvided) {
-			existingDeposit = await deposit.findOne({
-			where: {
-					contractEsntlId: finalContractEsntlId,
-					deleteYN: { [Op.or]: [null, 'N'] },
-					type: 'RESERVATION',
-				},
-				order: [['createdAt', 'DESC']],
+		// 3. roomEsntlId로 room 정보 조회하여 gosiwonEsntlId 자동 가져오기
+		const roomInfo = await room.findOne({
+			where: { esntlId: roomEsntlId },
+			attributes: ['gosiwonEsntlId'],
 			transaction,
 		});
 
-			if (!existingDeposit) {
-				// 기존 보증금 정보가 없으면 PENDING 상태로 새로운 deposit 레코드 생성
-				isNewDeposit = true;
-				// room 테이블에서 보증금 정보 가져오기
-				const roomInfo = await room.findOne({
-					where: { esntlId: finalRoomEsntlId },
-					attributes: ['deposit'],
-					transaction,
-				});
-				depositAmountValue = roomInfo?.deposit || 0;
-			} else {
-				depositAmountValue = existingDeposit.amount || existingDeposit.depositAmount || 0;
-			}
-
-			// 같은 계약서 ID의 모든 deposit 레코드에서 paidAmount 합계 계산
-			const allDepositsForContract = await deposit.findAll({
-				where: {
-				contractEsntlId: finalContractEsntlId,
-					deleteYN: { [Op.or]: [null, 'N'] },
-					type: 'RESERVATION',
-				},
-				attributes: ['paidAmount'],
-				transaction,
-			});
-
-			totalPaidAmount = allDepositsForContract.reduce((sum, d) => {
-				return sum + (parseInt(d.paidAmount) || 0);
-			}, 0);
-
-			currentTotalPaid = totalPaidAmount + paidAmountInt;
-
-			// paidAmount의 합계가 depositAmountValue보다 클 수 없음 (depositAmountValue가 0보다 큰 경우만 검증)
-			if (depositAmountValue > 0 && currentTotalPaid > depositAmountValue) {
-				errorHandler.errorThrow(
-					400,
-					`입금액 합계(${currentTotalPaid}원)가 보증금액(${depositAmountValue}원)을 초과할 수 없습니다.`
-				);
-			}
-
-			// 5. paidAmount 들의 합과 depositAmountValue의 차액이 존재한다면 unpaidAmount에 차액을 저장한다.
-			unpaidAmount = depositAmountValue > currentTotalPaid ? depositAmountValue - currentTotalPaid : 0;
-
-			// 4, 6. 상태 결정
-			// 기존 보증금 정보가 없으면 PENDING 상태로 생성
-			// 기존 depositAmountValue에 비해 납입금액이 작으면 PARTIAL
-			// 기존 depositAmountValue에 비해 납입금액이 같거나, paidAmount 들의 합과 depositAmountValue의 차액이 없으면 COMPLETED
-			if (!isNewDeposit) {
-				newStatus = 'PARTIAL';
-				if (currentTotalPaid >= depositAmountValue || unpaidAmount === 0) {
-					newStatus = 'COMPLETED';
-				}
-			}
-		} else {
-			// contractEsntlId가 없으면 PENDING 상태로 등록하고 depositAmountValue에만 금액 등록
-			isNewDeposit = true;
-			depositAmountValue = paidAmountInt; // depositAmountValue에 paidAmount 값 저장
-			unpaidAmount = 0; // contractEsntlId가 없으면 미납금액 없음
-			totalPaidAmount = 0;
-			currentTotalPaid = 0;
+		if (!roomInfo) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
 		}
 
-		// 새로운 deposit 레코드 생성 (기존 값을 수정하는게 아니라 추가)
+		// gosiwonEsntlId는 room에서 가져오거나 입력값 사용 (입력값이 있으면 우선)
+		const finalGosiwonEsntlId = gosiwonEsntlId || roomInfo.gosiwonEsntlId;
+		
+		if (!finalGosiwonEsntlId) {
+			errorHandler.errorThrow(400, '고시원 정보를 찾을 수 없습니다.');
+		}
+
+		// 4. contractEsntlId는 받지 않음 (예약금 등록은 계약서 없이 가능)
+		const finalContractEsntlId = null;
+		const finalRoomEsntlId = roomEsntlId;
+		const customerEsntlId = null;
+		const contractorEsntlId = null;
+		const isContractEsntlIdProvided = false;
+
+		const paidAmountInt = parseInt(inputPaidAmount);
+		// contractEsntlId가 없으므로 항상 새로운 예약금으로 등록 (type: RESERVATION 고정)
+		const isNewDeposit = true;
+		const depositAmountValue = paidAmountInt; // depositAmountValue에 paidAmount 값 저장
+		const unpaidAmount = 0; // 예약금 등록은 미납금액 없음
+		const totalPaidAmount = 0;
+		const currentTotalPaid = 0;
+		const newStatus = 'PENDING';
+
+		// 새로운 예약금 레코드 생성 (type: RESERVATION 고정)
 		const managerId = getWriterAdminId(decodedToken);
 		const newDepositId = await generateDepositId(transaction);
 		
-		// contractEsntlId가 없을 때는 depositAmountValue에만 금액 등록 (paidAmount, unpaidAmount는 모두 0)
-		const finalAmount = isContractEsntlIdProvided ? depositAmountValue : paidAmountInt;
-		const finalPaidAmount = isContractEsntlIdProvided ? paidAmountInt : 0;
-		const finalUnpaidAmount = isContractEsntlIdProvided ? unpaidAmount : 0;
+		// 예약금 등록은 depositAmountValue에만 금액 등록 (paidAmount, unpaidAmount는 모두 0)
+		const finalAmount = depositAmountValue;
+		const finalPaidAmount = 0;
+		const finalUnpaidAmount = 0;
 		
 		const newDeposit = await deposit.create(
 			{
 				esntlId: newDepositId,
 				roomEsntlId: finalRoomEsntlId,
 				gosiwonEsntlId: finalGosiwonEsntlId,
-				customerEsntlId: isNewDeposit ? (customerEsntlId || null) : (existingDeposit?.customerEsntlId || null),
-				contractorEsntlId: isNewDeposit ? (contractorEsntlId || null) : (existingDeposit?.contractorEsntlId || null),
+				customerEsntlId: customerEsntlId,
+				contractorEsntlId: contractorEsntlId,
 				contractEsntlId: finalContractEsntlId,
-				type: 'RESERVATION',
+				type: 'RESERVATION', // 고정
 				amount: finalAmount,
 				paidAmount: finalPaidAmount,
 				unpaidAmount: finalUnpaidAmount,
-				accountBank: isNewDeposit ? null : (existingDeposit?.accountBank || null),
-				accountNumber: isNewDeposit ? null : (existingDeposit?.accountNumber || null),
-				accountHolder: isNewDeposit ? null : (existingDeposit?.accountHolder || null),
+				accountBank: null,
+				accountNumber: null,
+				accountHolder: null,
 				status: newStatus,
 				manager: managerId,
 				depositDate: depositDate,
 				depositorName: depositorName || null,
-				virtualAccountNumber: isNewDeposit ? null : (existingDeposit?.virtualAccountNumber || null),
-				virtualAccountExpiryDate: isNewDeposit ? null : (existingDeposit?.virtualAccountExpiryDate || null),
+				virtualAccountNumber: null,
+				virtualAccountExpiryDate: null,
 				deleteYN: 'N',
 			},
 			{ transaction }
