@@ -730,11 +730,20 @@ exports.getRefundRequestList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { eId, year, month, day, search, draw, start, length } = req.query;
+		const {
+			eId,
+			year,
+			month,
+			day,
+			search,
+			page = 1,
+			limit = 50,
+		} = req.query;
 
-		// DataTables 파라미터
-		const limit = length ? parseInt(length) : 20;
-		const offset = start ? parseInt(start) : 0;
+		// 페이지 기반 페이징 (depositList와 동일하게 page/limit 사용)
+		const safePage = Math.max(parseInt(page) || 1, 1);
+		const safeLimit = Math.max(parseInt(limit) || 50, 1);
+		const offset = (safePage - 1) * safeLimit;
 
 		// WHERE 조건 구성
 		let whereClause = "WHERE NOT PL.paymentType = 'REFUND'";
@@ -823,7 +832,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 		`;
 
 		const rows = await mariaDBSequelize.query(query, {
-			replacements: [...replacements, limit, offset],
+			replacements: [...replacements, safeLimit, offset],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -853,12 +862,14 @@ exports.getRefundRequestList = async (req, res, next) => {
 		const recordsTotal = totalCountResult[0]?.total || 0;
 		const data = Array.isArray(rows) ? rows : [];
 
-		// DataTables 형식으로 응답
+		// 페이지 기반 형식으로 응답
 		const result = {
-			data: data,
-			recordsTotal: recordsTotal,
-			recordsFiltered: recordsFiltered,
-			draw: draw ? parseInt(draw) : 1,
+			data,
+			total: recordsFiltered,
+			page: safePage,
+			limit: safeLimit,
+			totalPages: Math.ceil(recordsFiltered / safeLimit) || 0,
+			recordsTotal, // 필터 미적용 전체 건수 (참고용)
 		};
 
 		return errorHandler.successThrow(res, '환불 요청 목록 조회 성공', result);

@@ -302,26 +302,21 @@ router.post('/refundInsert', refundController.refundInsert);
  *         description: '검색어 (고시원명, 방번호, 입실자명, 연락처 검색)'
  *         example: 'test'
  *       - in: query
- *         name: draw
+ *         name: page
  *         required: false
  *         schema:
  *           type: integer
- *         description: DataTables draw 파라미터
+ *           default: 1
+ *         description: 페이지 번호 (depositList와 동일)
  *         example: 1
  *       - in: query
- *         name: start
+ *         name: limit
  *         required: false
  *         schema:
  *           type: integer
- *         description: DataTables start 파라미터 (페이징 시작 위치)
- *         example: 0
- *       - in: query
- *         name: length
- *         required: false
- *         schema:
- *           type: integer
- *         description: DataTables length 파라미터 (페이지당 항목 수)
- *         example: 10
+ *           default: 50
+ *         description: 페이지당 항목 수 (depositList와 동일)
+ *         example: 20
  *     responses:
  *       200:
  *         description: 환불 요청 목록 조회 성공

@@ -1,6 +1,6 @@
 const {
 	mariaDBSequelize,
-	paymentLog,
+	extraPayment,
 	roomContract,
 	room,
 	customer,
@@ -12,21 +12,21 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 
-const PYLG_PREFIX = 'PYLG';
-const PYLG_PADDING = 10;
+const EXTR_PREFIX = 'EXTR';
+const EXTR_PADDING = 10;
 
-// paymentLog ID 생성 함수 (PYLG 접두사 사용, 마지막 키값 확인)
-const generatePaymentLogId = async (transaction) => {
+// extraPayment ID 생성 함수 (EXTR 접두사 사용, 마지막 키값 확인)
+const generateExtraPaymentId = async (transaction) => {
 	const idQuery = `
-		SELECT CONCAT('PYLG', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-		FROM paymentLog
-		WHERE esntlId LIKE 'PYLG%'
+		SELECT CONCAT('EXTR', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+		FROM extraPayment
+		WHERE esntlId LIKE 'EXTR%'
 	`;
 	const [idResult] = await mariaDBSequelize.query(idQuery, {
 		type: mariaDBSequelize.QueryTypes.SELECT,
 		transaction,
 	});
-	return idResult?.nextId || 'PYLG0000000001';
+	return idResult?.nextId || 'EXTR0000000001';
 };
 
 // 공통 토큰 검증 함수
@@ -159,10 +159,10 @@ exports.roomExtraPayment = async (req, res, next) => {
 			}
 
 			// esntlId 생성
-			const esntlId = await generatePaymentLogId(transaction);
+			const esntlId = await generateExtraPaymentId(transaction);
 
-			// paymentLog 생성
-			const extraPayment = await paymentLog.create(
+			// extraPayment 생성
+			const extraPaymentRecord = await extraPayment.create(
 				{
 					esntlId: esntlId,
 					contractEsntlId: contractEsntlId,
@@ -175,25 +175,22 @@ exports.roomExtraPayment = async (req, res, next) => {
 					useStartDate: useStartDate || null,
 					optionName: optionName || null,
 					extendWithPayment: extendWithPayment ? 1 : 0,
-					isExtra: 1, // 옵션에서 발생한 추가 결제
 					pDate: pDate,
 					pTime: pTime,
 					paymentAmount: String(Math.abs(parseInt(cost, 10))),
-					discountAmount: '0',
-					paymentPoint: '0',
-					paymentCoupon: '0',
-					calAmount: '',
 					pyl_goods_amount: Math.abs(parseInt(cost, 10)),
 					imp_uid: '', // 추가 결제 요청 시 PG 결제 전이므로 빈 문자열
 					paymentType: null, // paymentType은 결제 주체(수단)이므로 추가 결제 요청 시에는 null
+					withdrawalStatus: null,
+					deleteYN: 'N',
 				},
 				{ transaction }
 			);
 
 			createdPayments.push({
-				esntlId: extraPayment.esntlId,
-				extraCostName: extraPayment.extraCostName,
-				cost: parseInt(extraPayment.paymentAmount, 10),
+				esntlId: extraPaymentRecord.esntlId,
+				extraCostName: extraPaymentRecord.extraCostName,
+				cost: parseInt(extraPaymentRecord.paymentAmount, 10),
 			});
 
 			totalAmount += Math.abs(parseInt(cost, 10));

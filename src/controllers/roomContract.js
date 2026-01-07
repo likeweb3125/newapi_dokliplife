@@ -298,24 +298,24 @@ exports.getContractDetail = async (req, res, next) => {
 			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
 		}
 
-		// 결제 내역 조회 (paymentLog 기준)
+		// 결제 내역 조회 (extraPayment만 사용)
 		const paymentQuery = `
 			SELECT 
-				pyl.pDate,
-				pyl.pTime,
-				pyl.pyl_goods_amount AS pyl_goods_amount,
-				FORMAT(IFNULL(pyl.paymentAmount, 0), 0) AS paymentAmount,
-				FORMAT(IFNULL(pyl.paymentPoint, 0), 0) AS paymentPoint,
-				FORMAT(IFNULL(pyl.paymentCoupon, 0), 0) AS paymentCoupon,
-				ucp.name AS couponName,
-				pyl.paymentType,
-				pyl.extraCostName,
-				pyl.isExtra,
-				pyl.extendWithPayment
-			FROM paymentLog pyl
-			LEFT JOIN userCoupon AS ucp ON pyl.ucp_eid = ucp.esntlId
-			WHERE pyl.contractEsntlId = ?
-			ORDER BY pyl.pDate DESC, pyl.pTime DESC
+				ep.pDate,
+				ep.pTime,
+				ep.pyl_goods_amount AS pyl_goods_amount,
+				FORMAT(IFNULL(ep.paymentAmount, 0), 0) AS paymentAmount,
+				'0' AS paymentPoint,
+				'0' AS paymentCoupon,
+				NULL AS couponName,
+				ep.paymentType,
+				ep.extraCostName,
+				1 AS isExtra,
+				ep.extendWithPayment
+			FROM extraPayment ep
+			WHERE ep.contractEsntlId = ?
+				AND ep.deleteYN = 'N'
+			ORDER BY ep.pDate DESC, ep.pTime DESC
 		`;
 
 		const paymentList = await mariaDBSequelize.query(paymentQuery, {

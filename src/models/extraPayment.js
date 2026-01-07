@@ -1,0 +1,148 @@
+module.exports = (sequelize, DataTypes) => {
+	return sequelize.define(
+		'extraPayment',
+		{
+			esntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				primaryKey: true,
+				field: 'esntlId',
+				comment: '추가 결제 고유아이디',
+			},
+			contractEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				field: 'contractEsntlId',
+				comment: '계약 고유아이디',
+			},
+			gosiwonEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				field: 'gosiwonEsntlId',
+				comment: '고시원 고유아이디',
+			},
+			roomEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				field: 'roomEsntlId',
+				comment: '방 고유아이디',
+			},
+			customerEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				defaultValue: '',
+				field: 'customerEsntlId',
+				comment: '고객 고유아이디',
+			},
+			extraCostName: {
+				type: DataTypes.STRING(200),
+				allowNull: false,
+				field: 'extraCostName',
+				comment: '추가비용명칭 (주차비, 추가 입실료, 직접 입력 등)',
+			},
+			memo: {
+				type: DataTypes.TEXT,
+				allowNull: true,
+				field: 'memo',
+				comment: '메모 (ex. 2인 추가 / 정가 계산 등)',
+			},
+			optionInfo: {
+				type: DataTypes.STRING(200),
+				allowNull: true,
+				field: 'optionInfo',
+				comment: '옵션정보 (주차비의 경우 차량정보, 직접 입력의 경우 옵션명 등)',
+			},
+			useStartDate: {
+				type: DataTypes.DATEONLY,
+				allowNull: true,
+				field: 'useStartDate',
+				comment: '이용 시작 일자 (주차비, 직접 입력의 경우)',
+			},
+			optionName: {
+				type: DataTypes.STRING(200),
+				allowNull: true,
+				field: 'optionName',
+				comment: '옵션명 (직접 입력의 경우, 예: 자동차, 오토바이, 기타 비용 등)',
+			},
+			extendWithPayment: {
+				type: DataTypes.TINYINT(1),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'extendWithPayment',
+				comment: '연장시 함께 결제 여부 (0: 미사용, 1: 사용)',
+			},
+			pDate: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'pDate',
+				comment: '결제 날짜',
+			},
+			pTime: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'pTime',
+				comment: '결제 시간',
+			},
+			paymentAmount: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				defaultValue: '0',
+				field: 'paymentAmount',
+				comment: '결제 금액',
+			},
+			pyl_goods_amount: {
+				type: DataTypes.INTEGER(11),
+				allowNull: false,
+				defaultValue: 0,
+				field: 'pyl_goods_amount',
+				comment: '상품금액(원입실료)',
+			},
+			imp_uid: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				defaultValue: '',
+				field: 'imp_uid',
+				comment: 'PG 결제 고유아이디',
+			},
+			paymentType: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'paymentType',
+				comment: '결제 종류',
+			},
+			withdrawalStatus: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'withdrawalStatus',
+				comment: '결제 취소 여부',
+			},
+			deleteYN: {
+				type: DataTypes.CHAR(1),
+				allowNull: false,
+				defaultValue: 'N',
+				field: 'deleteYN',
+				comment: '삭제여부',
+			},
+			deletedBy: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'deletedBy',
+				comment: '삭제한 관리자 ID',
+			},
+			deletedAt: {
+				type: DataTypes.DATE,
+				allowNull: true,
+				field: 'deletedAt',
+				comment: '삭제 시간',
+			},
+		},
+		{
+			tableName: 'extraPayment',
+			timestamps: true,
+			createdAt: 'createdAt',
+			updatedAt: 'updatedAt',
+			freezeTableName: true,
+		}
+	);
+};
+
