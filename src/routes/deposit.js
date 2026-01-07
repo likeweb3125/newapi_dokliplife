@@ -274,6 +274,79 @@ router.get('/reservationList', depositController.getReservationList);
  */
 router.post('/reservationRegist', depositController.registerDeposit);
 
+/**
+ * @swagger
+ * /v1/deposit/getRoomDepositList:
+ *   get:
+ *     summary: 방 보증금/예약금 이력 조회
+ *     description: 'roomEsntlId와 type(RESERVATION, DEPOSIT)으로 deposit 테이블 이력을 조회합니다.'
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디
+ *         example: ROOM0000000001
+ *       - in: query
+ *         name: type
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [RESERVATION, DEPOSIT]
+ *         description: '조회 타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *         example: RESERVATION
+ *     responses:
+ *       200:
+ *         description: 방 보증금/예약금 이력 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 보증금/예약금 이력 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       status:
+ *                         type: string
+ *                         description: 상태
+ *                         example: PENDING
+ *                       date:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 날짜 (depositDate)
+ *                       amount:
+ *                         type: integer
+ *                         description: 금액
+ *                       paidAmount:
+ *                         type: integer
+ *                         description: 입금액
+ *                       unpaidAmount:
+ *                         type: integer
+ *                         description: 미납액
+ *                       manager:
+ *                         type: string
+ *                         description: 담당자
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/getRoomDepositList', depositController.getRoomDepositList);
+
 
 /**
  * @swagger

@@ -1105,6 +1105,59 @@ exports.getDepositHistoryReturnList = async (req, res, next) => {
 	}
 };
 
+// 방 기준 deposit 테이블 이력 조회 (입금 등록 화면용)
+exports.getRoomDepositList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { roomEsntlId, type } = req.query;
+
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
+		}
+
+		const upperType = (type || '').toString().toUpperCase();
+		const allowedTypes = ['RESERVATION', 'DEPOSIT'];
+		if (!upperType || !allowedTypes.includes(upperType)) {
+			errorHandler.errorThrow(
+				400,
+				`type은 ${allowedTypes.join(', ')} 중 하나여야 합니다.`
+			);
+		}
+
+		const rows = await deposit.findAll({
+			where: {
+				roomEsntlId: roomEsntlId,
+				type: upperType,
+				deleteYN: { [Op.or]: [null, 'N'] },
+			},
+			attributes: [
+				'status',
+				'depositDate',
+				'amount',
+				'paidAmount',
+				'unpaidAmount',
+				'manager',
+			],
+			order: [['depositDate', 'DESC'], ['createdAt', 'DESC']],
+			raw: true,
+		});
+
+		const result = (rows || []).map((r) => ({
+			status: r.status || null,
+			date: r.depositDate || null,
+			amount: r.amount ?? null,
+			paidAmount: r.paidAmount ?? null,
+			unpaidAmount: r.unpaidAmount ?? null,
+			manager: r.manager || null,
+		}));
+
+		return errorHandler.successThrow(res, '방 보증금/예약금 이력 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
 // 계약서 쿠폰 정보 조회
 exports.getContractCouponInfo = async (req, res, next) => {
 	try {
