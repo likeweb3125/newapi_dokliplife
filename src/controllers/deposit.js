@@ -1145,6 +1145,7 @@ exports.getRoomDepositList = async (req, res, next) => {
 				'paidAmount',
 				'unpaidAmount',
 				'manager',
+				'depositorName',
 			],
 			order: [['depositDate', 'DESC'], ['createdAt', 'DESC']],
 			raw: true,
@@ -1157,6 +1158,7 @@ exports.getRoomDepositList = async (req, res, next) => {
 			paidAmount: r.paidAmount ?? null,
 			unpaidAmount: r.unpaidAmount ?? null,
 			manager: r.manager || null,
+			depositorName: r.depositorName || null,
 		}));
 
 		return errorHandler.successThrow(res, '방 보증금/예약금 이력 조회 성공', result);

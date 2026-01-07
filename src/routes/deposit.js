@@ -1267,6 +1267,10 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *                       manager:
  *                         type: string
  *                         description: 담당자
+ *                       depositorName:
+ *                         type: string
+ *                         description: 입금자명
+ *                         nullable: true
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
