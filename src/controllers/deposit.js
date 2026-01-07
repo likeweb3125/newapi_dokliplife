@@ -264,6 +264,9 @@ exports.createDeposit = async (req, res, next) => {
 			contractStatus,
 			virtualAccountNumber,
 			virtualAccountExpiryDate,
+			depositDate,
+			depositorName,
+			depositorPhone,
 		} = req.body;
 
 		// type은 DEPOSIT으로 고정
@@ -357,7 +360,10 @@ exports.createDeposit = async (req, res, next) => {
 				moveInDate: moveInDate || null,
 				moveOutDate: moveOutDate || null,
 				contractStatus: contractStatus || null,
-				status: 'DEPOSIT_PENDING',
+				status: 'PENDING',
+				depositDate: depositDate || null,
+				depositorName: depositorName || null,
+				depositorPhone: depositorPhone || null,
 				virtualAccountNumber: virtualAccountNumber || null,
 				virtualAccountExpiryDate: virtualAccountExpiryDate || null,
 				deleteYN: 'N',
@@ -372,11 +378,12 @@ exports.createDeposit = async (req, res, next) => {
 				esntlId: historyId,
 				depositEsntlId: esntlId,
 				roomEsntlId: roomEsntlId, // 방 고유아이디 저장
-					contractEsntlId: contractEsntlId || null,
+				contractEsntlId: contractEsntlId || null,
 				type: 'DEPOSIT',
 				amount: 0,
 				status: 'DEPOSIT_PENDING',
-				depositorName: null,
+				depositorName: depositorName || null,
+				depositDate: depositDate || null,
 				manager: '시스템',
 			},
 			{ transaction }
