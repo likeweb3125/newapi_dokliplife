@@ -126,7 +126,7 @@ exports.getGosiwonInfo = async (req, res, next) => {
                     ,GA.hp adminHP, GA.ceo admin
                     ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
                     ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
-                    ,GU.deposit,GU.qualified,GU.minAge,GU.maxAge,GU.minUsedDate,GU.gender,GU.foreignLanguage,GU.orderData useOrderData 
+                    ,GU.deposit depositAmount,GU.qualified,GU.minAge,GU.maxAge,GU.minUsedDate,GU.gender,GU.foreignLanguage,GU.orderData useOrderData 
                     ,IGC.gsc_checkin_able_date ableCheckDays, IGC.gsc_sell_able_period ableContractDays, IGC.gsc_checkInTimeStart checkInTimeStart, IGC.gsc_checkInTimeEnd checkInTimeEnd, IGC.gsc_checkOutTime checkOutTime
 			FROM gosiwon G 
 			LEFT OUTER JOIN room R 

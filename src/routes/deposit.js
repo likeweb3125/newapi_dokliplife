@@ -614,6 +614,11 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                             nullable: true
  *                             description: 보증금 (deposit.amount)
  *                             example: 500000
+ *                           contractEsntlId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 계약 고유 아이디 (roomContract.esntlId)
+ *                             example: RCTT0000000001
  *                           moveInDate:
  *                             type: string
  *                             format: date
