@@ -656,6 +656,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				pl.pDate,
 				pl.pTime,
 				pl.paymentType,
+				pl.isExtra,
 				pl.contractEsntlId AS contractEsntlId,
 				pl.gosiwonEsntlId,
 				(SELECT name FROM gosiwon WHERE esntlId = pl.gosiwonEsntlId) AS gosiwonName,
@@ -759,6 +760,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				pDate,
 				pTime,
 				paymentType,
+				isExtra,
 				contractEsntlId,
 				gosiwonEsntlId,
 				gosiwonName,
@@ -785,11 +787,11 @@ exports.getRealTimeList = async (req, res, next) => {
 				contractType,
 			} = ele;
 
-			// contractType을 기반으로 payType 결정 (입실료: checkInPay, 추가결제: extraPay)
+			// isExtra 값을 payType으로 변환 (0: checkInPay, 1: extraPay)
 			let payType = null;
-			if (contractType === '입실료') {
+			if (isExtra === 0 || isExtra === '0' || isExtra === false) {
 				payType = 'checkInPay';
-			} else if (contractType === '추가결제') {
+			} else if (isExtra === 1 || isExtra === '1' || isExtra === true) {
 				payType = 'extraPay';
 			}
 
@@ -800,6 +802,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				pTime,
 				payMethod: paymentType || null,
 				payType: payType,
+				isExtra: isExtra,
 				contractEsntlId,
 				gosiwonEsntlId,
 				gosiwonName,

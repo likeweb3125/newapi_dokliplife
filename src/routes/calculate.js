@@ -1,21 +1,20 @@
 const express = require('express');
 const router = express.Router();
 
-// TODO: 실제 컨트롤러 함수 연결 필요
-// const calculateController = require('../controllers/calculate');
+const calculateController = require('../controllers/calculate');
 
 /**
  * @swagger
  * tags:
  *   name: 일일 정산관리
- *   description: 일별 고시원 정산 관리 API (2023년 8월 이후)
+ *   description: 일별 고시원 정산 관리 API
  */
 
 /**
  * @swagger
  * /v1/calculate/daily/list:
  *   post:
- *     summary: 일별 고시원 정산 목록 조회 (2023년 8월 이후)
+ *     summary: 일별 고시원 정산 목록 조회
  *     description: 일별 고시원 정산 목록을 조회합니다. DataTables 형식으로 반환됩니다.
  *     tags: [일일 정산관리]
  *     security:
@@ -180,13 +179,13 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-// router.post('/daily/list', calculateController.selectListToCalculateDaily);
+router.post('/daily/list', calculateController.selectListToCalculateDaily);
 
 /**
  * @swagger
  * /v1/calculate/daily/admin/list:
  *   post:
- *     summary: 일별 고시원 정산 목록 조회 - 관리자 (2023년 8월 이후)
+ *     summary: 일별 고시원 정산 목록 조회 - 관리자
  *     description: 관리자용 일별 고시원 정산 목록을 조회합니다. DataTables 형식으로 반환됩니다.
  *     tags: [일일 정산관리]
  *     security:
@@ -388,13 +387,13 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-// router.post('/daily/admin/list', calculateController.selectCalculateAdminByDate);
+router.post('/daily/admin/list', calculateController.selectCalculateAdminByDate);
 
 /**
  * @swagger
  * /v1/calculate/daily/detail:
  *   post:
- *     summary: 일별 고시원 정산 세부 내역 조회 (2023년 8월 이후)
+ *     summary: 일별 고시원 정산 세부 내역 조회
  *     description: 일별 고시원 정산 세부 내역을 조회합니다. 결제/환불 구분별로 조회 가능합니다.
  *     tags: [일일 정산관리]
  *     security:
@@ -548,13 +547,13 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-// router.post('/daily/detail', calculateController.selectListCalculateCompleteByType);
+router.post('/daily/detail', calculateController.selectListCalculateCompleteByType);
 
 /**
  * @swagger
  * /v1/calculate/daily/payment/list:
  *   post:
- *     summary: 일별 고시원 정산 결제 내역 조회 - 월별 (2023년 8월 이후)
+ *     summary: 일별 고시원 정산 결제 내역 조회 - 월별
  *     description: 일별 고시원 정산 결제 내역을 조회합니다. DataTables 형식으로 반환됩니다.
  *     tags: [일일 정산관리]
  *     security:
@@ -717,7 +716,7 @@ const router = express.Router();
  * @swagger
  * /v1/calculate/daily/payment/detail:
  *   post:
- *     summary: 일별 고시원 정산 결제 내역 조회 - 일별 (2023년 8월 이후)
+ *     summary: 일별 고시원 정산 결제 내역 조회 - 일별
  *     description: 특정 일자의 고시원 정산 결제 내역을 조회합니다. 결제와 환불을 모두 포함합니다.
  *     tags: [일일 정산관리]
  *     security:
@@ -861,7 +860,7 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-// router.post('/daily/payment/detail', calculateController.selectListToPaymentLog);
+router.post('/daily/payment/detail', calculateController.selectListToPaymentLog);
 
 module.exports = router;
 
