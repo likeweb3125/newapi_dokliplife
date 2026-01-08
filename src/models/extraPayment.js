@@ -104,11 +104,18 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'imp_uid',
 				comment: 'PG 결제 고유아이디',
 			},
+			paymentStatus: {
+				type: DataTypes.STRING(50),
+				allowNull: false,
+				defaultValue: 'PENDING',
+				field: 'paymentStatus',
+				comment: '결제 상태 (PENDING: 결제대기, COMPLETED: 결제완료, CANCELLED: 결제취소, FAILED: 결제실패)',
+			},
 			paymentType: {
 				type: DataTypes.STRING(50),
 				allowNull: true,
 				field: 'paymentType',
-				comment: '결제 종류',
+				comment: '결제 방식 (accountPayment: 계좌 결제, cardPayment: 카드 결제, appPayment: 앱 결제, manualPayment: 수동 결제)',
 			},
 			withdrawalStatus: {
 				type: DataTypes.STRING(50),

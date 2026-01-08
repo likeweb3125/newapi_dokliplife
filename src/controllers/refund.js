@@ -807,7 +807,8 @@ exports.getRefundRequestList = async (req, res, next) => {
 				RRR.rrr_payment_amt,
 				RRR.rrr_process_status_cd,
 				RRR.rrr_process_reason,
-				RRR.ctt_eid
+				RRR.ctt_eid,
+				RC.esntlId AS contractId
 			FROM il_room_refund_request RRR
 			LEFT OUTER JOIN gosiwon AS G ON RRR.gsw_eid = G.esntlId
 			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId

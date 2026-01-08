@@ -50,6 +50,7 @@ const refundRoutes = require('./src/routes/refund');
 const roomMoveRoutes = require('./src/routes/roomMove');
 const extraPaymentRoutes = require('./src/routes/extraPayment');
 const parkingManagementRoutes = require('./src/routes/parkingManagement');
+const calculateRoutes = require('./src/routes/calculate');
 
 const errorHandler = require('./src/middleware/error');
 const { logs } = require('./src/middleware/logs');
@@ -143,6 +144,9 @@ app.use('/v1/roomExtraPayment', extraPaymentRoutes);
 
 // 주차 관리 Routes
 app.use('/v1/parking', parkingManagementRoutes);
+
+// 정산 관리 Routes
+app.use('/v1/calculate', calculateRoutes);
 
 app.get('/', (req, res) => {
 	res.send('Welcome to Doklip Life REST API');

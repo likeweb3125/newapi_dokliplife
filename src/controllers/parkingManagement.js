@@ -1,6 +1,6 @@
 const {
 	mariaDBSequelize,
-	paymentLog,
+	extraPayment,
 	roomContract,
 	parking,
 	parkStatus,
@@ -9,8 +9,8 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 
-const PYLG_PREFIX = 'PYLG';
-const PYLG_PADDING = 10;
+const EXTR_PREFIX = 'EXTR';
+const EXTR_PADDING = 10;
 const PARKSTATUS_PREFIX = 'PKST';
 const PARKSTATUS_PADDING = 10;
 const HISTORY_PREFIX = 'HISTORY';
@@ -42,18 +42,18 @@ const verifyAdminToken = (req) => {
 	return decodedToken;
 };
 
-// paymentLog ID 생성 함수
-const generatePaymentLogId = async (transaction) => {
+// extraPayment ID 생성 함수
+const generateExtraPaymentId = async (transaction) => {
 	const idQuery = `
-		SELECT CONCAT('PYLG', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-		FROM paymentLog
-		WHERE esntlId LIKE 'PYLG%'
+		SELECT CONCAT('EXTR', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
+		FROM extraPayment
+		WHERE esntlId LIKE 'EXTR%'
 	`;
 	const [idResult] = await mariaDBSequelize.query(idQuery, {
 		type: mariaDBSequelize.QueryTypes.SELECT,
 		transaction,
 	});
-	return idResult?.nextId || 'PYLG0000000001';
+	return idResult?.nextId || 'EXTR0000000001';
 };
 
 // parkStatus ID 생성 함수
@@ -151,11 +151,11 @@ exports.createParking = async (req, res, next) => {
 		// 현재 날짜/시간
 		const { pDate, pTime } = getCurrentDateTime();
 
-		// paymentLog 생성 (0원이어도 기록)
-		const paymentLogId = await generatePaymentLogId(transaction);
-		await paymentLog.create(
+		// extraPayment 생성 (0원이어도 기록)
+		const paymentId = await generateExtraPaymentId(transaction);
+		await extraPayment.create(
 			{
-				esntlId: paymentLogId,
+				esntlId: paymentId,
 				contractEsntlId: contractEsntlId,
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
@@ -166,17 +166,15 @@ exports.createParking = async (req, res, next) => {
 				useStartDate: useStartDate || null,
 				optionName: optionName,
 				extendWithPayment: extendValue ? 1 : 0,
-				isExtra: 1,
 				pDate: pDate,
 				pTime: pTime,
 				paymentAmount: String(Math.abs(parseInt(cost, 10))),
-				discountAmount: '0',
-				paymentPoint: '0',
-				paymentCoupon: '0',
-				calAmount: '',
 				pyl_goods_amount: Math.abs(parseInt(cost, 10)),
 				imp_uid: cost > 0 ? '' : '', // 0원이면 빈 문자열
+				paymentStatus: 'PENDING', // 결제 상태: PENDING(결제대기), COMPLETED(결제완료), CANCELLED(결제취소), FAILED(결제실패)
 				paymentType: cost > 0 ? null : null, // 0원이면 null
+				withdrawalStatus: null,
+				deleteYN: 'N',
 			},
 			{ transaction }
 		);
@@ -252,7 +250,7 @@ exports.createParking = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '주차 등록이 완료되었습니다.', {
 			contractEsntlId: contractEsntlId,
-			paymentLogId: paymentLogId,
+			paymentLogId: paymentId, // 기존 키 유지
 			parkStatusId: parkStatusId,
 			historyId: historyId,
 		});
@@ -273,36 +271,36 @@ exports.getParkingList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// paymentLog와 parkStatus 조인하여 주차 정보 조회
+		// extraPayment와 parkStatus 조인하여 주차 정보 조회
 		const query = `
 			SELECT 
-				PL.esntlId AS paymentLogId,
+				EP.esntlId AS paymentLogId,
 				PS.esntlId AS parkStatusId,
-				PL.optionName,
-				PL.optionInfo,
+				EP.optionName,
+				EP.optionInfo,
 				PS.useStartDate,
 				PS.useEndDate,
-				PL.pyl_goods_amount AS cost,
-				PL.paymentAmount,
-				PL.paymentType,
-				PL.extendWithPayment,
-				PL.pDate,
-				PL.pTime,
+				EP.pyl_goods_amount AS cost,
+				EP.paymentAmount,
+				EP.paymentType,
+				EP.extendWithPayment,
+				EP.pDate,
+				EP.pTime,
 				PS.status,
 				PS.memo,
 				CASE 
-					WHEN PL.pyl_goods_amount = 0 THEN '입실료 포함'
+					WHEN EP.pyl_goods_amount = 0 THEN '입실료 포함'
 					ELSE '별도 결제'
 				END AS paymentStatus
-			FROM paymentLog PL
-			LEFT JOIN parkStatus PS ON PL.contractEsntlId = PS.contractEsntlId 
+			FROM extraPayment EP
+			LEFT JOIN parkStatus PS ON EP.contractEsntlId = PS.contractEsntlId 
 				AND PS.deleteYN = 'N'
 				AND PS.status = 'IN_USE'
-			WHERE PL.contractEsntlId = ?
-				AND PL.isExtra = 1
-				AND PL.extraCostName = '주차비'
-				AND (PL.optionName = '자동차' OR PL.optionName = '오토바이')
-			ORDER BY PL.pDate DESC, PL.pTime DESC
+			WHERE EP.contractEsntlId = ?
+				AND EP.deleteYN = 'N'
+				AND EP.extraCostName = '주차비'
+				AND (EP.optionName = '자동차' OR EP.optionName = '오토바이')
+			ORDER BY EP.pDate DESC, EP.pTime DESC
 		`;
 
 		const result = await mariaDBSequelize.query(query, {
@@ -325,7 +323,7 @@ exports.updateParking = async (req, res, next) => {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
 
-		const { parkingId } = req.params; // paymentLog의 esntlId
+		const { parkingId } = req.params; // extraPayment의 esntlId
 		const {
 			optionName,
 			optionInfo,
@@ -341,12 +339,12 @@ exports.updateParking = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'parkingId를 입력해주세요.');
 		}
 
-		// paymentLog 조회
-		const paymentLogInfo = await paymentLog.findOne({
+		// extraPayment 조회
+		const paymentLogInfo = await extraPayment.findOne({
 			where: {
 				esntlId: parkingId,
-				isExtra: 1,
 				extraCostName: '주차비',
+				deleteYN: 'N',
 			},
 			transaction,
 		});
@@ -373,9 +371,9 @@ exports.updateParking = async (req, res, next) => {
 			updateData.extendWithPayment = extendValue ? 1 : 0;
 		}
 
-		// paymentLog 업데이트
+		// extraPayment 업데이트
 		if (Object.keys(updateData).length > 0) {
-			await paymentLog.update(updateData, {
+			await extraPayment.update(updateData, {
 				where: { esntlId: parkingId },
 				transaction,
 			});
@@ -451,14 +449,14 @@ exports.deleteParking = async (req, res, next) => {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
 
-		const { parkingId } = req.params; // paymentLog의 esntlId
+		const { parkingId } = req.params; // extraPayment의 esntlId
 
 		if (!parkingId) {
 			errorHandler.errorThrow(400, 'parkingId를 입력해주세요.');
 		}
 
-		// paymentLog 조회 (필요한 컬럼만 선택하여 pyl_expected_settle 오류 방지)
-		const paymentLogInfo = await paymentLog.findOne({
+		// extraPayment 조회
+		const paymentLogInfo = await extraPayment.findOne({
 			attributes: [
 				'esntlId',
 				'contractEsntlId',
@@ -469,8 +467,8 @@ exports.deleteParking = async (req, res, next) => {
 			],
 			where: {
 				esntlId: parkingId,
-				isExtra: 1,
 				extraCostName: '주차비',
+				deleteYN: 'N',
 			},
 			transaction,
 		});

@@ -180,6 +180,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 					paymentAmount: String(Math.abs(parseInt(cost, 10))),
 					pyl_goods_amount: Math.abs(parseInt(cost, 10)),
 					imp_uid: '', // 추가 결제 요청 시 PG 결제 전이므로 빈 문자열
+					paymentStatus: 'PENDING', // 결제 상태: PENDING(결제대기), COMPLETED(결제완료), CANCELLED(결제취소), FAILED(결제실패)
 					paymentType: null, // paymentType은 결제 주체(수단)이므로 추가 결제 요청 시에는 null
 					withdrawalStatus: null,
 					deleteYN: 'N',

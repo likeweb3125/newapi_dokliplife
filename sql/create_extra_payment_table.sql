@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS `extraPayment` (
   `paymentAmount` VARCHAR(50) NOT NULL DEFAULT '0' COMMENT '결제 금액 (String 타입, 기존 paymentLog와 호환)',
   `pyl_goods_amount` INT(11) NOT NULL DEFAULT 0 COMMENT '상품금액(원입실료) - 절댓값 저장',
   `imp_uid` VARCHAR(50) NOT NULL DEFAULT '' COMMENT 'PG 결제 고유아이디 (결제 완료 시)',
-  `paymentType` VARCHAR(50) NULL COMMENT '결제 종류 (accountPayment: 계좌 결제, cardPayment: 카드 결제)',
+  `paymentStatus` VARCHAR(50) NOT NULL DEFAULT 'PENDING' COMMENT '결제 상태 (PENDING: 결제대기, COMPLETED: 결제완료, CANCELLED: 결제취소, FAILED: 결제실패)',
+  `paymentType` VARCHAR(50) NULL COMMENT '결제 방식 (accountPayment: 계좌 결제, cardPayment: 카드 결제, appPayment: 앱 결제, manualPayment: 수동 결제)',
   `withdrawalStatus` VARCHAR(50) NULL COMMENT '결제 취소 여부 (기존 paymentLog와 호환)',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
   `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID',
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS `extraPayment` (
   INDEX `idx_extendWithPayment` (`extendWithPayment`),
   INDEX `idx_paymentAmount` (`paymentAmount`),
   INDEX `idx_pyl_goods_amount` (`pyl_goods_amount`),
+  INDEX `idx_paymentStatus` (`paymentStatus`),
   INDEX `idx_paymentType` (`paymentType`),
   INDEX `idx_withdrawalStatus` (`withdrawalStatus`),
   INDEX `idx_pDate` (`pDate`),
@@ -58,6 +60,7 @@ CREATE INDEX `idx_extraPayment_gosiwon_delete` ON `extraPayment` (`gosiwonEsntlI
 CREATE INDEX `idx_extraPayment_room_delete` ON `extraPayment` (`roomEsntlId`, `deleteYN`);
 CREATE INDEX `idx_extraPayment_extraCostName` ON `extraPayment` (`contractEsntlId`, `extraCostName`, `deleteYN`);
 CREATE INDEX `idx_extraPayment_optionName` ON `extraPayment` (`contractEsntlId`, `optionName`, `deleteYN`);
+CREATE INDEX `idx_extraPayment_status_type` ON `extraPayment` (`contractEsntlId`, `paymentStatus`, `paymentType`, `deleteYN`);
 
 -- =============================================
 -- 외래키 제약조건 추가 (선택사항)
