@@ -387,7 +387,7 @@ exports.createRoom = async (req, res, next) => {
 				rom_dp_at: rom_dp_at ? String(rom_dp_at).substring(0, 1) : null,
 				deleteYN: deleteYN || 'N',
 				orderNo: orderNo !== undefined ? parseInt(orderNo, 10) : 1,
-				agreementType: agreementType || null,
+				agreementType: agreementType || 'GENERAL',
 				agreementContent: agreementContent || null,
 				availableGender: availableGender || 'DEFAULT',
 			},
@@ -650,9 +650,9 @@ exports.updateRoomAgreement = async (req, res, next) => {
 		const changes = [];
 
 		if (agreementType !== undefined) {
-			updateData.agreementType = agreementType || null;
+			updateData.agreementType = agreementType || 'GENERAL';
 			changes.push(
-				`특약 타입: ${roomInfo.agreementType || '없음'} → ${agreementType || '없음'}`
+				`특약 타입: ${roomInfo.agreementType || 'GENERAL'} → ${agreementType || 'GENERAL'}`
 			);
 		}
 

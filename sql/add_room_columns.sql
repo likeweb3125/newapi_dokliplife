@@ -20,7 +20,7 @@ AFTER `deposit`;
 -- 특약 타입을 저장하는 컬럼 (GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)
 -- 주의: 이미 컬럼이 존재하는 경우 오류가 발생할 수 있습니다.
 ALTER TABLE `room` 
-ADD COLUMN `agreementType` VARCHAR(50) NULL COMMENT '특약타입 (GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)' 
+ADD COLUMN `agreementType` VARCHAR(50) NULL DEFAULT 'GENERAL' COMMENT '특약타입 (GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)' 
 AFTER `org_rom_eid`;
 
 -- agreementContent 컬럼 추가
@@ -50,7 +50,6 @@ CREATE INDEX `idx_room_depositYN` ON `room` (`depositYN`);
 -- 참고사항
 -- =============================================
 
--- 기존 데이터가 있는 경우, 컬럼 추가 후 기본값 설정이 필요할 수 있습니다.
--- 예시:
--- UPDATE `room` SET `agreementType` = 'GENERAL' WHERE `agreementType` IS NULL;
+-- 기존 데이터가 있는 경우, 컬럼 추가 후 기본값 설정
+UPDATE `room` SET `agreementType` = 'GENERAL' WHERE `agreementType` IS NULL;
 

@@ -154,6 +154,7 @@ module.exports = (sequelize, DataTypes) => {
 			agreementType: {
 				type: DataTypes.STRING(50),
 				allowNull: true,
+				defaultValue: 'GENERAL',
 				field: 'agreementType',
 				comment: '특약타입 (GENERAL: 독립생활 일반 규정 11항 적용, GOSIWON: 현재 고시원 특약사항 적용, ROOM: 해당 방만 특약사항 수정)',
 			},
