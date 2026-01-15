@@ -114,8 +114,8 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             type: integer
  *                             description: 아이템 ID
  *                           group:
- *                             type: integer
- *                             description: 그룹 인덱스
+ *                             type: string
+ *                             description: 방 고유 아이디 (roomEsntlId)
  *                           itemType:
  *                             type: string
  *                             enum: [contract, disabled, system]
@@ -192,8 +192,8 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             type: string
  *                             description: 상태 아이템 ID
  *                           group:
- *                             type: integer
- *                             description: 그룹 인덱스
+ *                             type: string
+ *                             description: 방 고유 아이디 (roomEsntlId)
  *                           itemType:
  *                             type: string
  *                             enum: [system]

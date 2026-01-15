@@ -340,7 +340,7 @@ exports.mngChartMain = async (req, res, next) => {
 
 			items.push({
 				id: itemIdCounter++,
-				group: groupIndex,
+				group: contract.roomEsntlId,
 				itemType: 'contract',
 				start: formatDateTime(startDate),
 				end: formatDateTime(endDate + ' 23:59:59'),
@@ -383,7 +383,7 @@ exports.mngChartMain = async (req, res, next) => {
 
 			items.push({
 				id: itemIdCounter++,
-				group: groupIndex,
+				group: status.roomEsntlId,
 				itemType: 'disabled',
 				className: 'disabled',
 				start: formattedStart,
@@ -456,8 +456,8 @@ exports.mngChartMain = async (req, res, next) => {
 
 			// 각 상태를 개별 아이템으로 생성
 			roomStatusesArray.push({
-				id: `room-${groupIndex}-statuses-${statusItemIdCounter++}`,
-				group: groupIndex,
+				id: `room-${status.roomEsntlId}-statuses-${statusItemIdCounter++}`,
+				group: status.roomEsntlId,
 				itemType: 'system',
 				content: [contentText],
 				colors: [statusInfo.color],
