@@ -62,6 +62,9 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           id:
  *                             type: integer
  *                             description: 그룹 인덱스
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
  *                           roomNumber:
  *                             type: string
  *                             description: 방 번호

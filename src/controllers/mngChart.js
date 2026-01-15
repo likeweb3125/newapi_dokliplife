@@ -59,7 +59,7 @@ const getContractType = (contractDate, startDate) => {
 const STATUS_MAP = {
 	'BEFORE_SALES': { color: '#9B9B9B', label: '판매신청전' },
 	'ON_SALE': { color: '#27A644', label: '판매중' },
-	'DEPOSIT_PENDING': { color: '#FFB800', label: '입금대기중' },
+	'PENDING': { color: '#FFB800', label: '입금대기중' },
 	'RESERVED': { color: '#35BB88', label: '예약중' },
 	'IN_USE': { color: '#FF8A00', label: '이용중' },
 	'OVERDUE': { color: '#D25454', label: '체납상태' },
@@ -98,9 +98,9 @@ exports.mngChartMain = async (req, res, next) => {
 		const endDateStr = endDate.toISOString().slice(0, 10);
 		const startDateStr = startDate.toISOString().slice(0, 10);
 
-		// 1. Groups 데이터 조회 (활성 방 목록)
+		// 1. Groups 데이터 조회 (활성 방 목록) - 중복 방지를 위해 DISTINCT와 서브쿼리로 최신 roomStatus만 가져옴
 		const groupsQuery = `
-			SELECT 
+			SELECT DISTINCT
 				R.esntlId AS id,
 				R.roomNumber,
 				R.roomNumber AS roomName,
@@ -117,8 +117,27 @@ exports.mngChartMain = async (req, res, next) => {
 					DATE_FORMAT(RS.statusEndDate, '%y-%m-%d')
 				), '') AS stayPeriod
 			FROM room R
-			LEFT JOIN roomStatus RS ON R.esntlId = RS.roomEsntlId 
-				AND RS.status IN ('IN_USE', 'RESERVED', 'DEPOSIT_PENDING', 'ON_SALE')
+			LEFT JOIN (
+				SELECT RS1.*
+				FROM roomStatus RS1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
+					FROM roomStatus
+					WHERE status IN ('IN_USE', 'RESERVED', 'PENDING', 'ON_SALE')
+					GROUP BY roomEsntlId
+				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId 
+					AND RS1.updatedAt = RS2.maxUpdatedAt
+					AND RS1.status IN ('IN_USE', 'RESERVED', 'PENDING', 'ON_SALE')
+				WHERE RS1.esntlId = (
+					SELECT esntlId 
+					FROM roomStatus RS3 
+					WHERE RS3.roomEsntlId = RS1.roomEsntlId 
+						AND RS3.updatedAt = RS2.maxUpdatedAt
+						AND RS3.status IN ('IN_USE', 'RESERVED', 'PENDING', 'ON_SALE')
+					ORDER BY RS3.esntlId DESC
+					LIMIT 1
+				)
+			) RS ON R.esntlId = RS.roomEsntlId
 			WHERE R.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 			ORDER BY R.orderNo ASC, R.roomNumber ASC
@@ -129,13 +148,14 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// Groups 데이터 변환
-		const groups = rooms.map((room, index) => {
+		// Groups 데이터 변환 - id는 room.esntlId 사용
+		const groups = rooms.map((room) => {
 			const statusKey = room.status || 'BEFORE_SALES';
 			const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP['BEFORE_SALES'];
 			
 			return {
-				id: index,
+				id: room.id, // room.esntlId
+				roomEsntlId: room.id, // room.esntlId
 				roomNumber: room.roomNumber,
 				roomName: room.roomName || room.roomNumber,
 				status: statusInfo.label,
@@ -144,7 +164,7 @@ exports.mngChartMain = async (req, res, next) => {
 				monthlyRent: parseInt(room.monthlyRent) || 0,
 				currentGuest: room.currentGuest || '',
 				stayPeriod: room.stayPeriod || '',
-				value: room.value || index + 1,
+				value: room.value || 0,
 				color: {
 					sidebar: statusInfo.color,
 					statusBorder: statusInfo.color,
@@ -155,8 +175,8 @@ exports.mngChartMain = async (req, res, next) => {
 
 		// 방 ID 매핑 생성 (roomEsntlId -> group index)
 		const roomIdToGroupIndex = {};
-		rooms.forEach((room, index) => {
-			roomIdToGroupIndex[room.id] = index; // room.id는 esntlId
+		groups.forEach((group, index) => {
+			roomIdToGroupIndex[group.id] = index; // group.id는 esntlId
 		});
 
 		// 2. Items 데이터 조회 (계약 정보) - 날짜 범위 필터 적용
@@ -393,7 +413,7 @@ exports.mngChartMain = async (req, res, next) => {
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 				AND RS.status IN (
-					'BEFORE_SALES', 'ON_SALE', 'DEPOSIT_PENDING', 
+					'BEFORE_SALES', 'ON_SALE', 'PENDING', 
 					'RESERVED', 'CHECKOUT_REQUESTED', 'CHECKOUT_CONFIRMED'
 				)
 				AND DATE(RS.createdAt) >= ?
@@ -539,10 +559,10 @@ const generateRoomStatusId = async (transaction) => {
 
 const generateContractId = async (transaction) => {
 	const [result] = await mariaDBSequelize.query(
-		`SELECT CONCAT('RCON', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId FROM roomContract WHERE esntlId LIKE 'RCON%'`,
+		`SELECT CONCAT('RCTT', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId FROM roomContract WHERE esntlId LIKE 'RCTT%'`,
 		{ type: mariaDBSequelize.QueryTypes.SELECT, transaction }
 	);
-	return result?.nextId || 'RCON0000000001';
+	return result?.nextId || 'RCTT0000000001';
 };
 
 const generatePaymentLogId = async (transaction) => {
@@ -586,89 +606,154 @@ exports.createTestData = async (req, res, next) => {
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
 		
-		// 최근 한 달 내 기간 설정 (과거 포함)
-		const oneMonthAgo = new Date(today);
-		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+		// 2025년 8월 1일부터 현재까지의 랜덤 날짜 생성
+		const startDate = new Date('2025-08-01');
+		const endDate = new Date(today);
 		
-		const twoWeeksAgo = new Date(today);
-		twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+		// 두 날짜 사이의 랜덤 날짜 생성 함수
+		const getRandomDate = (start, end) => {
+			const startTime = start.getTime();
+			const endTime = end.getTime();
+			const randomTime = startTime + Math.random() * (endTime - startTime);
+			return new Date(randomTime);
+		};
 		
-		const oneWeekAgo = new Date(today);
-		oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-		
-		const twoWeeksLater = new Date(today);
-		twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
-		
-		const oneMonthLater = new Date(today);
-		oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+		// 랜덤 날짜 생성 함수 (YYYY-MM-DD 형식)
+		const getRandomDateString = (start, end) => {
+			const date = getRandomDate(start, end);
+			return date.toISOString().slice(0, 10);
+		};
 
-		// 1. 방 데이터 생성 (3개)
-		const roomNumbers = ['101', '102', '103'];
-		for (let i = 0; i < roomNumbers.length; i++) {
-			const roomId = await generateRoomId(transaction);
-			const roomNumber = roomNumbers[i];
+		// 랜덤 숫자 생성 함수 (min ~ max)
+		const getRandomInt = (min, max) => {
+			return Math.floor(Math.random() * (max - min + 1)) + min;
+		};
 
-			await room.create(
-				{
-					esntlId: roomId,
-					gosiwonEsntlId: gosiwonEsntlId,
-					roomNumber: roomNumber,
-					roomType: '원룸',
-					window: '외창',
-					monthlyRent: '50', // 만원 단위
-					deposit: 200000,
-					orderNo: i + 1,
-					deleteYN: 'N',
-					status: 'EMPTY',
-					empty: '1',
-					agreementType: 'GENERAL',
-					availableGender: 'DEFAULT',
-				},
-				{ transaction }
-			);
+		// 랜덤 이름 생성 함수
+		const generateRandomName = () => {
+			const surnames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임'];
+			const firstNames = ['민준', '서준', '도윤', '예준', '시우', '하준', '주원', '지호', '준서', '건우', 
+								'서연', '서윤', '지우', '서현', '민서', '하은', '예은', '윤서', '채원', '지원'];
+			const surname = surnames[getRandomInt(0, surnames.length - 1)];
+			const firstName = firstNames[getRandomInt(0, firstNames.length - 1)];
+			return surname + firstName;
+		};
+
+		// 랜덤 전화번호 생성 함수
+		const generateRandomPhone = () => {
+			const middle = String(getRandomInt(1000, 9999));
+			const last = String(getRandomInt(1000, 9999));
+			return `010${middle}${last}`;
+		};
+
+		// 1. 해당 고시원의 기존 방 조회
+		const existingRooms = await room.findAll({
+			where: {
+				gosiwonEsntlId: gosiwonEsntlId,
+				deleteYN: 'N',
+			},
+			attributes: ['esntlId', 'roomNumber'],
+			transaction,
+		});
+
+		if (existingRooms.length === 0) {
+			errorHandler.errorThrow(400, '해당 고시원에 등록된 방이 없습니다.');
+		}
+
+		// 2. 기존 방 중에서 랜덤하게 선택 (3~10개 또는 전체 방 개수 중 작은 값)
+		const maxRoomCount = Math.min(getRandomInt(3, 10), existingRooms.length);
+		const selectedRooms = [];
+		const usedIndices = new Set();
+
+		while (selectedRooms.length < maxRoomCount) {
+			const randomIndex = getRandomInt(0, existingRooms.length - 1);
+			if (!usedIndices.has(randomIndex)) {
+				usedIndices.add(randomIndex);
+				selectedRooms.push(existingRooms[randomIndex]);
+			}
+		}
+
+		// 3. 선택된 방들에 대해 테스트 데이터 생성
+		for (let i = 0; i < selectedRooms.length; i++) {
+			const selectedRoom = selectedRooms[i];
+			const roomId = selectedRoom.esntlId;
+			const roomNumber = selectedRoom.roomNumber;
 
 			createdData.rooms.push({ esntlId: roomId, roomNumber });
 
-			// 2. 고객 데이터 생성 (각 방마다 1명)
-			const customerId = await generateCustomerId(transaction);
-			const customerName = `테스트고객${i + 1}`;
-			const customerPhone = `0101234567${i}`;
+			// 2. 고객 데이터 생성 (각 방마다 랜덤 0~2명)
+			const roomCustomers = []; // 이 방에 생성된 고객들 저장
+			const customerCount = getRandomInt(0, 2);
+			for (let j = 0; j < customerCount; j++) {
+				const customerId = await generateCustomerId(transaction);
+				const customerName = generateRandomName();
+				const customerPhone = generateRandomPhone();
+				const gender = getRandomInt(0, 1) === 0 ? 'M' : 'F';
+				const birthYear = getRandomInt(1980, 2000);
+				const birthMonth = String(getRandomInt(1, 12)).padStart(2, '0');
+				const birthDay = String(getRandomInt(1, 28)).padStart(2, '0');
+				const birth = `${birthYear}-${birthMonth}-${birthDay}`;
+				const banks = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행'];
+				const bank = banks[getRandomInt(0, banks.length - 1)];
+				const bankAccount = String(getRandomInt(1000000000, 9999999999));
 
-			await customer.create(
-				{
-					esntlId: customerId,
-					name: customerName,
-					phone: customerPhone,
-					gender: i % 2 === 0 ? 'M' : 'F',
-					birth: '1990-01-01',
-					bank: 'KB국민은행',
-					bankAccount: `1234567890${i}`,
-					regDate: today.toISOString().slice(0, 19).replace('T', ' '),
-					cus_status: 'USED',
-				},
-				{ transaction }
-			);
+				await customer.create(
+					{
+						esntlId: customerId,
+						name: customerName,
+						phone: customerPhone,
+						gender: gender,
+						birth: birth,
+						bank: bank,
+						bankAccount: bankAccount,
+						regDate: today.toISOString().slice(0, 19).replace('T', ' '),
+						cus_status: 'USED',
+					},
+					{ transaction }
+				);
 
-			createdData.customers.push({ esntlId: customerId, name: customerName });
+				roomCustomers.push({ esntlId: customerId, name: customerName, phone: customerPhone, gender: gender });
+				createdData.customers.push({ esntlId: customerId, name: customerName });
+			}
 
-			// 3. 방 상태 데이터 생성
+			// 3. 방 상태 데이터 생성 (랜덤 상태 할당)
 			const statusId = await generateRoomStatusId(transaction);
-			const status = i === 0 ? 'IN_USE' : i === 1 ? 'RESERVED' : 'ON_SALE';
+			// 고객이 있으면 IN_USE 또는 RESERVED, 없으면 ON_SALE
+			const statusOptions = roomCustomers.length > 0 
+				? ['IN_USE', 'RESERVED', 'ON_SALE'] 
+				: ['ON_SALE'];
+			const status = statusOptions[getRandomInt(0, statusOptions.length - 1)];
 			
-			// 상태별 날짜 범위 설정 (최근 한 달 내)
+			// 고객이 있는 경우 랜덤하게 선택, 없는 경우 null
+			const selectedCustomer = roomCustomers.length > 0 
+				? roomCustomers[getRandomInt(0, roomCustomers.length - 1)] 
+				: null;
+			const customerId = selectedCustomer ? selectedCustomer.esntlId : null;
+			const customerName = selectedCustomer ? selectedCustomer.name : null;
+			
+			// 상태별 날짜 범위 설정 (2025년 8월부터 현재까지 랜덤)
 			let statusStartDate, statusEndDate;
 			if (status === 'IN_USE') {
-				// 이용중: 2주 전부터 2주 후까지
-				statusStartDate = formatDateTime(twoWeeksAgo.toISOString().slice(0, 10));
-				statusEndDate = formatDateTime(twoWeeksLater.toISOString().slice(0, 10));
+				// 이용중: 랜덤 시작일부터 1개월 후까지
+				const randomStart = getRandomDateString(startDate, endDate);
+				const startDateObj = new Date(randomStart);
+				const endDateObj = new Date(startDateObj);
+				endDateObj.setMonth(endDateObj.getMonth() + 1);
+				statusStartDate = formatDateTime(randomStart);
+				statusEndDate = formatDateTime(endDateObj.toISOString().slice(0, 10));
 			} else if (status === 'RESERVED') {
-				// 예약중: 1주 전부터 3주 후까지
-				statusStartDate = formatDateTime(oneWeekAgo.toISOString().slice(0, 10));
-				statusEndDate = formatDateTime(oneMonthLater.toISOString().slice(0, 10));
+				// 예약중: 랜덤 시작일부터 1개월 후까지
+				const randomStart = getRandomDateString(startDate, endDate);
+				const startDateObj = new Date(randomStart);
+				const endDateObj = new Date(startDateObj);
+				endDateObj.setMonth(endDateObj.getMonth() + 1);
+				statusStartDate = formatDateTime(randomStart);
+				statusEndDate = formatDateTime(endDateObj.toISOString().slice(0, 10));
 			} else {
-				// 판매중: 현재부터 1개월 후까지
-				statusStartDate = formatDateTime(today.toISOString().slice(0, 10));
-				statusEndDate = formatDateTime(oneMonthLater.toISOString().slice(0, 10));
+				// 판매중: 랜덤 시작일부터 현재까지
+				const randomStart = getRandomDateString(startDate, endDate);
+				statusStartDate = formatDateTime(randomStart);
+				statusEndDate = formatDateTime(today.toISOString().slice(0, 10));
 			}
 
 			await mariaDBSequelize.query(
@@ -689,19 +774,19 @@ exports.createTestData = async (req, res, next) => {
 			if (status === 'IN_USE' || status === 'RESERVED') {
 				const contractId = await generateContractId(transaction);
 				
-				// 계약별 날짜 범위 설정 (최근 한 달 내)
-				let contractDate, contractStartDate, contractEndDate;
-				if (status === 'IN_USE') {
-					// 이용중 계약: 2주 전 시작, 2주 후 종료
-					contractDate = twoWeeksAgo.toISOString().slice(0, 10);
-					contractStartDate = twoWeeksAgo.toISOString().slice(0, 10);
-					contractEndDate = twoWeeksLater.toISOString().slice(0, 10);
-				} else {
-					// 예약중 계약: 1주 전 시작, 3주 후 종료
-					contractDate = oneWeekAgo.toISOString().slice(0, 10);
-					contractStartDate = oneWeekAgo.toISOString().slice(0, 10);
-					contractEndDate = oneMonthLater.toISOString().slice(0, 10);
-				}
+				// 계약별 날짜 범위 설정 (2025년 8월부터 현재까지 랜덤)
+				// 계약 시작일을 랜덤으로 생성
+				const contractStartDateStr = getRandomDateString(startDate, endDate);
+				const contractStartDateObj = new Date(contractStartDateStr);
+				const contractEndDateObj = new Date(contractStartDateObj);
+				contractEndDateObj.setMonth(contractEndDateObj.getMonth() + 1); // 1개월 후
+				
+				const contractDate = contractStartDateStr;
+				const contractStartDate = contractStartDateStr;
+				const contractEndDate = contractEndDateObj.toISOString().slice(0, 10);
+
+				// monthlyRent는 10000으로 나눈 값으로 저장 (500000 -> 50)
+				const monthlyRentValue = 50; // 500000 / 10000
 
 				await mariaDBSequelize.query(
 					`INSERT INTO roomContract (
@@ -710,29 +795,135 @@ exports.createTestData = async (req, res, next) => {
 						customerName, customerPhone, customerGender, customerAge,
 						checkinName, checkinPhone, checkinGender, checkinAge,
 						monthlyRent
-					) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE', ?, ?, ?, 30, ?, ?, ?, 30, 500000)`,
+					) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE', ?, ?, ?, 30, ?, ?, ?, 30, ?)`,
 					{
 						replacements: [
 							contractId,
 							roomId,
 							gosiwonEsntlId,
-							customerId,
+							selectedCustomer.esntlId,
 							contractStartDate,
 							contractEndDate,
 							contractDate,
-							customerName,
-							customerPhone,
-							i % 2 === 0 ? 'M' : 'F',
-							customerName,
-							customerPhone,
-							i % 2 === 0 ? 'M' : 'F',
+							selectedCustomer.name,
+							selectedCustomer.phone,
+							selectedCustomer.gender,
+							selectedCustomer.name,
+							selectedCustomer.phone,
+							selectedCustomer.gender,
+							monthlyRentValue,
 						],
 						type: mariaDBSequelize.QueryTypes.INSERT,
 						transaction,
 					}
 				);
 
-				createdData.contracts.push({ esntlId: contractId, roomId, customerId });
+				createdData.contracts.push({ esntlId: contractId, roomId, customerId: selectedCustomer.esntlId });
+
+				// 4-1. 계약 관련 roomStatus 이력 생성 (PENDING, RESERVED, IN_USE 등)
+				// 입금대기중 상태 (계약 시작일 3일 전)
+				const depositPendingDateObj = new Date(contractStartDate);
+				depositPendingDateObj.setDate(depositPendingDateObj.getDate() - 3);
+				const depositPendingDate = depositPendingDateObj.toISOString().slice(0, 10);
+				const depositPendingStatusId = await generateRoomStatusId(transaction);
+				
+				await mariaDBSequelize.query(
+					`INSERT INTO roomStatus (
+						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
+						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
+					) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+					{
+						replacements: [
+							depositPendingStatusId,
+							roomId,
+							gosiwonEsntlId,
+							selectedCustomer.esntlId,
+							selectedCustomer.name,
+							contractId,
+							formatDateTime(depositPendingDate),
+							formatDateTime(contractStartDate),
+						],
+						type: mariaDBSequelize.QueryTypes.INSERT,
+						transaction,
+					}
+				);
+				createdData.roomStatuses.push({ esntlId: depositPendingStatusId, roomId, status: 'PENDING' });
+
+				// 예약중 상태 (계약 시작일 1일 전)
+				const reservedDateObj = new Date(contractStartDate);
+				reservedDateObj.setDate(reservedDateObj.getDate() - 1);
+				const reservedDate = reservedDateObj.toISOString().slice(0, 10);
+				const reservedStatusId = await generateRoomStatusId(transaction);
+				
+				await mariaDBSequelize.query(
+					`INSERT INTO roomStatus (
+						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
+						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
+					) VALUES (?, ?, ?, 'RESERVED', ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+					{
+						replacements: [
+							reservedStatusId,
+							roomId,
+							gosiwonEsntlId,
+							selectedCustomer.esntlId,
+							selectedCustomer.name,
+							contractId,
+							formatDateTime(reservedDate),
+							formatDateTime(contractStartDate),
+						],
+						type: mariaDBSequelize.QueryTypes.INSERT,
+						transaction,
+					}
+				);
+				createdData.roomStatuses.push({ esntlId: reservedStatusId, roomId, status: 'RESERVED' });
+
+				// 이용중 상태 (계약 시작일)
+				const inUseStatusId = await generateRoomStatusId(transaction);
+				await mariaDBSequelize.query(
+					`INSERT INTO roomStatus (
+						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
+						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
+					) VALUES (?, ?, ?, 'IN_USE', ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+					{
+						replacements: [
+							inUseStatusId,
+							roomId,
+							gosiwonEsntlId,
+							selectedCustomer.esntlId,
+							selectedCustomer.name,
+							contractId,
+							formatDateTime(contractStartDate),
+							formatDateTime(contractEndDate),
+						],
+						type: mariaDBSequelize.QueryTypes.INSERT,
+						transaction,
+					}
+				);
+				createdData.roomStatuses.push({ esntlId: inUseStatusId, roomId, status: 'IN_USE' });
+
+				// 판매중 상태 (계약 시작 전 - 랜덤하게 일부 방에만)
+				if (getRandomInt(0, 2) === 0) { // 33% 확률
+					const onSaleDateObj = new Date(contractStartDate);
+					onSaleDateObj.setDate(onSaleDateObj.getDate() - 5);
+					const onSaleDate = onSaleDateObj.toISOString().slice(0, 10);
+					const onSaleStatusId = await generateRoomStatusId(transaction);
+					
+					await mariaDBSequelize.query(
+						`INSERT INTO roomStatus (
+							esntlId, roomEsntlId, gosiwonEsntlId, status, createdAt, updatedAt
+						) VALUES (?, ?, ?, 'ON_SALE', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+						{
+							replacements: [
+								onSaleStatusId,
+								roomId,
+								gosiwonEsntlId,
+							],
+							type: mariaDBSequelize.QueryTypes.INSERT,
+							transaction,
+						}
+					);
+					createdData.roomStatuses.push({ esntlId: onSaleStatusId, roomId, status: 'ON_SALE' });
+				}
 
 				// 5. 결제 로그 데이터 생성
 				const paymentLogId = await generatePaymentLogId(transaction);
@@ -747,7 +938,7 @@ exports.createTestData = async (req, res, next) => {
 						withdrawalStatus, isExtra, imp_uid
 					) VALUES (?, ?, ?, ?, ?, ?, ?, '700000', 700000, 'accountPayment', NULL, 0, 'TEST_IMP_UID')`,
 					{
-						replacements: [paymentLogId, contractId, gosiwonEsntlId, roomId, customerId, pDate, pTime],
+						replacements: [paymentLogId, contractId, gosiwonEsntlId, roomId, selectedCustomer.esntlId, pDate, pTime],
 						type: mariaDBSequelize.QueryTypes.INSERT,
 						transaction,
 					}
@@ -755,8 +946,8 @@ exports.createTestData = async (req, res, next) => {
 
 				createdData.paymentLogs.push({ esntlId: paymentLogId, contractId });
 
-				// 6. 추가 결제 데이터 생성 (첫 번째 계약만)
-				if (i === 0) {
+				// 6. 추가 결제 데이터 생성 (랜덤하게 일부 계약에만)
+				if (getRandomInt(0, 2) === 0) { // 33% 확률
 					const extraPaymentId = await generateExtraPaymentId(transaction);
 
 					await mariaDBSequelize.query(
@@ -766,7 +957,7 @@ exports.createTestData = async (req, res, next) => {
 							deleteYN, imp_uid, createdAt, updatedAt
 						) VALUES (?, ?, ?, ?, ?, '주차비', '100000', 100000, 'COMPLETED', 'N', 'TEST_IMP_UID', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
 						{
-							replacements: [extraPaymentId, contractId, gosiwonEsntlId, roomId, customerId],
+							replacements: [extraPaymentId, contractId, gosiwonEsntlId, roomId, selectedCustomer.esntlId],
 							type: mariaDBSequelize.QueryTypes.INSERT,
 							transaction,
 						}
