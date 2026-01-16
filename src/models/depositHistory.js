@@ -44,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.STRING(50),
 				allowNull: false,
 				field: 'status',
-				comment: '상태 (DEPOSIT_PENDING: 입금대기, PARTIAL_DEPOSIT: 부분입금, DEPOSIT_COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DEPOSIT_RE_REQUEST: 입금재요청, VIRTUAL_ACCOUNT_ISSUED: 가상계좌 발급, VIRTUAL_ACCOUNT_EXPIRED: 가상계좌 만료)',
+				comment: '상태 (PENDING: 입금대기, PARTIAL_DEPOSIT: 부분입금, DEPOSIT_COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DEPOSIT_RE_REQUEST: 입금재요청, VIRTUAL_ACCOUNT_ISSUED: 가상계좌 발급, VIRTUAL_ACCOUNT_EXPIRED: 가상계좌 만료)',
 			},
 			depositorName: {
 				type: DataTypes.STRING(100),

@@ -52,7 +52,7 @@ const depositController = require('../controllers/deposit');
  *         required: false
  *         schema:
  *           type: boolean
- *         description: "예약금요청상태만보기 (deposit.type이 RESERVATION이고 deposit.status가 DEPOSIT_PENDING인 경우만)"
+ *         description: "예약금요청상태만보기 (deposit.type이 RESERVATION이고 deposit.status가 PENDING인 경우만)"
  *       - in: query
  *         name: page
  *         required: false
@@ -150,7 +150,7 @@ const depositController = require('../controllers/deposit');
  *                             type: string
  *                             nullable: true
  *                             description: 예약금상태 (deposit.type이 RESERVATION인 경우의 deposit.status, 해당방의 마지막 상태값, 없으면 null)
- *                             example: DEPOSIT_PENDING
+ *                             example: PENDING
  *                           depositHistory:
  *                             type: array
  *                             description: 해당 방의 예약금 내역 히스토리 (최대 30개)

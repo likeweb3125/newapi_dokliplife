@@ -381,7 +381,7 @@ exports.createDeposit = async (req, res, next) => {
 				contractEsntlId: contractEsntlId || null,
 				type: 'DEPOSIT',
 				amount: 0,
-				status: 'DEPOSIT_PENDING',
+				status: 'PENDING',
 				depositorName: depositorName || null,
 				depositDate: depositDate || null,
 				manager: '시스템',
