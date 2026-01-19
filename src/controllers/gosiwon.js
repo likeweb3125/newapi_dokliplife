@@ -24,11 +24,15 @@ const verifyAdminToken = (req) => {
 		errorHandler.errorThrow(401, '토큰 디코딩에 실패했습니다.');
 	}
 
-	if (!decodedToken || !decodedToken.admin) {
+	if (!decodedToken || (!decodedToken.admin && !decodedToken.partner)) {
 		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
 	}
 
-	console.log('👤 관리자 ID:', decodedToken.admin);
+	if (decodedToken.admin) {
+		console.log('👤 관리자 ID:', decodedToken.admin);
+	} else if (decodedToken.partner) {
+		console.log('👤 파트너 ID:', decodedToken.partner);
+	}
 	return decodedToken;
 };
 
@@ -449,7 +453,7 @@ exports.createGosiwon = async (req, res, next) => {
 			errorHandler.errorThrow(400, '고시원 이름을 입력해주세요.');
 		}
 
-		if (!decodedToken.admin) {
+		if (!decodedToken.admin && !decodedToken.partner) {
 			errorHandler.errorThrow(400, '관리자 정보가 필요합니다.');
 		}
 
@@ -500,7 +504,7 @@ exports.createGosiwon = async (req, res, next) => {
 				contractFileOrgName: contractFileOrgName || null,
 				serviceNumber: serviceNumber || null,
 				district: district || null,
-				adminEsntlId: decodedToken.admin,
+				adminEsntlId: decodedToken.admin || decodedToken.partner,
 				is_controlled: is_controlled !== undefined ? (is_controlled === true || is_controlled === 'true' || is_controlled === 1 ? 1 : 0) : 0,
 				penaltyRate: penaltyRate !== undefined ? penaltyRate : null,
 				penaltyMin: penaltyMin !== undefined ? penaltyMin : 0,
@@ -586,7 +590,7 @@ exports.createGosiwon = async (req, res, next) => {
 			if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;
 			
 			// 등록한 관리자 ID 필수 추가 (고시원 관리자 ID 또는 등록한 관리자 ID)
-			const registrantId = decodedToken.admin || writerAdminId;
+			const registrantId = decodedToken.admin || decodedToken.partner || writerAdminId;
 
 			// 먼저 존재 여부 확인
 			const [existingConfig] = await mariaDBSequelize.query(
