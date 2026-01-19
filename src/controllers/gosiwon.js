@@ -287,7 +287,16 @@ exports.toggleFavorite = async (req, res, next) => {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
 
-		const { esntlId } = req.body;
+				const {
+			esntlId,
+			ableCheckDays,
+			ableContractDays,
+			checkInTimeStart,
+			checkInTimeEnd,
+			checkOutTime,
+			useCheckInTime,
+			useCheckOutTime,
+		} = req.body;
 
 		if (!esntlId) {
 			errorHandler.errorThrow(400, 'esntlId 입력해주세요.');
@@ -447,6 +456,8 @@ exports.createGosiwon = async (req, res, next) => {
 			checkInTimeStart,
 			checkInTimeEnd,
 			checkOutTime,
+			useCheckInTime,
+			useCheckOutTime,
 		} = req.body;
 
 		if (!name) {
@@ -695,6 +706,8 @@ exports.updateGosiwon = async (req, res, next) => {
 			checkInTimeStart,
 			checkInTimeEnd,
 			checkOutTime,
+			useCheckInTime,
+			useCheckOutTime,
 		} = req.body;
 
 		if (!esntlId) {
@@ -1156,3 +1169,214 @@ exports.deleteGosiwon = async (req, res, next) => {
 	}
 };
 
+
+// 운영환경설정 조회
+exports.getGosiwonConfig = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { esntlId } = req.query;
+
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+
+		// 고시원 존재 여부 확인
+		const gosiwonInfo = await gosiwon.findOne({
+			where: {
+				esntlId: esntlId,
+			},
+		});
+
+		if (!gosiwonInfo) {
+			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
+		}
+
+		// 운영환경설정 조회
+				const query = `
+			SELECT 
+				gsc_checkin_able_date AS ableCheckDays,
+				gsc_sell_able_period AS ableContractDays,
+				gsc_checkInTimeStart AS checkInTimeStart,
+				gsc_checkInTimeEnd AS checkInTimeEnd,
+				gsc_checkOutTime AS checkOutTime,
+				gsc_use_checkInTime AS useCheckInTime,
+				gsc_use_checkOutTime AS useCheckOutTime
+			FROM il_gosiwon_config
+			WHERE gsw_eid = ?
+		`;
+
+		const [configData] = await mariaDBSequelize.query(query, {
+			replacements: [esntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const response = {
+			esntlId: esntlId,
+			ableCheckDays: configData?.ableCheckDays || null,
+			ableContractDays: configData?.ableContractDays || null,
+			checkInTimeStart: configData?.checkInTimeStart || null,
+			checkInTimeEnd: configData?.checkInTimeEnd || null,
+			checkOutTime: configData?.checkOutTime || null,
+			useCheckInTime: configData?.useCheckInTime === 1 || configData?.useCheckInTime === true || configData?.useCheckInTime === '1',
+			useCheckOutTime: configData?.useCheckOutTime === 1 || configData?.useCheckOutTime === true || configData?.useCheckOutTime === '1',
+		
+			useCheckInTime: configData?.useCheckInTime === 1 || configData?.useCheckInTime === true || configData?.useCheckInTime === '1',
+			useCheckOutTime: configData?.useCheckOutTime === 1 || configData?.useCheckOutTime === true || configData?.useCheckOutTime === '1',};
+
+		errorHandler.successThrow(res, '운영환경설정 조회 성공', response);
+	} catch (err) {
+		next(err);
+	}
+};
+// 운영환경설정 저장
+exports.updateGosiwonConfig = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const {
+			esntlId,
+			ableCheckDays,
+			ableContractDays,
+			checkInTimeStart,
+			checkInTimeEnd,
+			checkOutTime,
+			useCheckInTime,
+			useCheckOutTime,
+		} = req.body;
+
+
+
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+
+		// 고시원 존재 여부 확인
+		const gosiwonInfo = await gosiwon.findOne({
+			where: {
+				esntlId: esntlId,
+			},
+			transaction,
+		});
+
+		if (!gosiwonInfo) {
+			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
+		}
+
+		// 저장할 데이터 구성
+		const configData = {};
+		if (ableCheckDays !== undefined) configData.gsc_checkin_able_date = ableCheckDays;
+		if (ableContractDays !== undefined) configData.gsc_sell_able_period = ableContractDays;
+		if (checkInTimeStart !== undefined) configData.gsc_checkInTimeStart = checkInTimeStart;
+		if (checkInTimeEnd !== undefined) configData.gsc_checkInTimeEnd = checkInTimeEnd;
+		if (checkOutTime !== undefined) configData.gsc_checkOutTime = checkOutTime;
+		if (useCheckInTime !== undefined)
+			configData.gsc_use_checkInTime =
+				useCheckInTime === true || useCheckInTime === 'true' || useCheckInTime === 1 ? 1 : 0;
+		if (useCheckOutTime !== undefined)
+			configData.gsc_use_checkOutTime =
+				useCheckOutTime === true || useCheckOutTime === 'true' || useCheckOutTime === 1 ? 1 : 0;
+		if (useCheckInTime !== undefined) configData.gsc_use_checkInTime = useCheckInTime === true || useCheckInTime === 'true' || useCheckInTime === 1 ? 1 : 0;
+		if (useCheckOutTime !== undefined) configData.gsc_use_checkOutTime = useCheckOutTime === true || useCheckOutTime === 'true' || useCheckOutTime === 1 ? 1 : 0;
+
+		
+		if (useCheckInTime !== undefined) configData.gsc_use_checkInTime = useCheckInTime === true || useCheckInTime === 'true' || useCheckInTime === 1 ? 1 : 0;
+		if (useCheckOutTime !== undefined) configData.gsc_use_checkOutTime = useCheckOutTime === true || useCheckOutTime === 'true' || useCheckOutTime === 1 ? 1 : 0;// 등록한 관리자 ID 필수 추가
+		const registrantId = decodedToken.admin || decodedToken.partner || writerAdminId;
+
+		// 먼저 존재 여부 확인
+		const [existingConfig] = await mariaDBSequelize.query(
+			`SELECT gsw_eid FROM il_gosiwon_config WHERE gsw_eid = ?`,
+			{
+				replacements: [esntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (existingConfig) {
+			// UPDATE 시: 업데이트 시간과 업데이트한 관리자 ID 추가
+			configData.gsc_update_dtm = new Date();
+			configData.gsc_updater_id = registrantId;
+
+			const configSetClause = Object.keys(configData)
+				.map((key) => `\`${key}\` = ?`)
+				.join(', ');
+			const configParams = [...Object.values(configData), esntlId];
+
+			await mariaDBSequelize.query(
+				`UPDATE il_gosiwon_config SET ${configSetClause} WHERE gsw_eid = ?`,
+				{
+					replacements: configParams,
+					transaction,
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+				}
+			);
+		} else {
+			// INSERT 시: 등록자 ID 추가
+			configData.gsc_registrant_id = registrantId;
+
+			const configColumns = Object.keys(configData)
+				.map((key) => `\`${key}\``)
+				.join(', ');
+			const configValues = Object.keys(configData)
+				.map(() => '?')
+				.join(', ');
+			const configInsertParams = [esntlId, ...Object.values(configData)];
+
+			if (useCheckInTime !== undefined) changes.push(`체크인시간 사용: ${useCheckInTime ? 'Y' : 'N'}`);
+			if (useCheckOutTime !== undefined) changes.push(`체크아웃시간 사용: ${useCheckOutTime ? 'Y' : 'N'}`);
+			await mariaDBSequelize.query(
+				`INSERT INTO il_gosiwon_config (gsw_eid, ${configColumns}) VALUES (?, ${configValues})`,
+				{
+					replacements: configInsertParams,
+					transaction,
+					type: mariaDBSequelize.QueryTypes.INSERT,
+				}
+			);
+		}
+
+		// History 기록 생성
+		try {
+			const historyId = await generateHistoryId(transaction);
+			const changes = [];
+			if (ableCheckDays !== undefined) changes.push(`입실가능기간: ${ableCheckDays}`);
+			if (ableContractDays !== undefined) changes.push(`계약가능기간: ${ableContractDays}`);
+			if (checkInTimeStart !== undefined) changes.push(`입실가능시작시간: ${checkInTimeStart}`);
+			if (checkInTimeEnd !== undefined) changes.push(`입실가능종료시간: ${checkInTimeEnd}`);
+			if (checkOutTime !== undefined) changes.push(`퇴실시간: ${checkOutTime}`);
+			if (useCheckInTime !== undefined) changes.push(`체크인시간 사용: ${useCheckInTime ? 'Y' : 'N'}`);
+			if (useCheckOutTime !== undefined) changes.push(`체크아웃시간 사용: ${useCheckOutTime ? 'Y' : 'N'}`);
+
+			const historyContent = `운영환경설정 저장: ${changes.length > 0 ? changes.join(', ') : '설정 변경'}`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: esntlId,
+					etcEsntlId: esntlId,
+					content: historyContent,
+					category: 'GOSIWON',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('History 생성 실패:', historyErr);
+			// History 생성 실패해도 설정 저장 프로세스는 계속 진행
+		}
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '운영환경설정 저장 성공');
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};

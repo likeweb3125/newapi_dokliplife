@@ -1195,5 +1195,170 @@ router.delete('/parking/delete', parkingController.deleteParking);
  */
 router.get('/adminContract', gosiwonController.getAdminContract);
 
+/**
+ * @swagger
+ * /v1/gosiwon/config:
+ *   get:
+ *     summary: 운영환경설정 조회
+ *     description: 고시원 ID로 운영환경설정 정보를 조회합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유아이디
+ *         example: GOSI0000002130
+ *     responses:
+ *       200:
+ *         description: 운영환경설정 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 운영환경설정 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       example: GOSI0000002130
+ *                     ableCheckDays:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 입실가능기간
+ *                       example: 2
+ *                     ableContractDays:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 계약가능기간
+ *                       example: 10
+ *                     checkInTimeStart:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 입실가능시작시간
+ *                       example: AM|9|00
+ *                     checkInTimeEnd:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 입실가능종료시간
+ *                       example: PM|9|00
+ *                     checkOutTime:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 퇴실시간
+ *                       example: AM|11|00
+ *                     useCheckInTime:
+ *                       type: boolean
+ *                       nullable: true
+ *                       description: 체크인시간 사용 여부
+ *                       example: false
+ *                     useCheckOutTime:
+ *                       type: boolean
+ *                       nullable: true
+ *                       description: 체크아웃시간 사용 여부
+ *                       example: false
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/config', gosiwonController.getGosiwonConfig);
+
+/**
+ * @swagger
+ * /v1/gosiwon/config:
+ *   put:
+ *     summary: 운영환경설정 저장
+ *     description: 고시원의 운영환경설정 정보를 저장합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - esntlId
+ *             properties:
+ *               esntlId:
+ *                 type: string
+ *                 description: 고시원 고유아이디
+ *                 example: GOSI0000002130
+ *               ableCheckDays:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: 입실가능기간
+ *                 example: 2
+ *               ableContractDays:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: 계약가능기간
+ *                 example: 10
+ *               checkInTimeStart:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 입실가능시작시간 (ex - AM|9|00)
+ *                 example: AM|9|00
+ *               checkInTimeEnd:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 입실가능종료시간 (ex - PM|9|00)
+ *                 example: PM|9|00
+ *               checkOutTime:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 퇴실시간 (ex - AM|11|00)
+ *                 example: AM|11|00
+ *               useCheckInTime:
+ *                 type: boolean
+ *                 nullable: true
+ *                 description: 체크인시간 사용 여부
+ *                 example: false
+ *               useCheckOutTime:
+ *                 type: boolean
+ *                 nullable: true
+ *                 description: 체크아웃시간 사용 여부
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: 운영환경설정 저장 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 운영환경설정 저장 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/config', gosiwonController.updateGosiwonConfig);
+
 module.exports = router;
 
