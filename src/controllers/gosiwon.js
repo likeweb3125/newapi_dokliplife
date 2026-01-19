@@ -412,7 +412,6 @@ exports.createGosiwon = async (req, res, next) => {
 			gsw_signup_path_etc,
 			alarmTalk,
 			alarmEmail,
-			status,
 			process,
 			rejectText,
 			contractText,
@@ -454,11 +453,6 @@ exports.createGosiwon = async (req, res, next) => {
 			errorHandler.errorThrow(400, '관리자 정보가 필요합니다.');
 		}
 
-		// status 값 검증
-		if (status !== undefined && (status === null || status === '' || String(status).trim() === '')) {
-			errorHandler.errorThrow(400, '상태값을 빈 값으로 저장할 수 없습니다.');
-		}
-
 		const esntlId = await generateGosiwonId(transaction);
 
 		// gosiwon 테이블에 데이터 삽입
@@ -496,7 +490,6 @@ exports.createGosiwon = async (req, res, next) => {
 				gsw_signup_path_etc: gsw_signup_path_etc || '',
 				alarmTalk: alarmTalk || null,
 				alarmEmail: alarmEmail || null,
-				status: status || null,
 				process: process || null,
 				rejectText: rejectText || null,
 				contractText: contractText || null,
@@ -760,12 +753,6 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (req.body.gsw_signup_path_etc !== undefined) updateData.gsw_signup_path_etc = req.body.gsw_signup_path_etc;
 		if (req.body.alarmTalk !== undefined) updateData.alarmTalk = req.body.alarmTalk;
 		if (req.body.alarmEmail !== undefined) updateData.alarmEmail = req.body.alarmEmail;
-		if (req.body.status !== undefined) {
-			if (req.body.status === null || req.body.status === '' || String(req.body.status).trim() === '') {
-				errorHandler.errorThrow(400, '상태값을 빈 값으로 저장할 수 없습니다.');
-			}
-			updateData.status = String(req.body.status).trim();
-		}
 		if (req.body.process !== undefined) updateData.process = req.body.process;
 		if (req.body.rejectText !== undefined) updateData.rejectText = req.body.rejectText;
 		if (req.body.contractText !== undefined) updateData.contractText = req.body.contractText;
@@ -1015,9 +1002,6 @@ exports.updateGosiwon = async (req, res, next) => {
 				}
 				if (updateData.keeperName && updateData.keeperName !== beforeGosiwon.keeperName) {
 					changes.push(`관리자명: ${beforeGosiwon.keeperName} → ${updateData.keeperName}`);
-				}
-				if (updateData.status !== undefined && updateData.status !== beforeGosiwon.status) {
-					changes.push(`상태: ${beforeGosiwon.status} → ${updateData.status}`);
 				}
 				if (updateData.use_deposit !== undefined && updateData.use_deposit !== beforeGosiwon.use_deposit) {
 					changes.push(`보증금 사용: ${beforeGosiwon.use_deposit ? 'Y' : 'N'} → ${updateData.use_deposit ? 'Y' : 'N'}`);

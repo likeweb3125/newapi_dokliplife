@@ -53,6 +53,10 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                 data:
  *                   type: object
  *                   properties:
+ *                     gosiwonEsntlId:
+ *                       type: string
+ *                       description: 현재 검색 중인 고시원 고유 아이디
+ *                       example: GOSI0000000001
  *                     groups:
  *                       type: array
  *                       description: 방 목록 (vis-timeline groups)

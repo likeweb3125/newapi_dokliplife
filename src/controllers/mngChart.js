@@ -515,6 +515,7 @@ exports.mngChartMain = async (req, res, next) => {
 
 		// 8. 응답 데이터 구성
 		const responseData = {
+			gosiwonEsntlId: gosiwonEsntlId,
 			groups: groups,
 			items: items,
 			roomStatuses: roomStatusesArray,
