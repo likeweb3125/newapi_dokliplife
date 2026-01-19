@@ -82,7 +82,7 @@ const verifyAdminToken = (req) => {
 		errorHandler.errorThrow(401, '토큰 디코딩에 실패했습니다.');
 	}
 
-	if (!decodedToken || !decodedToken.admin) {
+	if (!decodedToken || (!decodedToken.admin && !decodedToken.partner)) {
 		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
 	}
 	return decodedToken;
