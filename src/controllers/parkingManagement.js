@@ -113,6 +113,7 @@ exports.createParking = async (req, res, next) => {
 			useEndDate,
 			cost = 0, // 주차비 (0원 가능)
 			extend, // 연장시 함께 연장 여부
+			memo, // 메모
 		} = req.body;
 
 		// extend가 true이면 1로 설정
@@ -208,7 +209,9 @@ exports.createParking = async (req, res, next) => {
 
 		// parkStatus 생성
 		const parkStatusId = await generateParkStatusId(transaction);
-		const parkStatusMemo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+		const parkNumber = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+		const parkStatusMemo = memo && memo.trim() !== '' ? memo.trim() : null;
+		const parkStatusCost = Math.abs(parseInt(cost, 10)) || 0;
 		await parkStatus.create(
 			{
 				esntlId: parkStatusId,
@@ -218,6 +221,9 @@ exports.createParking = async (req, res, next) => {
 				status: 'IN_USE',
 				useStartDate: useStartDate || pDate,
 				useEndDate: useEndDate || contract.endDate || null,
+				parkType: optionName,
+				parkNumber: parkNumber,
+				cost: parkStatusCost,
 				memo: parkStatusMemo,
 				deleteYN: 'N',
 			},
@@ -227,7 +233,7 @@ exports.createParking = async (req, res, next) => {
 		// History 기록 생성
 		const historyId = await generateHistoryId(transaction);
 		const costText = cost > 0 ? `${cost.toLocaleString()}원` : '입실료 포함';
-		const historyContent = `주차 등록: ${optionName}${parkStatusMemo ? ` (${parkStatusMemo})` : ''}, 주차비: ${costText}`;
+		const historyContent = `주차 등록: ${optionName}${parkNumber ? ` (${parkNumber})` : ''}, 주차비: ${costText}`;
 
 		await history.create(
 			{
@@ -278,9 +284,12 @@ exports.getParkingList = async (req, res, next) => {
 				PS.esntlId AS parkStatusId,
 				EP.optionName,
 				EP.optionInfo,
+				PS.parkType,
+				PS.parkNumber,
 				PS.useStartDate,
 				PS.useEndDate,
 				EP.pyl_goods_amount AS cost,
+				PS.cost AS parkStatusCost,
 				EP.paymentAmount,
 				EP.paymentType,
 				EP.extendWithPayment,
@@ -316,6 +325,59 @@ exports.getParkingList = async (req, res, next) => {
 	}
 };
 
+// 주차 사용 현황 리스트 조회 (고시원별)
+exports.getParkingNowList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { gosiwonEsntlId } = req.query;
+
+		if (!gosiwonEsntlId) {
+			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
+		}
+
+		// parkStatus와 roomContract, customer 조인하여 주차 사용 현황 조회
+		const query = `
+			SELECT 
+				PS.gosiwonEsntlId AS gosiwonEsntlId,
+				PS.contractEsntlId AS contractEsntlId,
+				RC.roomEsntlId AS roomEsntlId,
+				COALESCE(RC.customerName, C.name) AS customerName,
+				COALESCE(RC.customerGender, C.gender) AS customerGender,
+				COALESCE(RC.customerAge, 
+					CASE 
+						WHEN C.birth IS NOT NULL AND C.birth != '' 
+						THEN ROUND((TO_DAYS(NOW()) - TO_DAYS(C.birth)) / 365)
+						ELSE NULL
+					END
+				) AS customerAge,
+				PS.parkType AS parkType,
+				PS.parkNumber AS parkNumber,
+				PS.useStartDate AS useStartDate,
+				PS.useEndDate AS useEndDate,
+				COALESCE(PS.cost, 0) AS cost
+			FROM parkStatus PS
+			LEFT JOIN roomContract RC ON PS.contractEsntlId = RC.esntlId
+			LEFT JOIN customer C ON PS.customerEsntlId = C.esntlId
+			WHERE PS.gosiwonEsntlId = ?
+				AND PS.status = 'IN_USE'
+				AND PS.deleteYN = 'N'
+			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
+		`;
+
+		const result = await mariaDBSequelize.query(query, {
+			replacements: [gosiwonEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		errorHandler.successThrow(res, '주차 사용 현황 리스트 조회 성공', {
+			list: result || [],
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
 // 주차 정보 수정 (Update)
 exports.updateParking = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -330,6 +392,8 @@ exports.updateParking = async (req, res, next) => {
 			useStartDate,
 			useEndDate,
 			extend, // 연장시 함께 연장 여부
+			memo, // 메모
+			cost, // 주차비
 		} = req.body;
 
 		// extend가 true이면 1로 설정
@@ -397,8 +461,21 @@ exports.updateParking = async (req, res, next) => {
 			if (useEndDate !== undefined) {
 				parkStatusUpdateData.useEndDate = useEndDate || null;
 			}
+			if (optionName !== undefined) {
+				if (optionName !== '자동차' && optionName !== '오토바이') {
+					errorHandler.errorThrow(400, 'optionName은 "자동차" 또는 "오토바이"여야 합니다.');
+				}
+				parkStatusUpdateData.parkType = optionName;
+			}
 			if (optionInfo !== undefined) {
-				parkStatusUpdateData.memo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+				const parkNumber = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+				parkStatusUpdateData.parkNumber = parkNumber;
+			}
+			if (memo !== undefined) {
+				parkStatusUpdateData.memo = memo && memo.trim() !== '' ? memo.trim() : null;
+			}
+			if (cost !== undefined) {
+				parkStatusUpdateData.cost = Math.abs(parseInt(cost, 10)) || 0;
 			}
 
 			if (Object.keys(parkStatusUpdateData).length > 0) {

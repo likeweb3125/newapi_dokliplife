@@ -46,6 +46,25 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'useEndDate',
 				comment: '사용 종료일',
 			},
+			parkType: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'parkType',
+				comment: '주차 유형 (자동차, 오토바이)',
+			},
+			parkNumber: {
+				type: DataTypes.STRING(500),
+				allowNull: true,
+				field: 'parkNumber',
+				comment: '번호판',
+			},
+			cost: {
+				type: DataTypes.INTEGER(11),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'cost',
+				comment: '주차비',
+			},
 			memo: {
 				type: DataTypes.STRING(500),
 				allowNull: true,

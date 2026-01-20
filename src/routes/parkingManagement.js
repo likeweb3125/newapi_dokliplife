@@ -62,6 +62,10 @@ const parkingManagementController = require('../controllers/parkingManagement');
  *                 description: 다음 연장 시 주차 정보도 같이 연장 여부
  *                 default: false
  *                 example: false
+ *               memo:
+ *                 type: string
+ *                 description: 메모
+ *                 example: 추가 메모 사항
  *     responses:
  *       200:
  *         description: 주차 등록 성공
@@ -148,6 +152,89 @@ router.get('/', parkingManagementController.getParkingList);
 
 /**
  * @swagger
+ * /v1/parking/nowList:
+ *   get:
+ *     summary: 주차 사용 현황 리스트 조회
+ *     description: 고시원 ID를 기준으로 현재 사용 중인 주차 현황 리스트를 조회합니다.
+ *     tags: [계약현황]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: gosiwonEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유아이디
+ *         example: GSW0000000001
+ *     responses:
+ *       200:
+ *         description: 주차 사용 현황 리스트 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 주차 사용 현황 리스트 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     list:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             description: 고시원 고유아이디
+ *                           contractEsntlId:
+ *                             type: string
+ *                             description: 계약서 고유아이디
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유아이디
+ *                           customerName:
+ *                             type: string
+ *                             description: 사용자 이름
+ *                           customerGender:
+ *                             type: string
+ *                             description: 사용자 성별
+ *                           customerAge:
+ *                             type: integer
+ *                             description: 사용자 나이
+ *                           parkType:
+ *                             type: string
+ *                             description: 차량 타입 (자동차, 오토바이)
+ *                           parkNumber:
+ *                             type: string
+ *                             description: 차량 번호
+ *                           useStartDate:
+ *                             type: string
+ *                             format: date
+ *                             description: 이용 시작일
+ *                           useEndDate:
+ *                             type: string
+ *                             format: date
+ *                             description: 이용 종료일
+ *                           cost:
+ *                             type: integer
+ *                             description: 주차비
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/nowList', parkingManagementController.getParkingNowList);
+
+/**
+ * @swagger
  * /v1/parking/{parkingId}:
  *   put:
  *     summary: 주차 정보 수정
@@ -188,6 +275,14 @@ router.get('/', parkingManagementController.getParkingList);
  *               extend:
  *                 type: boolean
  *                 description: 다음 연장 시 주차 정보도 같이 연장 여부
+ *               memo:
+ *                 type: string
+ *                 description: 메모
+ *                 example: 추가 메모 사항
+ *               cost:
+ *                 type: integer
+ *                 description: 주차비
+ *                 example: 50000
  *     responses:
  *       200:
  *         description: 주차 정보 수정 성공
