@@ -131,7 +131,7 @@ exports.getGosiwonInfo = async (req, res, next) => {
                     ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
                     ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
                     ,GU.deposit depositAmount,GU.qualified,GU.minAge,GU.maxAge,GU.minUsedDate,GU.gender,GU.foreignLanguage,GU.orderData useOrderData 
-                    ,IGC.gsc_checkin_able_date ableCheckDays, IGC.gsc_sell_able_period ableContractDays, IGC.gsc_checkInTimeStart checkInTimeStart, IGC.gsc_checkInTimeEnd checkInTimeEnd, IGC.gsc_checkOutTime checkOutTime
+                    ,IGC.gsc_checkin_able_date ableCheckDays, IGC.gsc_sell_able_period ableContractDays, IGC.gsc_checkInTimeStart checkInTimeStart, IGC.gsc_checkInTimeEnd checkInTimeEnd, IGC.gsc_checkOutTime checkOutTime, IGC.gsc_use_checkInTime useCheckInTime, IGC.gsc_use_checkOutTime useCheckOutTime
 			FROM gosiwon G 
 			LEFT OUTER JOIN room R 
 				ON G.esntlId = R.gosiwonEsntlId 
@@ -172,6 +172,10 @@ exports.getGosiwonInfo = async (req, res, next) => {
 
 		// TINYINT(1) 필드를 boolean으로 변환
 		convertTinyIntToBoolean(gosiwonInfo);
+
+		// useCheckInTime, useCheckOutTime을 boolean으로 변환
+		gosiwonInfo.useCheckInTime = gosiwonInfo.useCheckInTime === 1 || gosiwonInfo.useCheckInTime === true || gosiwonInfo.useCheckInTime === '1' ? true : false;
+		gosiwonInfo.useCheckOutTime = gosiwonInfo.useCheckOutTime === 1 || gosiwonInfo.useCheckOutTime === true || gosiwonInfo.useCheckOutTime === '1' ? true : false;
 
 		// /v1/gosiwon/names와 동일한 형식의 추가 정보 추가
 		gosiwonInfo.address = gosiwonInfo.address || '';

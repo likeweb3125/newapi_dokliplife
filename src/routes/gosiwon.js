@@ -37,6 +37,20 @@ const parkingController = require('../controllers/parking');
  *                   example: 고시원 정보 조회 성공
  *                 data:
  *                   $ref: '#/components/schemas/GosiwonInfo'
+ *             example:
+ *               statusCode: 200
+ *               message: 고시원 정보 조회 성공
+ *               data:
+ *                 esntlId: GOSI0000002130
+ *                 name: 성수 고시원
+ *                 address: 서울시 성동구 성수동
+ *                 ableCheckDays: 2
+ *                 ableContractDays: 10
+ *                 checkInTimeStart: AM|9|00
+ *                 checkInTimeEnd: PM|9|00
+ *                 checkOutTime: AM|11|00
+ *                 useCheckInTime: false
+ *                 useCheckOutTime: false
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       404:
