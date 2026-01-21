@@ -296,10 +296,7 @@ exports.getParkingList = async (req, res, next) => {
 				EP.pTime,
 				PS.status,
 				COALESCE(PS.memo, EP.memo) AS memo,
-				CASE 
-					WHEN COALESCE(EP.pyl_goods_amount, PS.cost, 0) = 0 THEN '입실료 포함'
-					ELSE '별도 결제'
-				END AS paymentStatus
+				EP.paymentStatus AS paymentStatus
 			FROM parkStatus PS
 			LEFT JOIN extraPayment EP ON EP.contractEsntlId = PS.contractEsntlId
 				AND EP.deleteYN = 'N'

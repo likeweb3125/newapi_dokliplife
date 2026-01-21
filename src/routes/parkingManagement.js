@@ -140,7 +140,7 @@ router.post('/', parkingManagementController.createParking);
  *                             description: 주차비
  *                           paymentStatus:
  *                             type: string
- *                             description: 결제 상태 (입실료 포함/별도 결제)
+ *                             description: "extraPayment.paymentStatus (PENDING: 결제대기, COMPLETED: 결제완료, CANCELLED: 결제취소, FAILED: 결제실패). extraPayment 미매칭 시 null"
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
