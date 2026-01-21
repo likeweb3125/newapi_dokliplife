@@ -122,7 +122,7 @@ router.post('/', parkingManagementController.createParking);
  *                             description: 결제 로그 ID
  *                           parkStatusId:
  *                             type: string
- *                             description: 주차 상태 ID
+ *                             description: "주차 상태 ID (parkStatus.esntlId). PUT/DELETE /v1/parking/{parkingId}의 parkingId로 사용"
  *                           optionName:
  *                             type: string
  *                             description: 차량 구분 (자동차/오토바이)
@@ -191,7 +191,7 @@ router.get('/', parkingManagementController.getParkingList);
  *                         properties:
  *                           parkStatusId:
  *                             type: string
- *                             description: 주차 상태 고유아이디
+ *                             description: "주차 상태 ID (parkStatus.esntlId). PUT/DELETE /v1/parking/{parkingId}의 parkingId로 사용"
  *                           gosiwonEsntlId:
  *                             type: string
  *                             description: 고시원 고유아이디
@@ -247,7 +247,7 @@ router.get('/nowList', parkingManagementController.getParkingNowList);
  * /v1/parking/{parkingId}:
  *   put:
  *     summary: 주차 정보 수정
- *     description: 주차 정보를 수정합니다.
+ *     description: "주차 정보를 수정합니다. 수정 대상은 parkStatus ID(parkStatus.esntlId) 기준으로 식별합니다. 주차 목록(GET /v1/parking) 또는 주차 사용 현황(GET /v1/parking/nowList) 응답의 parkStatusId를 parkingId로 사용하세요."
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -257,8 +257,8 @@ router.get('/nowList', parkingManagementController.getParkingNowList);
  *         required: true
  *         schema:
  *           type: string
- *         description: 주차 ID (paymentLog의 esntlId)
- *         example: PYLG0000000001
+ *         description: "parkStatus ID (parkStatus.esntlId, PKST 접두사). 수정·삭제 식별 기준."
+ *         example: PKST0000000001
  *     requestBody:
  *       required: true
  *       content:
@@ -311,7 +311,7 @@ router.put('/:parkingId', parkingManagementController.updateParking);
  * /v1/parking/{parkingId}:
  *   delete:
  *     summary: 주차 삭제
- *     description: 주차 정보를 삭제합니다. gosiwonParking의 사용 대수도 감소하고, parkStatus는 소프트 삭제됩니다.
+ *     description: "주차 정보를 삭제합니다. 삭제 대상은 parkStatus ID(parkStatus.esntlId) 기준으로 식별합니다. gosiwonParking 사용 대수 감소, parkStatus 소프트 삭제. 주차 목록·현황 응답의 parkStatusId를 parkingId로 사용하세요."
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -321,8 +321,8 @@ router.put('/:parkingId', parkingManagementController.updateParking);
  *         required: true
  *         schema:
  *           type: string
- *         description: 주차 ID (paymentLog의 esntlId)
- *         example: PYLG0000000001
+ *         description: "parkStatus ID (parkStatus.esntlId, PKST 접두사). 수정·삭제 식별 기준."
+ *         example: PKST0000000001
  *     responses:
  *       200:
  *         description: 주차 삭제 성공
