@@ -276,18 +276,18 @@ exports.getParkingList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// extraPayment와 parkStatus 조인하여 주차 정보 조회
+		// parkStatus 기준: contractEsntlId로 계약 조회, 1:1로 extraPayment 매칭(optionName=parkType, optionInfo=parkNumber, useStartDate)
 		const query = `
 			SELECT 
 				EP.esntlId AS paymentLogId,
 				PS.esntlId AS parkStatusId,
-				EP.optionName,
-				EP.optionInfo,
+				COALESCE(EP.optionName, PS.parkType) AS optionName,
+				COALESCE(EP.optionInfo, PS.parkNumber) AS optionInfo,
 				PS.parkType,
 				PS.parkNumber,
 				PS.useStartDate,
 				PS.useEndDate,
-				EP.pyl_goods_amount AS cost,
+				COALESCE(EP.pyl_goods_amount, PS.cost) AS cost,
 				PS.cost AS parkStatusCost,
 				EP.paymentAmount,
 				EP.paymentType,
@@ -295,20 +295,23 @@ exports.getParkingList = async (req, res, next) => {
 				EP.pDate,
 				EP.pTime,
 				PS.status,
-				PS.memo,
+				COALESCE(PS.memo, EP.memo) AS memo,
 				CASE 
-					WHEN EP.pyl_goods_amount = 0 THEN '입실료 포함'
+					WHEN COALESCE(EP.pyl_goods_amount, PS.cost, 0) = 0 THEN '입실료 포함'
 					ELSE '별도 결제'
 				END AS paymentStatus
-			FROM extraPayment EP
-			LEFT JOIN parkStatus PS ON EP.contractEsntlId = PS.contractEsntlId 
-				AND PS.deleteYN = 'N'
-				AND PS.status = 'IN_USE'
-			WHERE EP.contractEsntlId = ?
+			FROM parkStatus PS
+			LEFT JOIN extraPayment EP ON EP.contractEsntlId = PS.contractEsntlId
 				AND EP.deleteYN = 'N'
 				AND EP.extraCostName = '주차비'
-				AND (EP.optionName = '자동차' OR EP.optionName = '오토바이')
-			ORDER BY EP.pDate DESC, EP.pTime DESC
+				AND (EP.optionName <=> PS.parkType)
+				AND (EP.optionInfo <=> PS.parkNumber)
+				AND (EP.useStartDate <=> PS.useStartDate)
+			WHERE PS.contractEsntlId = ?
+				AND PS.deleteYN = 'N'
+				AND (PS.status = 'IN_USE' OR PS.status = 'RESERVED')
+				AND (PS.parkType = '자동차' OR PS.parkType = '오토바이')
+			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;
 
 		const result = await mariaDBSequelize.query(query, {
