@@ -201,6 +201,42 @@ exports.getRoomList = async (req, res, next) => {
 	}
 };
 
+// roomStatus 대시보드 집계 (전체/입금대기/예약중/이용중/체납/퇴실확정/보증금미납)
+exports.getDashboardCnt = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const [row] = await mariaDBSequelize.query(
+			`
+			SELECT
+				COUNT(*) AS total,
+				SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
+				SUM(CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END) AS reserved,
+				SUM(CASE WHEN status = 'IN_USE' THEN 1 ELSE 0 END) AS inUse,
+				SUM(CASE WHEN status = 'OVERDUE' THEN 1 ELSE 0 END) AS overdue,
+				SUM(CASE WHEN status = 'CHECKOUT_CONFIRMED' THEN 1 ELSE 0 END) AS checkoutConfirmed,
+				SUM(CASE WHEN status = 'UNPAID' THEN 1 ELSE 0 END) AS unpaid
+			FROM roomStatus
+			`,
+			{ type: mariaDBSequelize.QueryTypes.SELECT }
+		);
+
+		const data = {
+			total: Number(row?.total ?? 0),
+			pending: Number(row?.pending ?? 0),
+			reserved: Number(row?.reserved ?? 0),
+			inUse: Number(row?.inUse ?? 0),
+			overdue: Number(row?.overdue ?? 0),
+			checkoutConfirmed: Number(row?.checkoutConfirmed ?? 0),
+			unpaid: Number(row?.unpaid ?? 0),
+		};
+
+		errorHandler.successThrow(res, '대시보드 집계 조회 성공', data);
+	} catch (err) {
+		next(err);
+	}
+};
+
 // 방 정보 조회
 exports.getRoomInfo = async (req, res, next) => {
 	try {

@@ -1211,6 +1211,63 @@ router.get('/adminContract', gosiwonController.getAdminContract);
 
 /**
  * @swagger
+ * /v1/gosiwon/dashboardCnt:
+ *   get:
+ *     summary: 대시보드 집계 조회
+ *     description: gosiwon 테이블 기준 집계 수를 반환합니다. 전체고시원 수, 관제(is_controlled=1), 제휴(is_controlled=0), 전산지급(use_settlement=1), 정산중지(use_settlement=0), 수수료 할인 적용(commision&lt;7) 고시원 수입니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 대시보드 집계 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 대시보드 집계 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: 전체 고시원 수 (gosiwon 테이블 총 개수)
+ *                       example: 150
+ *                     controlled:
+ *                       type: integer
+ *                       description: 관제 고시원 수 (is_controlled = 1)
+ *                       example: 80
+ *                     partner:
+ *                       type: integer
+ *                       description: 제휴 고시원 수 (is_controlled = 0)
+ *                       example: 70
+ *                     useSettlement:
+ *                       type: integer
+ *                       description: 전산지급 고시원 수 (use_settlement = 1)
+ *                       example: 100
+ *                     settlementStopped:
+ *                       type: integer
+ *                       description: 정산중지 고시원 수 (use_settlement = 0)
+ *                       example: 50
+ *                     commissionDiscount:
+ *                       type: integer
+ *                       description: 수수료 할인 적용 고시원 수 (commision &lt; 7)
+ *                       example: 20
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/dashboardCnt', gosiwonController.getDashboardCnt);
+
+/**
+ * @swagger
  * /v1/gosiwon/config:
  *   get:
  *     summary: 운영환경설정 조회

@@ -172,6 +172,67 @@ router.get('/list', roomController.getRoomList);
 
 /**
  * @swagger
+ * /v1/room/dashboardCnt:
+ *   get:
+ *     summary: roomStatus 대시보드 집계 조회
+ *     description: roomStatus 테이블의 status 별 건수를 반환합니다. 전체, 입금대기중(PENDING), 예약중(RESERVED), 이용중(IN_USE), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID)입니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 대시보드 집계 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 대시보드 집계 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: 전체 (roomStatus 총 개수)
+ *                       example: 500
+ *                     pending:
+ *                       type: integer
+ *                       description: 입금대기중 (status = PENDING)
+ *                       example: 10
+ *                     reserved:
+ *                       type: integer
+ *                       description: 예약중 (status = RESERVED)
+ *                       example: 20
+ *                     inUse:
+ *                       type: integer
+ *                       description: 이용중 (status = IN_USE)
+ *                       example: 300
+ *                     overdue:
+ *                       type: integer
+ *                       description: 체납상태 (status = OVERDUE)
+ *                       example: 5
+ *                     checkoutConfirmed:
+ *                       type: integer
+ *                       description: 퇴실확정 (status = CHECKOUT_CONFIRMED)
+ *                       example: 100
+ *                     unpaid:
+ *                       type: integer
+ *                       description: 보증금 미납 (status = UNPAID)
+ *                       example: 3
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/dashboardCnt', roomController.getDashboardCnt);
+
+/**
+ * @swagger
  * /v1/room/info:
  *   get:
  *     summary: 방 상세 정보 조회

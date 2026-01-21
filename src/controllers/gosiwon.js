@@ -219,6 +219,40 @@ exports.getAdminContract = async (req, res, next) => {
 	}
 };
 
+// 대시보드 집계 (전체/관제/제휴/전산지급/정산중지/수수료할인 고시원 수)
+exports.getDashboardCnt = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const [row] = await mariaDBSequelize.query(
+			`
+			SELECT
+				COUNT(*) AS total,
+				SUM(CASE WHEN is_controlled = 1 THEN 1 ELSE 0 END) AS controlled,
+				SUM(CASE WHEN is_controlled = 0 THEN 1 ELSE 0 END) AS partner,
+				SUM(CASE WHEN use_settlement = 1 THEN 1 ELSE 0 END) AS useSettlement,
+				SUM(CASE WHEN use_settlement = 0 THEN 1 ELSE 0 END) AS settlementStopped,
+				SUM(CASE WHEN (COALESCE(CAST(commision AS DECIMAL(10,2)), 7) < 7) THEN 1 ELSE 0 END) AS commissionDiscount
+			FROM gosiwon
+			`,
+			{ type: mariaDBSequelize.QueryTypes.SELECT }
+		);
+
+		const data = {
+			total: Number(row?.total ?? 0),
+			controlled: Number(row?.controlled ?? 0),
+			partner: Number(row?.partner ?? 0),
+			useSettlement: Number(row?.useSettlement ?? 0),
+			settlementStopped: Number(row?.settlementStopped ?? 0),
+			commissionDiscount: Number(row?.commissionDiscount ?? 0),
+		};
+
+		errorHandler.successThrow(res, '대시보드 집계 조회 성공', data);
+	} catch (err) {
+		next(err);
+	}
+};
+
 // 고시원 이름 목록 조회
 exports.getGosiwonNames = async (req, res, next) => {
 	try {
