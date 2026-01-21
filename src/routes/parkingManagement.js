@@ -201,6 +201,9 @@ router.get('/', parkingManagementController.getParkingList);
  *                           roomEsntlId:
  *                             type: string
  *                             description: 방 고유아이디
+ *                           roomNumber:
+ *                             type: string
+ *                             description: 방 이름(번호)
  *                           customerName:
  *                             type: string
  *                             description: 사용자 이름
@@ -216,6 +219,9 @@ router.get('/', parkingManagementController.getParkingList);
  *                           parkNumber:
  *                             type: string
  *                             description: 차량 번호
+ *                           status:
+ *                             type: string
+ *                             description: 주차 상태 (IN_USE, RESERVED)
  *                           useStartDate:
  *                             type: string
  *                             format: date

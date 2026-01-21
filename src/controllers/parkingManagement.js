@@ -336,13 +336,14 @@ exports.getParkingNowList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
 		}
 
-		// parkStatus와 roomContract, customer 조인하여 주차 사용 현황 조회
+		// parkStatus와 roomContract, customer, room 조인하여 주차 사용 현황 조회
 		const query = `
 			SELECT 
 				PS.esntlId AS parkStatusId,
 				PS.gosiwonEsntlId AS gosiwonEsntlId,
 				PS.contractEsntlId AS contractEsntlId,
 				RC.roomEsntlId AS roomEsntlId,
+				R.roomNumber AS roomNumber,
 				COALESCE(RC.customerName, C.name) AS customerName,
 				COALESCE(RC.customerGender, C.gender) AS customerGender,
 				COALESCE(RC.customerAge, 
@@ -354,14 +355,16 @@ exports.getParkingNowList = async (req, res, next) => {
 				) AS customerAge,
 				PS.parkType AS parkType,
 				PS.parkNumber AS parkNumber,
+				PS.status AS status,
 				PS.useStartDate AS useStartDate,
 				PS.useEndDate AS useEndDate,
 				COALESCE(PS.cost, 0) AS cost
 			FROM parkStatus PS
 			LEFT JOIN roomContract RC ON PS.contractEsntlId = RC.esntlId
+			LEFT JOIN room R ON RC.roomEsntlId = R.esntlId
 			LEFT JOIN customer C ON PS.customerEsntlId = C.esntlId
 			WHERE PS.gosiwonEsntlId = ?
-				AND PS.status = 'IN_USE'
+				AND PS.status IN ('IN_USE', 'RESERVED')
 				AND PS.deleteYN = 'N'
 			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;
