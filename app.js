@@ -140,6 +140,9 @@ app.use('/v1/refund', refundRoutes);
 // 방이동 Routes
 app.use('/v1/roomMove', roomMoveRoutes);
 
+// 문자 발송 Routes
+app.use('/v1/message', require('./src/routes/message'));
+
 // 추가 결제 Routes
 app.use('/v1/roomExtraPayment', extraPaymentRoutes);
 

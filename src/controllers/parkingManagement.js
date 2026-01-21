@@ -339,6 +339,7 @@ exports.getParkingNowList = async (req, res, next) => {
 		// parkStatus와 roomContract, customer 조인하여 주차 사용 현황 조회
 		const query = `
 			SELECT 
+				PS.esntlId AS parkStatusId,
 				PS.gosiwonEsntlId AS gosiwonEsntlId,
 				PS.contractEsntlId AS contractEsntlId,
 				RC.roomEsntlId AS roomEsntlId,

@@ -62,6 +62,15 @@ const generateRoomMoveStatusId = async (transaction) => {
 	return result?.nextId || `${ROOMMOVE_PREFIX}${String(1).padStart(ROOMMOVE_PADDING, '0')}`;
 };
 
+// 계약서 ID 생성 함수
+const generateContractId = async (transaction) => {
+	const [result] = await mariaDBSequelize.query(
+		`SELECT CONCAT('RCTT', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId FROM roomContract WHERE esntlId LIKE 'RCTT%'`,
+		{ type: mariaDBSequelize.QueryTypes.SELECT, transaction }
+	);
+	return result?.nextId || 'RCTT0000000001';
+};
+
 // 방이동 처리
 exports.processRoomMove = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -216,7 +225,23 @@ exports.processRoomMove = async (req, res, next) => {
 		const today = new Date();
 		const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-		// 1. 원래 방의 roomStatus subStatus를 ROOM_MOVE_OUT으로 변경하고 statusEndDate를 입실 신청 날짜(moveDate)로 변경
+		// 1. 기존 계약서 중지 (endDate를 moveDate로 변경, status를 'ENDED'로 변경)
+		await mariaDBSequelize.query(
+			`
+			UPDATE roomContract 
+			SET endDate = ?,
+				status = 'ENDED',
+				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+			WHERE esntlId = ?
+		`,
+			{
+				replacements: [moveDateStr, contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		// 2. 원래 방의 roomStatus subStatus를 ROOM_MOVE_OUT으로 변경하고 statusEndDate를 moveDate로 변경
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomStatus 
@@ -232,8 +257,47 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
-		// 2. 새로운 roomStatus 레코드 생성 (이동할 방용)
-		// statusStartDate는 moveDate, statusEndDate는 계약서의 끝나는 날로 설정
+		// 3. 새로운 계약서 생성
+		const newContractEsntlId = await generateContractId(transaction);
+		const contractDate = new Date();
+		const contractDateStr = `${contractDate.getFullYear()}-${String(contractDate.getMonth() + 1).padStart(2, '0')}-${String(contractDate.getDate()).padStart(2, '0')}`;
+		
+		// 기존 계약서의 모든 필드를 복사하여 새 계약서 생성 (roomEsntlId와 날짜만 변경)
+		await mariaDBSequelize.query(
+			`
+			INSERT INTO roomContract (
+				esntlId, roomEsntlId, gosiwonEsntlId, customerEsntlId,
+				startDate, endDate, contractDate, month, status,
+				customerName, customerPhone, customerGender, customerAge,
+				checkinName, checkinPhone, checkinGender, checkinAge,
+				monthlyRent, memo, memo2, emergencyContact,
+				checkInTime, contractorEsntlId
+			)
+			SELECT 
+				?, ?, gosiwonEsntlId, customerEsntlId,
+				?, endDate, ?, month, 'ACTIVE',
+				customerName, customerPhone, customerGender, customerAge,
+				checkinName, checkinPhone, checkinGender, checkinAge,
+				monthlyRent, memo, memo2, emergencyContact,
+				checkInTime, contractorEsntlId
+			FROM roomContract
+			WHERE esntlId = ?
+		`,
+			{
+				replacements: [
+					newContractEsntlId,
+					targetRoomEsntlId,
+					moveDateStr, // startDate: moveDate
+					contractDateStr, // contractDate: 오늘 날짜
+					contractEsntlId, // 기존 계약서 ID
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+
+		// 4. 새로운 roomStatus 레코드 생성 (이동할 방용, 새로운 계약서 연결)
+		// statusStartDate는 moveDate, statusEndDate는 새 계약서의 endDate로 설정
 		const newRoomStatusId = await generateRoomStatusId(transaction);
 		await mariaDBSequelize.query(
 			`
@@ -270,9 +334,9 @@ exports.processRoomMove = async (req, res, next) => {
 					contractInfo.roomStatusReservationName,
 					contractInfo.roomStatusContractorEsntlId,
 					contractInfo.roomStatusContractorName,
-					contractEsntlId,
+					newContractEsntlId, // 새로운 계약서 ID
 					moveDateStr, // statusStartDate: moveDate
-					contractInfo.endDate, // statusEndDate: 계약서의 끝나는 날
+					contractInfo.endDate, // statusEndDate: 기존 계약서의 endDate (새 계약서도 동일)
 					contractInfo.etcStartDate,
 					contractInfo.etcEndDate,
 					contractInfo.statusMemo,
@@ -337,6 +401,8 @@ exports.processRoomMove = async (req, res, next) => {
 			createdRoomStatusIds: [], // roomAfterUse로 생성될 상태 ID들 (아직 생성 전이므로 빈 배열)
 			originalRoomStatusId: contractInfo.roomStatusEsntlId,
 			newRoomStatusId: newRoomStatusId,
+			originalContractEsntlId: contractEsntlId, // 기존 계약서 ID
+			newContractEsntlId: newContractEsntlId, // 새로운 계약서 ID
 			targetRoomOnSaleStatuses: targetRoomOnSaleStatuses || [], // 타겟 방의 원래 ON_SALE 상태 정보
 		};
 		let memoWithStatusIds = memoWithContact
@@ -368,7 +434,7 @@ exports.processRoomMove = async (req, res, next) => {
 				replacements: [
 					roomMoveStatusId,
 					contractInfo.gosiwonEsntlId,
-					contractEsntlId,
+					newContractEsntlId, // 새로운 계약서 ID로 변경
 					contractInfo.roomStatusCustomerEsntlId,
 					originalRoomEsntlId,
 					targetRoomEsntlId,
@@ -419,6 +485,8 @@ exports.processRoomMove = async (req, res, next) => {
 				createdRoomStatusIds: createdRoomStatusIds,
 				originalRoomStatusId: contractInfo.roomStatusEsntlId,
 				newRoomStatusId: newRoomStatusId,
+				originalContractEsntlId: contractEsntlId,
+				newContractEsntlId: newContractEsntlId,
 				targetRoomOnSaleStatuses: targetRoomOnSaleStatuses || [],
 			};
 			const updatedMemo = memoWithStatusIds.replace(
@@ -445,6 +513,8 @@ exports.processRoomMove = async (req, res, next) => {
 				createdRoomStatusIds: [],
 				originalRoomStatusId: contractInfo.roomStatusEsntlId,
 				newRoomStatusId: newRoomStatusId,
+				originalContractEsntlId: contractEsntlId,
+				newContractEsntlId: newContractEsntlId,
 				targetRoomOnSaleStatuses: targetRoomOnSaleStatuses,
 			};
 			const updatedMemo = memoWithStatusIds.replace(
@@ -473,6 +543,8 @@ exports.processRoomMove = async (req, res, next) => {
 			roomMoveStatusId: roomMoveStatusId,
 			originalRoomStatusId: contractInfo.roomStatusEsntlId,
 			newRoomStatusId: newRoomStatusId,
+			originalContractEsntlId: contractEsntlId,
+			newContractEsntlId: newContractEsntlId,
 		});
 	} catch (err) {
 		await transaction.rollback();
@@ -529,8 +601,44 @@ exports.deleteRoomMove = async (req, res, next) => {
 			);
 		}
 
-		// 계약 정보 조회 (endDate 확인용)
-		const [contractInfo] = await mariaDBSequelize.query(
+		// memo에서 계약서 ID 정보 추출
+		let originalContractEsntlId = null;
+		let newContractEsntlId = existingRoomMove.contractEsntlId; // 기본값은 현재 contractEsntlId
+		
+		if (existingRoomMove.memo) {
+			const statusIdsMatch = existingRoomMove.memo.match(/\[STATUS_IDS:(.*?)\]/);
+			if (statusIdsMatch) {
+				try {
+					const statusIdsInfo = JSON.parse(statusIdsMatch[1]);
+					originalContractEsntlId = statusIdsInfo.originalContractEsntlId || null;
+					newContractEsntlId = statusIdsInfo.newContractEsntlId || existingRoomMove.contractEsntlId;
+				} catch (err) {
+					console.error('Failed to parse STATUS_IDS from memo:', err);
+				}
+			}
+		}
+
+		// 기존 계약서 정보 조회 (복구용)
+		const [originalContractInfo] = await mariaDBSequelize.query(
+			`
+			SELECT endDate, status
+			FROM roomContract
+			WHERE esntlId = ?
+			LIMIT 1
+		`,
+			{
+				replacements: [originalContractEsntlId || existingRoomMove.contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (!originalContractInfo && originalContractEsntlId) {
+			errorHandler.errorThrow(404, '기존 계약 정보를 찾을 수 없습니다.');
+		}
+
+		// 새 계약서 정보 조회 (삭제용)
+		const [newContractInfo] = await mariaDBSequelize.query(
 			`
 			SELECT endDate
 			FROM roomContract
@@ -538,22 +646,42 @@ exports.deleteRoomMove = async (req, res, next) => {
 			LIMIT 1
 		`,
 			{
-				replacements: [existingRoomMove.contractEsntlId],
+				replacements: [newContractEsntlId],
 				type: mariaDBSequelize.QueryTypes.SELECT,
 				transaction,
 			}
 		);
 
-		if (!contractInfo) {
-			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		if (!newContractInfo) {
+			errorHandler.errorThrow(404, '새 계약 정보를 찾을 수 없습니다.');
 		}
 
-		// 1. 원래 방의 roomStatus 복구 (ROOM_MOVE_OUT -> IN_USE, statusEndDate 복구)
+		// 1. 기존 계약서 복구 (endDate와 status 복구)
+		if (originalContractEsntlId) {
+			// 새 계약서의 endDate를 기존 계약서의 endDate로 복구 (원래 endDate)
+			await mariaDBSequelize.query(
+				`
+				UPDATE roomContract 
+				SET endDate = ?,
+					status = 'ACTIVE',
+					updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				WHERE esntlId = ?
+			`,
+				{
+					replacements: [newContractInfo.endDate, originalContractEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+
+		// 2. 원래 방의 roomStatus 복구 (ROOM_MOVE_OUT -> IN_USE, statusEndDate 복구)
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomStatus 
 			SET subStatus = NULL,
 				statusEndDate = ?,
+				contractEsntlId = ?,
 				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
 			WHERE contractEsntlId = ?
 				AND roomEsntlId = ?
@@ -562,8 +690,9 @@ exports.deleteRoomMove = async (req, res, next) => {
 		`,
 			{
 				replacements: [
-					contractInfo.endDate,
-					existingRoomMove.contractEsntlId,
+					originalContractInfo?.endDate || newContractInfo.endDate,
+					originalContractEsntlId || existingRoomMove.contractEsntlId,
+					newContractEsntlId,
 					existingRoomMove.originalRoomEsntlId,
 				],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
@@ -571,7 +700,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 			}
 		);
 
-		// 2. 새로운 방의 roomStatus 삭제 (ROOM_MOVE_IN 상태)
+		// 3. 새로운 방의 roomStatus 삭제 (ROOM_MOVE_IN 상태)
 		await mariaDBSequelize.query(
 			`
 			DELETE FROM roomStatus
@@ -582,9 +711,22 @@ exports.deleteRoomMove = async (req, res, next) => {
 		`,
 			{
 				replacements: [
-					existingRoomMove.contractEsntlId,
+					newContractEsntlId,
 					existingRoomMove.targetRoomEsntlId,
 				],
+				type: mariaDBSequelize.QueryTypes.DELETE,
+				transaction,
+			}
+		);
+
+		// 4. 새 계약서 삭제
+		await mariaDBSequelize.query(
+			`
+			DELETE FROM roomContract
+			WHERE esntlId = ?
+		`,
+			{
+				replacements: [newContractEsntlId],
 				type: mariaDBSequelize.QueryTypes.DELETE,
 				transaction,
 			}

@@ -189,6 +189,9 @@ router.get('/', parkingManagementController.getParkingList);
  *                       items:
  *                         type: object
  *                         properties:
+ *                           parkStatusId:
+ *                             type: string
+ *                             description: 주차 상태 고유아이디
  *                           gosiwonEsntlId:
  *                             type: string
  *                             description: 고시원 고유아이디
