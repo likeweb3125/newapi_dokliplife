@@ -174,9 +174,9 @@ router.get('/list', roomController.getRoomList);
  * @swagger
  * /v1/room/dashboardCnt:
  *   get:
- *     summary: roomStatus 대시보드 집계 조회
+ *     summary: roomStatus - 계약현황용 대시보드 집계 조회
  *     description: roomStatus 테이블의 status 별 건수를 반환합니다. 전체, 입금대기중(PENDING), 예약중(RESERVED), 이용중(IN_USE), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID)입니다.
- *     tags: [Room]
+ *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
  *     responses:
