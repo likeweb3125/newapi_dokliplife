@@ -1431,5 +1431,194 @@ router.get('/config', gosiwonController.getGosiwonConfig);
  */
 router.put('/config', gosiwonController.updateGosiwonConfig);
 
+/**
+ * @swagger
+ * /v1/gosiwon/list:
+ *   get:
+ *     summary: 고시원 리스트 조회 (관리자용)
+ *     description: 고시원 리스트를 조회합니다. 페이지네이션, 검색, 필터링을 지원합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: 고시원 상태 필터
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 시작일 (YYYY-MM-DD)
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 종료일 (YYYY-MM-DD)
+ *       - in: query
+ *         name: searchString
+ *         schema:
+ *           type: string
+ *         description: 검색어 (고시원 ID, 이름, 주소, 전화번호)
+ *       - in: query
+ *         name: order
+ *         schema:
+ *           type: string
+ *           enum: [ASC, DESC]
+ *           default: DESC
+ *         description: 정렬 순서
+ *       - in: query
+ *         name: stateType
+ *         schema:
+ *           type: string
+ *           enum: [all, controlled, partner, useSettlement, settlementStopped, commissionDiscount]
+ *           default: all
+ *         description: '상태 필터 (all=전체, controlled=관제, partner=제휴, useSettlement=전산지급, settlementStopped=정산중지, commissionDiscount=수수료할인적용)'
+ *     responses:
+ *       200:
+ *         description: 고시원 리스트 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 resultList:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 고시원 고유아이디
+ *                       region:
+ *                         type: string
+ *                         description: 지역
+ *                       contractDate:
+ *                         type: string
+ *                         description: 가입일
+ *                       pTime:
+ *                         type: string
+ *                         description: 결제 시간
+ *                       startDate:
+ *                         type: string
+ *                         description: 시작일
+ *                       endDate:
+ *                         type: string
+ *                         description: 종료일
+ *                       month:
+ *                         type: integer
+ *                         description: 월
+ *                       gosiwonEsntlId:
+ *                         type: string
+ *                         description: 고시원 고유아이디
+ *                       gosiwonName:
+ *                         type: string
+ *                         description: 고시원명
+ *                       gosiwonAddress:
+ *                         type: string
+ *                         description: 고시원 주소
+ *                       roomNumber:
+ *                         type: integer
+ *                         description: 방 개수
+ *                       customerName:
+ *                         type: integer
+ *                         description: 고객 수
+ *                       pyl_goods_amount:
+ *                         type: number
+ *                         description: 상품 금액
+ *                       paymentAmount:
+ *                         type: string
+ *                         description: 결제 금액 (포맷팅됨)
+ *                       payment_amount:
+ *                         type: number
+ *                         description: 결제 금액 (숫자)
+ *                       paymentPoint:
+ *                         type: string
+ *                         description: 포인트 결제 금액 (포맷팅됨)
+ *                       paymentCoupon:
+ *                         type: string
+ *                         description: 쿠폰 결제 금액 (포맷팅됨)
+ *                       cAmount:
+ *                         type: string
+ *                         description: 수수료 금액 (포맷팅됨)
+ *                       cPercent:
+ *                         type: string
+ *                         description: 수수료 비율 (포맷팅됨)
+ *                       paymentCount:
+ *                         type: integer
+ *                         description: 결제 건수
+ *                       totcnt:
+ *                         type: integer
+ *                         description: 전체 개수
+ *                 totcnt:
+ *                   type: integer
+ *                   description: 전체 개수
+ *                   example: 100
+ *                 totPaymentAmount:
+ *                   type: string
+ *                   description: 전체 결제 금액 합계
+ *                   example: "1,000,000"
+ *                 totPaymentPoint:
+ *                   type: string
+ *                   description: 전체 포인트 결제 합계
+ *                   example: "50,000"
+ *                 totPaymentCoupon:
+ *                   type: string
+ *                   description: 전체 쿠폰 결제 합계
+ *                   example: "30,000"
+ *                 totCAmount:
+ *                   type: string
+ *                   description: 전체 수수료 금액 합계
+ *                   example: "70,000"
+ *                 totCPercent:
+ *                   type: string
+ *                   description: 전체 수수료 비율 평균
+ *                   example: "7.0"
+ *                 page:
+ *                   type: integer
+ *                   description: 현재 페이지
+ *                   example: 1
+ *             example:
+ *               result: SUCCESS
+ *               resultList:
+ *                 - esntlId: GOSI0000000001
+ *                   region: 서울시 강남구
+ *                   contractDate: 2024-01-01
+ *                   pTime: "14:30:00"
+ *                   gosiwonName: "강남 고시원"
+ *                   gosiwonAddress: "서울시 강남구 테헤란로"
+ *                   roomNumber: 10
+ *                   customerName: 5
+ *                   paymentAmount: "1,000,000"
+ *                   payment_amount: 1000000
+ *                   totcnt: 100
+ *               totcnt: 100
+ *               totPaymentAmount: "10,000,000"
+ *               totPaymentPoint: "500,000"
+ *               totPaymentCoupon: "300,000"
+ *               totCAmount: "700,000"
+ *               totCPercent: "7.0"
+ *               page: 1
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/list', gosiwonController.selectListToAdminNew);
+
 module.exports = router;
 

@@ -1418,3 +1418,202 @@ exports.updateGosiwonConfig = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 고시원 리스트 조회 (관리자용)
+exports.selectListToAdminNew = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const params = {
+			page: parseInt(req.query.page) || 1,
+			status: req.query.status,
+			startDate: req.query.startDate,
+			endDate: req.query.endDate,
+			searchString: req.query.searchString,
+			order: req.query.order || 'DESC',
+			stateType: req.query.stateType // 전체, 관제, 제휴, 전산지급, 정산중지, 수수료할인적용
+		};
+
+		const buildWhereConditions = () => {
+			const conditions = ['1=1'];
+			const values = [];
+			
+			if (params.startDate && params.endDate) {
+				conditions.push('G.acceptDate BETWEEN ? AND ?');
+				values.push(params.startDate, params.endDate);
+			}
+			
+			if (params.searchString) {
+				conditions.push('(G.esntlId LIKE ? OR G.name LIKE ? OR G.address LIKE ? OR G.phone LIKE ?)');
+				const searchPattern = `%${params.searchString}%`;
+				values.push(searchPattern, searchPattern, searchPattern, searchPattern);
+			}
+			
+			if (params.status) {
+				conditions.push('G.status = ?');
+				values.push(params.status);
+			}
+			
+			// 상태 타입 필터 추가
+			if (params.stateType && params.stateType !== 'all') {
+				switch (params.stateType) {
+					case 'controlled':
+						// 관제 (is_controlled=1)
+						conditions.push('G.is_controlled = 1');
+						break;
+					case 'partner':
+						// 제휴 (is_controlled=0)
+						conditions.push('G.is_controlled = 0');
+						break;
+					case 'useSettlement':
+						// 전산지급 (use_settlement=1)
+						conditions.push('G.use_settlement = 1');
+						break;
+					case 'settlementStopped':
+						// 정산중지 (use_settlement=0)
+						conditions.push('G.use_settlement = 0');
+						break;
+					case 'commissionDiscount':
+						// 수수료할인적용 (commision<7)
+						conditions.push('CAST(COALESCE(G.commision, 7) AS DECIMAL(10,2)) < 7');
+						break;
+				}
+			}
+			
+			return { whereClause: conditions.join(' AND '), values };
+		};
+
+		const { whereClause, values: whereValues } = buildWhereConditions();
+		const orderDirection = params.order === 'ASC' ? 'ASC' : 'DESC';
+		const pageSize = 50; // Config.page 대신 고정값 사용
+		const offset = (params.page - 1) * pageSize;
+
+		// 성능 최적화: COUNT(*) OVER() 제거하고 별도 카운트 쿼리 사용
+		// paymentLog 집계를 서브쿼리로 최적화
+		// 불필요한 JOIN 제거 (room, customer는 집계만 필요)
+		
+		// 전체 개수 조회 (먼저 실행하여 빠른 응답)
+		const countQuery = `
+			SELECT COUNT(DISTINCT G.esntlId) AS total
+			FROM gosiwon G
+			WHERE ${whereClause}
+		`;
+
+		// 메인 데이터 조회 쿼리 (최적화)
+		const optimizedQuery = `
+			SELECT 
+				G.esntlId,
+				SUBSTRING_INDEX(SUBSTRING_INDEX(G.address, ' ', 2), ' ', -2) AS region,
+				G.acceptDate AS contractDate,
+				COALESCE(PL.pTime, '') AS pTime,
+				COALESCE(PL.minStartDate, '') AS startDate,
+				COALESCE(PL.maxEndDate, '') AS endDate,
+				COALESCE(PL.totalMonth, 0) AS month,
+				G.esntlId AS gosiwonEsntlId,
+				G.name AS gosiwonName,
+				G.address AS gosiwonAddress,
+				'' AS contract,
+				'' AS spacialContract,
+				CAST(COALESCE(PL.roomCount, 0) AS CHAR) AS roomNumber,
+				'' AS roomType,
+				'' AS window,
+				CAST(COALESCE(PL.customerCount, 0) AS CHAR) AS customerName,
+				'' AS customerPhone,
+				'' AS gender,
+				0 AS age,
+				COALESCE(PL.pyl_goods_amount, 0) AS pyl_goods_amount,
+				FORMAT(COALESCE(PL.paymentAmount, 0), 0) AS paymentAmount,
+				COALESCE(PL.paymentAmount, 0) AS payment_amount,
+				FORMAT(COALESCE(PL.paymentPoint, 0), 0) AS paymentPoint,
+				FORMAT(COALESCE(PL.paymentCoupon, 0), 0) AS paymentCoupon,
+				FORMAT(COALESCE(PL.cAmount, 0), 0) AS cAmount,
+				FORMAT(COALESCE(PL.cPercent, 0), 0) AS cPercent,
+				1 AS paymentCount
+			FROM gosiwon G
+			LEFT JOIN (
+				SELECT 
+					RC.gosiwonEsntlId,
+					MAX(PL2.pTime) AS pTime,
+					MIN(RC.startDate) AS minStartDate,
+					MAX(RC.endDate) AS maxEndDate,
+					SUM(COALESCE(RC.month, 0)) AS totalMonth,
+					COUNT(DISTINCT RC.roomEsntlId) AS roomCount,
+					COUNT(DISTINCT RC.customerEsntlId) AS customerCount,
+					SUM(COALESCE(PL2.pyl_goods_amount, 0)) AS pyl_goods_amount,
+					SUM(COALESCE(PL2.paymentAmount, 0)) AS paymentAmount,
+					SUM(COALESCE(PL2.paymentPoint, 0)) AS paymentPoint,
+					SUM(COALESCE(PL2.paymentCoupon, 0)) AS paymentCoupon,
+					SUM(COALESCE(PL2.cAmount, 0)) AS cAmount,
+					AVG(COALESCE(PL2.cPercent, 0)) AS cPercent
+				FROM roomContract RC
+				LEFT JOIN paymentLog PL2 ON RC.esntlId = PL2.contractEsntlId
+				GROUP BY RC.gosiwonEsntlId
+			) PL ON G.esntlId = PL.gosiwonEsntlId
+			WHERE ${whereClause}
+			ORDER BY G.acceptDate ${orderDirection}, COALESCE(PL.pTime, '') ${orderDirection}
+			LIMIT ? OFFSET ?
+		`;
+
+		// 합계 조회용 최적화 쿼리
+		const summaryQuery = `
+			SELECT 
+				FORMAT(COALESCE(SUM(PL.paymentAmount), 0), 0) AS paymentAmount,
+				FORMAT(COALESCE(SUM(PL.paymentPoint), 0), 0) AS paymentPoint,
+				FORMAT(COALESCE(SUM(PL.paymentCoupon), 0), 0) AS paymentCoupon,
+				FORMAT(COALESCE(SUM(PL.cAmount), 0), 0) AS cAmount,
+				FORMAT(COALESCE(AVG(PL.cPercent), 0), 0) AS cPercent
+			FROM gosiwon G
+			LEFT JOIN (
+				SELECT 
+					RC.gosiwonEsntlId,
+					SUM(COALESCE(PL2.paymentAmount, 0)) AS paymentAmount,
+					SUM(COALESCE(PL2.paymentPoint, 0)) AS paymentPoint,
+					SUM(COALESCE(PL2.paymentCoupon, 0)) AS paymentCoupon,
+					SUM(COALESCE(PL2.cAmount, 0)) AS cAmount,
+					AVG(COALESCE(PL2.cPercent, 0)) AS cPercent
+				FROM roomContract RC
+				LEFT JOIN paymentLog PL2 ON RC.esntlId = PL2.contractEsntlId
+				GROUP BY RC.gosiwonEsntlId
+			) PL ON G.esntlId = PL.gosiwonEsntlId
+			WHERE ${whereClause}
+		`;
+
+		// 병렬 실행으로 성능 개선
+		const [countResult, mainResult, summaryResult] = await Promise.all([
+			mariaDBSequelize.query(countQuery, {
+				replacements: whereValues,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(optimizedQuery, {
+				replacements: [...whereValues, pageSize, offset],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(summaryQuery, {
+				replacements: whereValues,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			})
+		]);
+
+		const totalCount = countResult[0]?.total || 0;
+		const resultList = Array.isArray(mainResult) ? mainResult : [];
+		const summary = summaryResult[0] || {};
+		
+		// 원본 함수와 동일한 리턴 구조
+		const response = {
+			result: 'SUCCESS',
+			resultList: resultList,
+			totcnt: totalCount,
+			totPaymentAmount: summary.paymentAmount || '0',
+			totPaymentPoint: summary.paymentPoint || '0',
+			totPaymentCoupon: summary.paymentCoupon || '0',
+			totCAmount: summary.cAmount || '0',
+			totCPercent: summary.cPercent || '0',
+			page: params.page
+		};
+		
+		res.json(response);
+	} catch (err) {
+		console.error('[selectListToAdminNew] Database error:', err);
+		res.json({ result: 'FAIL' });
+	}
+};
