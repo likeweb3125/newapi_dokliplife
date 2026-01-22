@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS `extraPayment` (
   `gosiwonEsntlId` VARCHAR(50) NOT NULL COMMENT '고시원 고유아이디',
   `roomEsntlId` VARCHAR(50) NOT NULL COMMENT '방 고유아이디',
   `customerEsntlId` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '고객 고유아이디',
+  `uniqueId` VARCHAR(50) NULL COMMENT '고유 식별자',
   `extraCostName` VARCHAR(200) NOT NULL COMMENT '추가비용명칭 (주차비, 추가 입실료, 직접 입력 등)',
   `memo` TEXT NULL COMMENT '메모 (ex. 2인 추가 / 정가 계산 등)',
   `optionInfo` VARCHAR(200) NULL COMMENT '옵션정보 (주차비의 경우 차량정보, 직접 입력의 경우 옵션명 등)',

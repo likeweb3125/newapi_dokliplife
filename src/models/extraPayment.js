@@ -34,6 +34,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'customerEsntlId',
 				comment: '고객 고유아이디',
 			},
+			uniqueId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'uniqueId',
+				comment: '고유 식별자',
+			},
 			extraCostName: {
 				type: DataTypes.STRING(200),
 				allowNull: false,

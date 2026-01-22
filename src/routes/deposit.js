@@ -492,6 +492,12 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *           type: string
  *         description: "고시원코드 필터 (값이 있으면 해당 고시원코드로 필터링)"
  *       - in: query
+ *         name: contractEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "계약서 아이디 필터 (값이 있으면 해당 계약서 아이디로 필터링)"
+ *       - in: query
  *         name: searchString
  *         required: false
  *         schema:

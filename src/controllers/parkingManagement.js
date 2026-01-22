@@ -55,6 +55,30 @@ const generateExtraPaymentId = async (transaction) => {
 	return idResult?.nextId || 'EXTR0000000001';
 };
 
+// uniqueId 생성 함수 (pDate와 esntlId를 기반으로 생성)
+// 형식: YYYYMMDD + esntlId의 숫자 부분(앞의 0 제거)
+// 예: pDate="2025-07-21", esntlId="EXTR0000004274" → uniqueId="202507214274"
+const generateUniqueId = (pDate, esntlId) => {
+	// pDate에서 날짜 추출 (YYYY-MM-DD 형식 → YYYYMMDD)
+	let dateStr = '';
+	if (pDate) {
+		// pDate가 "2025-07-31" 형식이면 "20250731"로 변환
+		dateStr = pDate.replace(/-/g, '');
+	}
+
+	// esntlId에서 숫자 부분 추출하고 앞의 0 제거 (예: EXTR0000004274 → 4274)
+	let esntlIdNumeric = '';
+	if (esntlId) {
+		const numericPart = esntlId.replace(/\D/g, '');
+		// 앞의 0 제거
+		esntlIdNumeric = numericPart.replace(/^0+/, '') || '0';
+	}
+
+	// uniqueId 생성: 날짜(YYYYMMDD) + 숫자 부분(앞의 0 제거)
+	const uniqueId = dateStr && esntlIdNumeric ? `${dateStr}${esntlIdNumeric}` : null;
+	return uniqueId;
+};
+
 // parkStatus ID 생성 함수
 const generateParkStatusId = async (transaction) => {
 	const idQuery = `
@@ -153,6 +177,10 @@ exports.createParking = async (req, res, next) => {
 
 		// extraPayment 생성 (0원이어도 기록)
 		const paymentId = await generateExtraPaymentId(transaction);
+		
+		// uniqueId 생성
+		const uniqueId = generateUniqueId(pDate, paymentId);
+		
 		await extraPayment.create(
 			{
 				esntlId: paymentId,
@@ -160,6 +188,7 @@ exports.createParking = async (req, res, next) => {
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				customerEsntlId: contract.customerEsntlId || '',
+				uniqueId: uniqueId,
 				extraCostName: '주차비',
 				memo: null,
 				optionInfo: optionInfo || null,

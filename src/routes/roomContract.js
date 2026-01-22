@@ -44,6 +44,14 @@ const roomContractController = require('../controllers/roomContract');
  *         description: 계약 상태 필터
  *         example: ACTIVE
  *       - in: query
+ *         name: roomStatus
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [PENDING, RESERVED, IN_USE, OVERDUE, CHECKOUT_CONFIRMED, UNPAID]
+ *         description: 방 상태 필터 (입금대기중(PENDING), 예약중(RESERVED), 이용중(IN_USE), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID))
+ *         example: IN_USE
+ *       - in: query
  *         name: startDate
  *         required: false
  *         schema:
@@ -538,5 +546,224 @@ router.get('/detail', roomContractController.getContractDetail);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.put('/detail', roomContractController.updateContract);
+
+/**
+ * @swagger
+ * /v1/roomContract/depositAndExtra:
+ *   get:
+ *     summary: 보증금 및 추가 결제 정보 조회
+ *     description: 계약서 ID를 입력받아 고시원 ID, 방 ID, 계약서 ID를 기본으로 반환하고, extraPayment 테이블에서 계약서 ID를 기준으로 결제 내역을 모두 조회하며, deposit 테이블에서 해당 계약의 보증금 정보를 조회합니다.
+ *     tags: [계약현황]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: contractEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 계약 고유 아이디
+ *         example: RCTT0000025145
+ *     responses:
+ *       200:
+ *         description: 보증금 및 추가 결제 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 보증금 및 추가 결제 정보 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     contractEsntlId:
+ *                       type: string
+ *                       description: 계약 고유 아이디
+ *                       example: RCTT0000025145
+ *                     gosiwonEsntlId:
+ *                       type: string
+ *                       description: 고시원 고유 아이디
+ *                       example: GOSI0000000001
+ *                     roomEsntlId:
+ *                       type: string
+ *                       description: 방 고유 아이디
+ *                       example: ROOM0000000001
+ *                     extraData:
+ *                       type: array
+ *                       description: 추가 결제 내역 목록
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 추가 결제 고유 아이디
+ *                           contractEsntlId:
+ *                             type: string
+ *                             description: 계약 고유 아이디
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             description: 고시원 고유 아이디
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
+ *                           customerEsntlId:
+ *                             type: string
+ *                             description: 고객 고유 아이디
+ *                           uniqueId:
+ *                             type: string
+ *                             description: 고유 식별자
+ *                           extraCostName:
+ *                             type: string
+ *                             description: 추가비용명칭
+ *                           memo:
+ *                             type: string
+ *                             description: 메모
+ *                           optionInfo:
+ *                             type: string
+ *                             description: 옵션정보
+ *                           useStartDate:
+ *                             type: string
+ *                             description: 이용 시작 일자
+ *                           optionName:
+ *                             type: string
+ *                             description: 옵션명
+ *                           extendWithPayment:
+ *                             type: integer
+ *                             description: 연장시 함께 결제 여부
+ *                           pDate:
+ *                             type: string
+ *                             description: 결제 날짜
+ *                           pTime:
+ *                             type: string
+ *                             description: 결제 시간
+ *                           paymentAmount:
+ *                             type: string
+ *                             description: 결제 금액
+ *                           pyl_goods_amount:
+ *                             type: integer
+ *                             description: 상품금액
+ *                           imp_uid:
+ *                             type: string
+ *                             description: PG 결제 고유아이디
+ *                           paymentStatus:
+ *                             type: string
+ *                             description: 결제 상태
+ *                           paymentType:
+ *                             type: string
+ *                             description: 결제 방식
+ *                           withdrawalStatus:
+ *                             type: string
+ *                             description: 결제 취소 여부
+ *                           deleteYN:
+ *                             type: string
+ *                             description: 삭제여부
+ *                           deletedBy:
+ *                             type: string
+ *                             description: 삭제한 관리자 ID
+ *                           deletedAt:
+ *                             type: string
+ *                             description: 삭제 시간
+ *                           createdAt:
+ *                             type: string
+ *                             description: 생성일
+ *                           updatedAt:
+ *                             type: string
+ *                             description: 수정일
+ *                     depositData:
+ *                       type: array
+ *                       description: 보증금 정보 목록
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 보증금 고유 아이디
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             description: 고시원 고유 아이디
+ *                           customerEsntlId:
+ *                             type: string
+ *                             description: 예약자/입실자 고유아이디
+ *                           contractorEsntlId:
+ *                             type: string
+ *                             description: 계약자 고유아이디
+ *                           contractEsntlId:
+ *                             type: string
+ *                             description: 방계약 고유아이디
+ *                           type:
+ *                             type: string
+ *                             description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
+ *                           amount:
+ *                             type: integer
+ *                             description: 금액 (예약금 또는 보증금)
+ *                           paidAmount:
+ *                             type: integer
+ *                             description: 입금액
+ *                           unpaidAmount:
+ *                             type: integer
+ *                             description: 미납금액
+ *                           accountBank:
+ *                             type: string
+ *                             description: 은행명
+ *                           accountNumber:
+ *                             type: string
+ *                             description: 계좌번호
+ *                           accountHolder:
+ *                             type: string
+ *                             description: 예금주명
+ *                           status:
+ *                             type: string
+ *                             description: 입금상태
+ *                           manager:
+ *                             type: string
+ *                             description: 담당자
+ *                           depositDate:
+ *                             type: string
+ *                             description: 입금일
+ *                           returnDate:
+ *                             type: string
+ *                             description: 반환일
+ *                           returnAmount:
+ *                             type: integer
+ *                             description: 반환금액
+ *                           returnReason:
+ *                             type: string
+ *                             description: 반환사유
+ *                           memo:
+ *                             type: string
+ *                             description: 메모
+ *                           deleteYN:
+ *                             type: string
+ *                             description: 삭제여부
+ *                           deletedBy:
+ *                             type: string
+ *                             description: 삭제한 관리자 ID
+ *                           deletedAt:
+ *                             type: string
+ *                             description: 삭제 시간
+ *                           createdAt:
+ *                             type: string
+ *                             description: 생성일
+ *                           updatedAt:
+ *                             type: string
+ *                             description: 수정일
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/depositAndExtra', roomContractController.getDepositAndExtra);
 
 module.exports = router;

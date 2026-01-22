@@ -1,4 +1,4 @@
-const { mariaDBSequelize, room, customer, history, deposit } = require('../models');
+const { mariaDBSequelize, room, customer, history, deposit, extraPayment } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 
@@ -63,6 +63,7 @@ exports.getContractList = async (req, res, next) => {
 		const {
 			page = 1,
 			status,
+			roomStatus,
 			startDate,
 			endDate,
 			searchString,
@@ -91,6 +92,11 @@ exports.getContractList = async (req, res, next) => {
 			if (status) {
 				conditions.push('RC.status = ?');
 				values.push(status);
+			}
+
+			if (roomStatus) {
+				conditions.push('RS.status = ?');
+				values.push(roomStatus);
 			}
 
 			return { whereClause: conditions.join(' AND '), values };
@@ -144,6 +150,7 @@ exports.getContractList = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
+			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			LEFT JOIN (
 				SELECT 
 					contractEsntlId,
@@ -173,6 +180,7 @@ exports.getContractList = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			LEFT JOIN paymentLog PL ON RC.esntlId = PL.contractEsntlId
 			WHERE ${whereClause}
 		`;
@@ -195,6 +203,7 @@ exports.getContractList = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			WHERE ${whereClause}
 		`;
 
@@ -698,6 +707,68 @@ exports.updateContract = async (req, res, next) => {
 		});
 	} catch (err) {
 		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 보증금 및 추가 결제 정보 조회
+exports.getDepositAndExtra = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { contractEsntlId } = req.query;
+
+		if (!contractEsntlId) {
+			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
+		}
+
+		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id)
+		const contractQuery = `
+			SELECT 
+				RC.esntlId AS contractEsntlId,
+				RC.gosiwonEsntlId,
+				RC.roomEsntlId
+			FROM roomContract RC
+			WHERE RC.esntlId = ?
+			LIMIT 1
+		`;
+
+		const [contractInfo] = await mariaDBSequelize.query(contractQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		if (!contractInfo) {
+			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		}
+
+		// extraPayment 테이블에서 계약서 id를 기준으로 결제 내역 조회
+		const extraPaymentList = await extraPayment.findAll({
+			where: {
+				contractEsntlId: contractEsntlId,
+				deleteYN: 'N',
+			},
+			order: [['createdAt', 'DESC']],
+			raw: true,
+		});
+
+		// deposit 테이블에서 해당 계약의 보증금 정보 조회
+		const depositList = await deposit.findAll({
+			where: {
+				contractEsntlId: contractEsntlId,
+			},
+			order: [['createdAt', 'DESC']],
+			raw: true,
+		});
+
+		errorHandler.successThrow(res, '보증금 및 추가 결제 정보 조회 성공', {
+			contractEsntlId: contractInfo.contractEsntlId,
+			gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+			roomEsntlId: contractInfo.roomEsntlId,
+			extraData: extraPaymentList,
+			depositData: depositList,
+		});
+	} catch (err) {
 		next(err);
 	}
 };

@@ -1686,6 +1686,7 @@ exports.getDepositList = async (req, res, next) => {
 		const {
 			gosiwonName, // 고시원명 필터
 			gosiwonCode, // 고시원코드 필터
+			contractEsntlId, // 계약서 아이디 필터
 			searchString, // 검색어
 			disableDeleted, // 삭제된 항목 숨기기 (checkbox)
 			disableCompleted, // 입금완료된 항목 숨기기 (checkbox)
@@ -1731,6 +1732,15 @@ exports.getDepositList = async (req, res, next) => {
 			if (gosiwonCodeValue) {
 				whereConditions.push('R.gosiwonEsntlId = ?');
 				replacements.push(gosiwonCodeValue);
+			}
+		}
+
+		// contractEsntlId 필터 처리 (값이 있으면 WHERE 절에 추가)
+		if (contractEsntlId) {
+			const contractEsntlIdValue = String(contractEsntlId).trim();
+			if (contractEsntlIdValue) {
+				whereConditions.push('RC.esntlId = ?');
+				replacements.push(contractEsntlIdValue);
 			}
 		}
 

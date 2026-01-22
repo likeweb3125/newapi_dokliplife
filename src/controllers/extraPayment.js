@@ -62,6 +62,30 @@ const compareDates = (date1, date2) => {
 	return d1.getTime() - d2.getTime();
 };
 
+// uniqueId 생성 함수 (pDate와 esntlId를 기반으로 생성)
+// 형식: YYYYMMDD + esntlId의 숫자 부분(앞의 0 제거)
+// 예: pDate="2025-07-21", esntlId="EXTR0000004274" → uniqueId="202507214274"
+const generateUniqueId = (pDate, esntlId) => {
+	// pDate에서 날짜 추출 (YYYY-MM-DD 형식 → YYYYMMDD)
+	let dateStr = '';
+	if (pDate) {
+		// pDate가 "2025-07-31" 형식이면 "20250731"로 변환
+		dateStr = pDate.replace(/-/g, '');
+	}
+
+	// esntlId에서 숫자 부분 추출하고 앞의 0 제거 (예: EXTR0000004274 → 4274)
+	let esntlIdNumeric = '';
+	if (esntlId) {
+		const numericPart = esntlId.replace(/\D/g, '');
+		// 앞의 0 제거
+		esntlIdNumeric = numericPart.replace(/^0+/, '') || '0';
+	}
+
+	// uniqueId 생성: 날짜(YYYYMMDD) + 숫자 부분(앞의 0 제거)
+	const uniqueId = dateStr && esntlIdNumeric ? `${dateStr}${esntlIdNumeric}` : null;
+	return uniqueId;
+};
+
 // 추가 결제 요청
 exports.roomExtraPayment = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -161,6 +185,9 @@ exports.roomExtraPayment = async (req, res, next) => {
 			// esntlId 생성
 			const esntlId = await generateExtraPaymentId(transaction);
 
+			// uniqueId 생성
+			const uniqueId = generateUniqueId(pDate, esntlId);
+
 			// extraPayment 생성
 			const extraPaymentRecord = await extraPayment.create(
 				{
@@ -169,6 +196,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 					gosiwonEsntlId: contract.gosiwonEsntlId,
 					roomEsntlId: contract.roomEsntlId,
 					customerEsntlId: contract.customerEsntlId || '',
+					uniqueId: uniqueId,
 					extraCostName: extraCostName,
 					memo: memo || null,
 					optionInfo: optionInfo || null,
