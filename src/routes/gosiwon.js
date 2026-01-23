@@ -1448,6 +1448,13 @@ router.put('/config', gosiwonController.updateGosiwonConfig);
  *           default: 1
  *         description: 페이지 번호
  *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: 한 페이지당 항목 수 (1~500)
+ *         example: 50
+ *       - in: query
  *         name: status
  *         schema:
  *           type: string
@@ -1566,6 +1573,14 @@ router.put('/config', gosiwonController.updateGosiwonConfig);
  *                   type: integer
  *                   description: 전체 개수
  *                   example: 100
+ *                 limit:
+ *                   type: integer
+ *                   description: 한 페이지당 항목 수
+ *                   example: 50
+ *                 lastPage:
+ *                   type: integer
+ *                   description: 마지막 페이지 번호
+ *                   example: 5
  *                 totPaymentAmount:
  *                   type: string
  *                   description: 전체 결제 금액 합계
@@ -1605,12 +1620,14 @@ router.put('/config', gosiwonController.updateGosiwonConfig);
  *                   payment_amount: 1000000
  *                   totcnt: 100
  *               totcnt: 100
+ *               limit: 50
+ *               page: 1
+ *               lastPage: 5
  *               totPaymentAmount: "10,000,000"
  *               totPaymentPoint: "500,000"
  *               totPaymentCoupon: "300,000"
  *               totCAmount: "700,000"
  *               totCPercent: "7.0"
- *               page: 1
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

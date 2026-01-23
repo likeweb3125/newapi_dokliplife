@@ -23,6 +23,23 @@ const bodyParser = require('body-parser');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./src/docs/swagger');
 
+// Swagger용 Basic Auth 미들웨어 (추가 패키지 없이 구현)
+const swaggerBasicAuth = (req, res, next) => {
+	const auth = req.headers.authorization;
+	if (!auth || !auth.startsWith('Basic ')) {
+		res.setHeader('WWW-Authenticate', 'Basic realm="Swagger API Documentation"');
+		return res.status(401).send('Authentication required');
+	}
+	const base64 = auth.slice(6);
+	const decoded = Buffer.from(base64, 'base64').toString('utf8');
+	const [user, pass] = decoded.split(':');
+	if (user === 'admin' && pass === 'like!@34') {
+		return next();
+	}
+	res.setHeader('WWW-Authenticate', 'Basic realm="Swagger API Documentation"');
+	return res.status(401).send('Invalid credentials');
+};
+
 const boardRoutes = require('./src/routes/board');
 const commentRoutes = require('./src/routes/comment');
 const authRoutes = require('./src/routes/auth');
@@ -79,13 +96,13 @@ app.use(bodyParser.json());
 
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
-// Swagger Docs
+// Swagger Docs with Basic Authentication
 const swaggerUiOptions = {
 	swaggerOptions: {
 		persistAuthorization: true,
 	},
 };
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
+app.use('/docs', swaggerBasicAuth, swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
 // logs
 app.use(async (req, res, next) => {

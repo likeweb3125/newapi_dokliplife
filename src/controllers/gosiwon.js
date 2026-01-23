@@ -1426,6 +1426,7 @@ exports.selectListToAdminNew = async (req, res, next) => {
 
 		const params = {
 			page: parseInt(req.query.page) || 1,
+			limit: Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 500),
 			status: req.query.status,
 			startDate: req.query.startDate,
 			endDate: req.query.endDate,
@@ -1485,8 +1486,8 @@ exports.selectListToAdminNew = async (req, res, next) => {
 
 		const { whereClause, values: whereValues } = buildWhereConditions();
 		const orderDirection = params.order === 'ASC' ? 'ASC' : 'DESC';
-		const pageSize = 50; // Config.page 대신 고정값 사용
-		const offset = (params.page - 1) * pageSize;
+		const limit = params.limit;
+		const offset = (params.page - 1) * limit;
 
 		// 성능 최적화: COUNT(*) OVER() 제거하고 별도 카운트 쿼리 사용
 		// paymentLog 집계를 서브쿼리로 최적화
@@ -1636,7 +1637,7 @@ exports.selectListToAdminNew = async (req, res, next) => {
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}),
 			mariaDBSequelize.query(optimizedQuery, {
-				replacements: [...whereValues, pageSize, offset],
+				replacements: [...whereValues, limit, offset],
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}),
 			mariaDBSequelize.query(summaryQuery, {
@@ -1648,18 +1649,21 @@ exports.selectListToAdminNew = async (req, res, next) => {
 		const totalCount = countResult[0]?.total || 0;
 		const resultList = Array.isArray(mainResult) ? mainResult : [];
 		const summary = summaryResult[0] || {};
-		
-		// 원본 함수와 동일한 리턴 구조
+		const lastPage = Math.ceil(totalCount / limit) || 1;
+
+		// 원본 함수와 동일한 리턴 구조 + limit, lastPage 추가
 		const response = {
 			result: 'SUCCESS',
 			resultList: resultList,
 			totcnt: totalCount,
+			limit: limit,
+			page: params.page,
+			lastPage: lastPage,
 			totPaymentAmount: summary.paymentAmount || '0',
 			totPaymentPoint: summary.paymentPoint || '0',
 			totPaymentCoupon: summary.paymentCoupon || '0',
 			totCAmount: summary.cAmount || '0',
 			totCPercent: summary.cPercent || '0',
-			page: params.page
 		};
 		
 		res.json(response);

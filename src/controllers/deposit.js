@@ -1777,6 +1777,7 @@ exports.getDepositList = async (req, res, next) => {
 				R.esntlId as roomEsntlId,
 				R.roomNumber,
 				R.gosiwonEsntlId,
+				G.name as gosiwonName,
 				C.name as currentOccupantName,
 				R.customerEsntlId as currentOccupantID,
 				C.bank as customerBank,
@@ -1835,6 +1836,7 @@ exports.getDepositList = async (req, res, next) => {
 					LIMIT 1
 				) as refundCreatedAt
 			FROM room R
+			LEFT JOIN gosiwon G ON R.gosiwonEsntlId = G.esntlId
 			LEFT JOIN customer C ON R.customerEsntlId = C.esntlId
 			LEFT JOIN (
 				SELECT RS1.*
@@ -1922,6 +1924,7 @@ exports.getDepositList = async (req, res, next) => {
 				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
 				gosiwonEsntlId: row.gosiwonEsntlId || null,
+				gosiwonName: row.gosiwonName || null,
 				roomNumber: row.roomNumber,
 				currentOccupantName: row.currentOccupantName || null,
 				currentOccupantID: row.currentOccupantID || null,
