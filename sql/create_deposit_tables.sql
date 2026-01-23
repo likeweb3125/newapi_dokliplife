@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   `accountBank` VARCHAR(50) NULL COMMENT '은행명',
   `accountNumber` VARCHAR(50) NULL COMMENT '계좌번호',
   `accountHolder` VARCHAR(100) NULL COMMENT '예금주명',
+  `expectedOccupantName` VARCHAR(100) NULL COMMENT '입실예정자명 (type이 RESERVATION일 때 사용)',
+  `expectedOccupantPhone` VARCHAR(50) NULL COMMENT '입실예정자연락처 (type이 RESERVATION일 때 사용)',
   `status` VARCHAR(50) NOT NULL DEFAULT 'PENDING' COMMENT '입금상태 (PENDING: 입금대기, PARTIAL: 부분입금, COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DELETED: 삭제됨)',
   `manager` VARCHAR(100) NULL COMMENT '담당자',
   `depositDate` DATETIME NULL COMMENT '입금일자',
@@ -43,6 +45,7 @@ CREATE TABLE IF NOT EXISTS `deposit` (
   INDEX `idx_depositDate` (`depositDate`),
   INDEX `idx_depositorName` (`depositorName`),
   INDEX `idx_depositorPhone` (`depositorPhone`),
+  INDEX `idx_expectedOccupantPhone` (`expectedOccupantPhone`),
   INDEX `idx_deleteYN` (`deleteYN`),
   INDEX `idx_deletedBy` (`deletedBy`),
   INDEX `idx_deletedAt` (`deletedAt`),
@@ -182,4 +185,16 @@ ADD CONSTRAINT `fk_depositHistory_roomContract` FOREIGN KEY (`contractEsntlId`)
   REFERENCES `roomContract` (`esntlId`) 
   ON DELETE SET NULL 
   ON UPDATE CASCADE;
+
+-- =============================================
+-- 추가 컬럼 (add 파일에서 병합)
+-- =============================================
+-- 아래 내용은 add_deposit_*.sql 파일들에서 병합되었습니다.
+-- 이미 CREATE TABLE 문에 포함되어 있으므로 ALTER TABLE 문은 실행할 필요가 없습니다.
+-- 
+-- 추가된 컬럼:
+--   - expectedOccupantName: 입실예정자명 (type이 RESERVATION일 때 사용)
+--   - expectedOccupantPhone: 입실예정자연락처 (type이 RESERVATION일 때 사용)
+-- 
+-- 참고: depositorPhone, manager, deletedBy, deletedAt 등은 이미 CREATE TABLE에 포함되어 있습니다.
 

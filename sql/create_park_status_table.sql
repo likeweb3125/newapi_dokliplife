@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS `parkStatus` (
   `status` VARCHAR(50) NOT NULL DEFAULT 'AVAILABLE' COMMENT '주차 상태 (AVAILABLE: 사용가능, IN_USE: 사용중, RESERVED: 예약됨, EXPIRED: 만료됨)',
   `useStartDate` DATE NULL COMMENT '사용 시작일',
   `useEndDate` DATE NULL COMMENT '사용 종료일',
+  `parkType` VARCHAR(50) NULL COMMENT '주차 유형 (자동차, 오토바이)',
+  `parkNumber` VARCHAR(500) NULL COMMENT '번호판 (기존 memo에서 마이그레이션)',
+  `cost` INT(11) NULL DEFAULT 0 COMMENT '주차비',
   `memo` VARCHAR(500) NULL COMMENT '메모 (차량번호, 차종 등)',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
   `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID',
@@ -26,6 +29,9 @@ CREATE TABLE IF NOT EXISTS `parkStatus` (
   INDEX `idx_deletedAt` (`deletedAt`),
   INDEX `idx_useStartDate` (`useStartDate`),
   INDEX `idx_useEndDate` (`useEndDate`),
+  INDEX `idx_parkStatus_parkType` (`parkType`),
+  INDEX `idx_parkStatus_parkNumber` (`parkNumber`),
+  INDEX `idx_parkStatus_cost` (`cost`),
   INDEX `idx_gosiwon_status` (`gosiwonEsntlId`, `status`, `deleteYN`),
   INDEX `idx_contract_status` (`contractEsntlId`, `status`, `deleteYN`),
   INDEX `idx_customer_status` (`customerEsntlId`, `status`, `deleteYN`),
@@ -56,6 +62,24 @@ CREATE INDEX `idx_parkStatus_date_range_delete` ON `parkStatus` (`useStartDate`,
 
 -- 고시원별 기간 조회 최적화
 CREATE INDEX `idx_parkStatus_gosiwon_date` ON `parkStatus` (`gosiwonEsntlId`, `useStartDate`, `useEndDate`, `deleteYN`);
+
+-- =============================================
+-- 추가 컬럼 및 인덱스 (add 파일에서 병합)
+-- =============================================
+-- 아래 내용은 add_park_status_*.sql 파일들에서 병합되었습니다.
+-- 이미 CREATE TABLE 문에 포함되어 있으므로 ALTER TABLE 문은 실행할 필요가 없습니다.
+-- 
+-- 추가된 컬럼:
+--   - parkType: 주차 유형 (자동차, 오토바이) (useEndDate 뒤)
+--   - parkNumber: 번호판 (parkType 뒤)
+--   - cost: 주차비 (parkNumber 뒤)
+-- 
+-- 추가된 인덱스:
+--   - idx_parkStatus_parkType: parkType 인덱스
+--   - idx_parkStatus_parkNumber: parkNumber 인덱스
+--   - idx_parkStatus_cost: cost 인덱스
+-- 
+-- 참고: memo, deletedBy, deletedAt는 이미 CREATE TABLE에 포함되어 있습니다.
 
 -- =============================================
 -- 참고사항

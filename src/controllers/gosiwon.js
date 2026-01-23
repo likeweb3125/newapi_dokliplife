@@ -1528,8 +1528,24 @@ exports.selectListToAdminNew = async (req, res, next) => {
 				FORMAT(COALESCE(PL.paymentCoupon, 0), 0) AS paymentCoupon,
 				FORMAT(COALESCE(PL.cAmount, 0), 0) AS cAmount,
 				FORMAT(COALESCE(PL.cPercent, 0), 0) AS cPercent,
-				1 AS paymentCount
+				1 AS paymentCount,
+				-- 추가 필드들
+				COALESCE(G.is_favorite, 0) AS is_favorite,
+				COALESCE(G.serviceNumber, '') AS serviceNumber,
+				COALESCE(RM.total_room, 0) AS total_room,
+				COALESCE(RM.contract_room, 0) AS contract_room,
+				COALESCE(RM.open_room, 0) AS open_room,
+				COALESCE(RM.wait_room, 0) AS wait_room,
+				COALESCE(RM.empty_room, 0) AS empty_room,
+				G.address AS address,
+				COALESCE(G.address3, '') AS address3,
+				COALESCE(GA.ceo, '') AS ceo,
+				COALESCE(DP.deposit_yn, 'F') AS deposit_yn,
+				COALESCE(RL_AGG.likes, 0) AS likes,
+				COALESCE(RS_AGG.see, 0) AS see,
+				COALESCE(G.commision, '') AS commision
 			FROM gosiwon G
+			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			LEFT JOIN (
 				SELECT 
 					RC.gosiwonEsntlId,
@@ -1549,6 +1565,41 @@ exports.selectListToAdminNew = async (req, res, next) => {
 				LEFT JOIN paymentLog PL2 ON RC.esntlId = PL2.contractEsntlId
 				GROUP BY RC.gosiwonEsntlId
 			) PL ON G.esntlId = PL.gosiwonEsntlId
+			LEFT JOIN (
+				SELECT 
+					R.gosiwonEsntlId,
+					COUNT(*) AS total_room,
+					SUM(CASE WHEN R.status = 'CONTRACT' THEN 1 ELSE 0 END) AS contract_room,
+					SUM(CASE WHEN R.status = 'OPEN' THEN 1 ELSE 0 END) AS open_room,
+					SUM(CASE WHEN R.status = 'RESERVE' OR R.status = 'VBANK' THEN 1 ELSE 0 END) AS wait_room,
+					SUM(CASE WHEN R.status = 'EMPTY' OR R.status = '' OR R.status IS NULL THEN 1 ELSE 0 END) AS empty_room
+				FROM room R
+				GROUP BY R.gosiwonEsntlId
+			) RM ON G.esntlId = RM.gosiwonEsntlId
+			LEFT JOIN (
+				SELECT 
+					R.gosiwonEsntlId,
+					COUNT(*) AS see
+				FROM room R
+				INNER JOIN roomSee RS ON R.esntlId = RS.roomEsntlId
+				GROUP BY R.gosiwonEsntlId
+			) RS_AGG ON G.esntlId = RS_AGG.gosiwonEsntlId
+			LEFT JOIN (
+				SELECT 
+					R.gosiwonEsntlId,
+					COUNT(*) AS likes
+				FROM room R
+				INNER JOIN roomLike RL ON R.esntlId = RL.roomEsntlId
+				GROUP BY R.gosiwonEsntlId
+			) RL_AGG ON G.esntlId = RL_AGG.gosiwonEsntlId
+			LEFT JOIN (
+				SELECT 
+					gsw_eid,
+					IF(COUNT(*) > 0, 'T', 'F') AS deposit_yn
+				FROM il_deposit
+				WHERE dps_status = 'ACTIVE' AND dps_manager = 'DOKLIPLIFE'
+				GROUP BY gsw_eid
+			) DP ON G.esntlId = DP.gsw_eid
 			WHERE ${whereClause}
 			ORDER BY G.acceptDate ${orderDirection}, COALESCE(PL.pTime, '') ${orderDirection}
 			LIMIT ? OFFSET ?

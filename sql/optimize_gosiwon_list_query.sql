@@ -49,6 +49,28 @@ CREATE INDEX IF NOT EXISTS `idx_paymentLog_contractEsntlId` ON `paymentLog` (`co
 -- contractEsntlId + pTime 복합 인덱스 (정렬 최적화)
 CREATE INDEX IF NOT EXISTS `idx_paymentLog_contract_pTime` ON `paymentLog` (`contractEsntlId`, `pTime`);
 
+-- room 테이블 인덱스
+-- gosiwonEsntlId로 그룹화 및 집계 최적화
+CREATE INDEX IF NOT EXISTS `idx_room_gosiwonEsntlId` ON `room` (`gosiwonEsntlId`);
+
+-- gosiwonEsntlId + status 복합 인덱스 (상태별 집계 최적화)
+CREATE INDEX IF NOT EXISTS `idx_room_gosiwon_status` ON `room` (`gosiwonEsntlId`, `status`);
+
+-- roomSee 테이블 인덱스
+-- roomEsntlId로 조인 최적화
+CREATE INDEX IF NOT EXISTS `idx_roomSee_roomEsntlId` ON `roomSee` (`roomEsntlId`);
+
+-- roomLike 테이블 인덱스
+-- roomEsntlId로 조인 최적화
+CREATE INDEX IF NOT EXISTS `idx_roomLike_roomEsntlId` ON `roomLike` (`roomEsntlId`);
+
+-- il_deposit 테이블 인덱스
+-- gsw_eid로 조인 최적화
+CREATE INDEX IF NOT EXISTS `idx_il_deposit_gsw_eid` ON `il_deposit` (`gsw_eid`);
+
+-- gsw_eid + dps_status + dps_manager 복합 인덱스 (보증금 관리 여부 조회 최적화)
+CREATE INDEX IF NOT EXISTS `idx_il_deposit_gsw_status_manager` ON `il_deposit` (`gsw_eid`, `dps_status`, `dps_manager`);
+
 -- =============================================
 -- 참고사항
 -- =============================================

@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS `depositRefund` (
   `esntlId` VARCHAR(50) NOT NULL COMMENT '보증금 환불 고유아이디 (DERF0000000001 형식)',
   `contractEsntlId` VARCHAR(50) NOT NULL COMMENT '방계약 고유아이디',
+  `roomEsntlId` VARCHAR(50) NULL COMMENT '방 고유아이디',
   `bank` VARCHAR(100) NULL COMMENT '환불 받을 은행명',
   `bankAccount` VARCHAR(100) NULL COMMENT '환불 받을 계좌번호',
   `accountHolder` VARCHAR(100) NULL COMMENT '계좌소유자 이름',
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS `depositRefund` (
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`esntlId`),
   INDEX `idx_contractEsntlId` (`contractEsntlId`),
+  INDEX `idx_depositRefund_roomEsntlId` (`roomEsntlId`),
   INDEX `idx_status` (`status`),
   INDEX `idx_manager` (`manager`),
   INDEX `idx_deleteYN` (`deleteYN`),
@@ -45,6 +47,14 @@ CREATE INDEX `idx_depositRefund_contract_delete` ON `depositRefund` (`contractEs
 CREATE INDEX `idx_depositRefund_manager_delete` ON `depositRefund` (`manager`, `deleteYN`);
 
 -- =============================================
--- 완료
+-- 추가 컬럼 (add 파일에서 병합)
 -- =============================================
+-- 아래 내용은 add_deposit_refund_roomEsntlId.sql에서 병합되었습니다.
+-- 이미 CREATE TABLE 문에 포함되어 있으므로 ALTER TABLE 문은 실행할 필요가 없습니다.
+-- 
+-- 추가된 컬럼:
+--   - roomEsntlId: 방 고유아이디 (contractEsntlId 뒤에 위치)
+-- 
+-- 추가된 인덱스:
+--   - idx_depositRefund_roomEsntlId: roomEsntlId 인덱스
 

@@ -62,6 +62,7 @@ CREATE INDEX `idx_extraPayment_room_delete` ON `extraPayment` (`roomEsntlId`, `d
 CREATE INDEX `idx_extraPayment_extraCostName` ON `extraPayment` (`contractEsntlId`, `extraCostName`, `deleteYN`);
 CREATE INDEX `idx_extraPayment_optionName` ON `extraPayment` (`contractEsntlId`, `optionName`, `deleteYN`);
 CREATE INDEX `idx_extraPayment_status_type` ON `extraPayment` (`contractEsntlId`, `paymentStatus`, `paymentType`, `deleteYN`);
+CREATE INDEX `idx_extraPayment_uniqueId` ON `extraPayment` (`uniqueId`);
 
 -- =============================================
 -- 외래키 제약조건 추가 (선택사항)
@@ -97,4 +98,17 @@ CREATE INDEX `idx_extraPayment_status_type` ON `extraPayment` (`contractEsntlId`
 --   REFERENCES `customer` (`esntlId`) 
 --   ON DELETE SET NULL 
 --   ON UPDATE CASCADE;
+
+-- =============================================
+-- 추가 컬럼 및 인덱스 (add 파일에서 병합)
+-- =============================================
+-- 아래 내용은 add_extra_payment_status_columns.sql과 add_extra_payment_uniqueId_column.sql에서 병합되었습니다.
+-- 이미 CREATE TABLE 문에 포함되어 있으므로 ALTER TABLE 문은 실행할 필요가 없습니다.
+-- 
+-- 추가된 컬럼:
+--   - uniqueId: 고유 식별자 (customerEsntlId 뒤에 위치)
+--   - paymentStatus: 결제 상태 (이미 CREATE TABLE에 포함)
+-- 
+-- 추가된 인덱스:
+--   - idx_extraPayment_uniqueId: uniqueId 인덱스
 
