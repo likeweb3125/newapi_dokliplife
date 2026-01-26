@@ -548,6 +548,42 @@ router.get('/refundData', refundController.getRefundData);
  *                     reason:
  *                       type: string
  *                       description: 퇴실 사유
+ *                     liabilityReason:
+ *                       type: string
+ *                       nullable: true
+ *                       description: '귀책사유 (OWNER: 사장님, OCCUPANT: 입실자)'
+ *                       example: OCCUPANT
+ *                     cancelDate:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *                       description: 취소일자(생성일)
+ *                       example: '2025-11-06T10:30:00'
+ *                     refundMethod:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 환불수단
+ *                       example: 계좌이체
+ *                     refundPaymentAmount:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 결제금액 (refund 테이블)
+ *                       example: 300000
+ *                     proratedRent:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 일할입실료
+ *                       example: 200000
+ *                     penalty:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 위약금
+ *                       example: 30000
+ *                     totalRefundAmount:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 총환불금액
+ *                       example: 70000
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

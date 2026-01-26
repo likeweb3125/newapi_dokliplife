@@ -999,7 +999,14 @@ exports.getRefundRequestData = async (req, res, next) => {
 				R.gosiwonEsntlId AS gswId,
 				RC.customerEsntlId AS mbrId,
 				RRR.rrr_leave_type_cd AS leaveType,
-				RRR.rrr_leave_reason AS reason
+				RRR.rrr_leave_reason AS reason,
+				RRR.rrr_liability_reason AS liabilityReason,
+				RRR.rrr_leave_date AS cancelDate,
+				NULL AS refundMethod,
+				RRR.rrr_payment_amt AS refundPaymentAmount,
+				RRR.rrr_use_amt AS proratedRent,
+				RRR.rrr_penalty_amt AS penalty,
+				RRR.rrr_refund_total_amt AS totalRefundAmount
 			FROM roomContract AS RC
 			JOIN paymentLog AS PL ON PL.contractEsntlId = RC.esntlId
 			JOIN customer AS C ON RC.customerEsntlId = C.esntlId
