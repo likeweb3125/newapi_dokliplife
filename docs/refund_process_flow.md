@@ -2,12 +2,12 @@
 
 ## API 개요
 
-| 항목 | 내용 |
-|------|------|
-| **엔드포인트** | `POST /v1/refund/process` |
-| **역할** | 계약에 대한 **환불 및 퇴실처리** 수행 |
-| **인증** | JWT Bearer (관리자) |
-| **트랜잭션** | 전체 처리 구간이 하나의 트랜잭션으로 묶여 있으며, 에러 시 롤백 |
+| 항목          | 내용                                                                      |
+|---------------|---------------------------------------------------------------------------|
+| **엔드포인트** | `POST /v1/refund/process`                                                |
+| **역할**      | 계약에 대한 **환불 및 퇴실처리** 수행                                     |
+| **인증**      | JWT Bearer (관리자)                                                       |
+| **트랜잭션**  | 전체 처리 구간이 하나의 트랜잭션으로 묶여 있으며, 에러 시 롤백               |
 
 ---
 
@@ -17,13 +17,13 @@
 
 계약 정보 조회에 사용. `room`, `customer`, `deposit`, `customer(계약자)`와 JOIN.
 
-| 테이블 | 역할 |
-|--------|------|
+| 테이블              | 역할                                                                      |
+|---------------------|---------------------------------------------------------------------------|
 | **roomContract (RC)** | 계약 기본 정보 (gosiwonEsntlId, roomEsntlId, customerEsntlId, startDate, endDate, status 등) |
-| **room (R)** | 방 정보 (JOIN용) |
-| **customer (C)** | 입실자 이름 (customerNameFromCustomer) |
-| **deposit (D)** | 예약금 정보, 계약자 ID(contractorEsntlId) - LEFT JOIN |
-| **customer (CT)** | 계약자 이름 (contractorName) - LEFT JOIN |
+| **room (R)**        | 방 정보 (JOIN용)                                                          |
+| **customer (C)**    | 입실자 이름 (customerNameFromCustomer)                                  |
+| **deposit (D)**     | 예약금 정보, 계약자 ID(contractorEsntlId) - LEFT JOIN                     |
+| **customer (CT)**   | 계약자 이름 (contractorName) - LEFT JOIN                                   |
 
 **조인 조건:**
 - `RC.roomEsntlId = R.esntlId`
@@ -40,25 +40,25 @@
 
 환불 요청 저장. **메인 저장 테이블**. **`refund` 테이블은 사용하지 않습니다.**
 
-| 컬럼 | 용도 |
-|------|------|
-| rrr_sno | PK, AUTO_INCREMENT (반환값) |
-| gsw_eid | 고시원 ID (contract.gosiwonEsntlId) |
-| rom_eid | 방 ID (contract.roomEsntlId) |
-| mbr_eid | 회원 ID (contract.customerEsntlId) |
-| ctt_eid | 계약 ID (contractEsntlId) |
-| rrr_leave_type_cd | 취소사유 (FULL / INTERIM / CANCEL / ETC) |
-| rrr_leave_date | 취소날짜 (cancelDate) |
-| rrr_leave_reason | 퇴실 사유 (cancelMemo 또는 "{취소사유} 퇴실") |
-| rrr_liability_reason | 귀책사유 (OWNER / OCCUPANT 또는 null) |
-| rrr_payment_amt | 결제금액 (paymentAmount) |
-| rrr_use_period | 사용기간 일수 (입실 시작일 ~ 현재일) |
-| rrr_use_amt | 일할입실료 (proratedRent) |
-| rrr_penalty_amt | 위약금 (penalty) |
-| rrr_refund_total_amt | 총환불금액 (totalRefundAmount) |
-| rrr_registrant_id | 등록자 ID (writerAdminId) |
-| rrr_update_dtm | NOW() |
-| rrr_updater_id | 수정자 ID (writerAdminId) |
+| 컬럼                | 용도                                    |
+|---------------------|-----------------------------------------|
+| rrr_sno             | PK, AUTO_INCREMENT (반환값)             |
+| gsw_eid             | 고시원 ID (contract.gosiwonEsntlId)     |
+| rom_eid             | 방 ID (contract.roomEsntlId)             |
+| mbr_eid             | 회원 ID (contract.customerEsntlId)       |
+| ctt_eid             | 계약 ID (contractEsntlId)                |
+| rrr_leave_type_cd   | 취소사유 (FULL / INTERIM / CANCEL / ETC) |
+| rrr_leave_date      | 취소날짜 (cancelDate)                    |
+| rrr_leave_reason    | 퇴실 사유 (cancelMemo 또는 "{취소사유} 퇴실") |
+| rrr_liability_reason | 귀책사유 (OWNER / OCCUPANT 또는 null)    |
+| rrr_payment_amt     | 결제금액 (paymentAmount)                |
+| rrr_use_period      | 사용기간 일수 (입실 시작일 ~ 현재일)      |
+| rrr_use_amt         | 일할입실료 (proratedRent)                |
+| rrr_penalty_amt     | 위약금 (penalty)                         |
+| rrr_refund_total_amt | 총환불금액 (totalRefundAmount)           |
+| rrr_registrant_id   | 등록자 ID (writerAdminId)                |
+| rrr_update_dtm      | NOW()                                    |
+| rrr_updater_id      | 수정자 ID (writerAdminId)                |
 
 ---
 
@@ -66,10 +66,10 @@
 
 `contractEsntlId`가 일치하는 행의 `status`를 `CHECKOUT_CONFIRMED`로 변경.
 
-| 컬럼 | 용도 |
-|------|------|
-| status | `CHECKOUT_CONFIRMED`로 업데이트 |
-| updatedAt | 현재 시간 (한국 시간) |
+| 컬럼    | 용도                      |
+|---------|---------------------------|
+| status  | `CHECKOUT_CONFIRMED`로 업데이트 |
+| updatedAt | 현재 시간 (한국 시간)     |
 
 ---
 
@@ -77,10 +77,10 @@
 
 `status`를 다음 규칙으로 갱신.
 
-| cancelReason | roomContract.status |
-|--------------|---------------------|
-| CANCEL | CANCEL |
-| FULL, INTERIM, ETC | FIN |
+| cancelReason        | roomContract.status |
+|---------------------|---------------------|
+| CANCEL              | CANCEL              |
+| FULL, INTERIM, ETC  | FIN                 |
 
 ---
 
@@ -88,8 +88,8 @@
 
 **`check_basic_sell === true`** 일 때만 조회.
 
-| 컬럼 | 용도 |
-|------|------|
+| 컬럼                 | 용도                  |
+|----------------------|-----------------------|
 | gsc_checkin_able_date | 입실 가능 일수 (기본 설정) |
 | gsc_sell_able_period | 판매 가능 기간 일수 (기본 설정) |
 
@@ -108,11 +108,11 @@
 - `sell_able_start_date`
 - `can_checkin_start_date`
 
-| 조건 | 생성 상태 | 설명 |
-|------|----------|------|
-| `check_room_only_config === true` | **ON_SALE** 1건<br>**CAN_CHECKIN** 1건 | 전달된 날짜(sell_able_*, can_checkin_*) 사용 |
-| `check_basic_sell === true` | **CAN_CHECKIN** 1건<br>**ON_SALE** 1건 | il_gosiwon_config 기반 계산 |
-| `check_basic_sell === false` && `unableCheckInReason` 존재 | **BEFORE_SALES** 1건 | subStatus = unableCheckInReason |
+| 조건                                                      | 생성 상태                                    | 설명                                    |
+|----------------------------------------------------------|---------------------------------------------|-----------------------------------------|
+| `check_room_only_config === true`                        | **ON_SALE** 1건<br>**CAN_CHECKIN** 1건      | 전달된 날짜(sell_able_*, can_checkin_*) 사용 |
+| `check_basic_sell === true`                              | **CAN_CHECKIN** 1건<br>**ON_SALE** 1건     | il_gosiwon_config 기반 계산             |
+| `check_basic_sell === false` && `unableCheckInReason` 존재 | **BEFORE_SALES** 1건                        | subStatus = unableCheckInReason         |
 
 **roomStatus 생성 컬럼:**
 - `esntlId`: PK, `RSTA` + 10자리 숫자 (자동 생성)
@@ -129,18 +129,18 @@
 
 **항상** 1건 INSERT.
 
-| 컬럼 | 용도 |
-|------|------|
-| esntlId | PK, `HISTORY` + 10자리 숫자 (SELECT로 최신 ID 조회 후 +1) |
-| gosiwonEsntlId, roomEsntlId, contractEsntlId | 계약 정보 |
-| etcEsntlId | `il_room_refund_request` INSERT 후 `insertId` (rrr_sno) |
-| content | `"환불 및 퇴실처리: {취소사유}, 귀책사유: {귀책사유}, 총환불금액: {금액}원"` |
-| category | `REFUND` |
-| priority | `NORMAL` |
-| publicRange | 0 |
-| writerAdminId | 토큰 관리자 ID |
-| writerType | `ADMIN` |
-| deleteYN | `N` |
+| 컬럼                              | 용도                                                                      |
+|-----------------------------------|---------------------------------------------------------------------------|
+| esntlId                           | PK, `HISTORY` + 10자리 숫자 (SELECT로 최신 ID 조회 후 +1)                 |
+| gosiwonEsntlId, roomEsntlId, contractEsntlId | 계약 정보                                                                 |
+| etcEsntlId                        | `il_room_refund_request` INSERT 후 `insertId` (rrr_sno)                   |
+| content                           | `"환불 및 퇴실처리: {취소사유}, 귀책사유: {귀책사유}, 총환불금액: {금액}원"` |
+| category                          | `REFUND`                                                                  |
+| priority                          | `NORMAL`                                                                  |
+| publicRange                       | 0                                                                         |
+| writerAdminId                     | 토큰 관리자 ID                                                            |
+| writerType                        | `ADMIN`                                                                   |
+| deleteYN                          | `N`                                                                       |
 
 ---
 
@@ -343,15 +343,15 @@ history ── (항상 1건) contractEsntlId, gosiwonEsntlId, roomEsntlId,
 
 ## 정리
 
-| 구분 | 테이블 | 사용 시점 |
-|------|--------|-----------|
-| **조회** | roomContract, room, customer, deposit, customer(계약자) | 계약 검증 및 정보 수집 |
-| **저장** | il_room_refund_request | 환불 요청 1건 INSERT (rrr_sno 반환) |
-| **갱신** | roomStatus | status = CHECKOUT_CONFIRMED |
-| **갱신** | roomContract | status = CANCEL 또는 FIN |
-| **조건부 조회** | il_gosiwon_config | check_basic_sell === true일 때만 |
-| **조건부 생성** | roomStatus | roomAfterUse 호출 시 (ON_SALE / CAN_CHECKIN / BEFORE_SALES) |
-| **로그** | history | 요청마다 1건 INSERT (REFUND, etcEsntlId=rrr_sno) |
+| 구분            | 테이블                                                                    | 사용 시점                                    |
+|-----------------|--------------------------------------------------------------------------|----------------------------------------------|
+| **조회**        | roomContract, room, customer, deposit, customer(계약자)                 | 계약 검증 및 정보 수집                        |
+| **저장**        | il_room_refund_request                                                    | 환불 요청 1건 INSERT (rrr_sno 반환)           |
+| **갱신**        | roomStatus                                                                | status = CHECKOUT_CONFIRMED                  |
+| **갱신**        | roomContract                                                              | status = CANCEL 또는 FIN                     |
+| **조건부 조회** | il_gosiwon_config                                                         | check_basic_sell === true일 때만             |
+| **조건부 생성** | roomStatus                                                                | roomAfterUse 호출 시 (ON_SALE / CAN_CHECKIN / BEFORE_SALES) |
+| **로그**        | history                                                                   | 요청마다 1건 INSERT (REFUND, etcEsntlId=rrr_sno) |
 
 **참고:**
 - **`refund` 테이블은 사용하지 않음** (il_room_refund_request만 사용)

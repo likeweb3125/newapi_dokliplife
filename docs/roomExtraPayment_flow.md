@@ -2,11 +2,11 @@
 
 ## API 개요
 
-| 항목 | 내용 |
-|------|------|
-| **엔드포인트** | `POST /v1/roomExtraPayment` |
-| **역할** | 계약에 대한 **추가 결제 요청** 등록 (주차비, 추가 입실료, 직접 입력 등) |
-| **인증** | JWT Bearer (관리자) |
+| 항목          | 내용                                                                      |
+|---------------|---------------------------------------------------------------------------|
+| **엔드포인트** | `POST /v1/roomExtraPayment`                                               |
+| **역할**      | 계약에 대한 **추가 결제 요청** 등록 (주차비, 추가 입실료, 직접 입력 등) |
+| **인증**      | JWT Bearer (관리자)                                                       |
 
 ---
 
@@ -16,12 +16,12 @@
 
 계약 정보 조회에 사용. `room`, `customer`와 JOIN.
 
-| 컬럼 | 용도 |
-|------|------|
-| esntlId | 계약 ID (contractEsntlId) |
-| gosiwonEsntlId | 고시원 ID |
-| roomEsntlId | 방 ID |
-| customerEsntlId | 고객 ID |
+| 컬럼          | 용도                    |
+|---------------|-------------------------|
+| esntlId       | 계약 ID (contractEsntlId) |
+| gosiwonEsntlId | 고시원 ID               |
+| roomEsntlId   | 방 ID                   |
+| customerEsntlId | 고객 ID                 |
 | startDate, endDate | 계약 기간 (sendDate 검증용) |
 
 ---
@@ -30,26 +30,26 @@
 
 추가 결제 항목 저장. **메인 저장소**.
 
-| 컬럼 | 용도 |
-|------|------|
-| esntlId | PK, `EXTR` + 10자리 숫자 |
-| contractEsntlId | 계약 ID |
-| gosiwonEsntlId | 고시원 ID (contract에서 복사) |
-| roomEsntlId | 방 ID (contract에서 복사) |
-| customerEsntlId | 고객 ID (contract에서 복사) |
-| uniqueId | YYYYMMDD + esntlId 숫자부 (예: 202507214274) |
-| extraCostName | 추가비용명 (주차비, 추가 입실료, 직접 입력 등) |
-| memo | 메모 (2인 추가 등) |
-| optionInfo | 옵션정보 (차량번호·차종 등) |
-| useStartDate | 이용 시작일 (주차비 등) |
-| optionName | 옵션명 (자동차, 오토바이, 기타 등) |
-| extendWithPayment | 연장 시 함께 결제 여부 (0/1) |
-| pDate, pTime | 결제(요청) 일시 |
-| paymentAmount, pyl_goods_amount | 금액 (절댓값) |
-| imp_uid | PG 결제 ID (요청 시 `''`) |
-| paymentStatus | `PENDING` (결제대기) 고정 |
-| paymentType, withdrawalStatus | null |
-| deleteYN | `N` |
+| 컬럼              | 용도                                    |
+|-------------------|-----------------------------------------|
+| esntlId           | PK, `EXTR` + 10자리 숫자                |
+| contractEsntlId   | 계약 ID                                 |
+| gosiwonEsntlId    | 고시원 ID (contract에서 복사)           |
+| roomEsntlId       | 방 ID (contract에서 복사)               |
+| customerEsntlId   | 고객 ID (contract에서 복사)             |
+| uniqueId          | YYYYMMDD + esntlId 숫자부 (예: 202507214274) |
+| extraCostName     | 추가비용명 (주차비, 추가 입실료, 직접 입력 등) |
+| memo               | 메모 (2인 추가 등)                      |
+| optionInfo        | 옵션정보 (차량번호·차종 등)              |
+| useStartDate      | 이용 시작일 (주차비 등)                 |
+| optionName        | 옵션명 (자동차, 오토바이, 기타 등)       |
+| extendWithPayment | 연장 시 함께 결제 여부 (0/1)            |
+| pDate, pTime      | 결제(요청) 일시                         |
+| paymentAmount, pyl_goods_amount | 금액 (절댓값)                    |
+| imp_uid           | PG 결제 ID (요청 시 `''`)                |
+| paymentStatus     | `PENDING` (결제대기) 고정                |
+| paymentType, withdrawalStatus | null                              |
+| deleteYN          | `N`                                     |
 
 ---
 
@@ -57,11 +57,11 @@
 
 **optionName = `자동차` | `오토바이`** 일 때만 사용.
 
-| 컬럼 | 용도 |
-|------|------|
-| esntlId | PK |
-| gosiwonEsntlId | 고시원 ID |
-| auto, autoUse | 자동차 가능/사용 대수 |
+| 컬럼          | 용도                  |
+|---------------|-----------------------|
+| esntlId       | PK                    |
+| gosiwonEsntlId | 고시원 ID             |
+| auto, autoUse | 자동차 가능/사용 대수  |
 | bike, bikeUse | 오토바이 가능/사용 대수 |
 
 - 자동차: `autoUse` +1  
@@ -73,17 +73,17 @@
 
 **optionName = `자동차` | `오토바이`** 이고, 해당 고시원 `gosiwonParking`이 있을 때만 **INSERT**.
 
-| 컬럼 | 용도 |
-|------|------|
-| esntlId | PK, `PKST` + 10자리 숫자 |
-| gosiwonEsntlId | 고시원 ID |
-| contractEsntlId | 계약 ID |
-| customerEsntlId | 고객 ID |
-| status | `IN_USE` |
-| useStartDate | 이용 시작일 (useStartDate 또는 pDate) |
-| useEndDate | 계약 종료일 (contract.endDate) |
-| memo | optionInfo (차량번호 등) |
-| deleteYN | `N` |
+| 컬럼          | 용도                                    |
+|---------------|-----------------------------------------|
+| esntlId       | PK, `PKST` + 10자리 숫자                |
+| gosiwonEsntlId | 고시원 ID                              |
+| contractEsntlId | 계약 ID                                |
+| customerEsntlId | 고객 ID                                |
+| status        | `IN_USE`                                |
+| useStartDate  | 이용 시작일 (useStartDate 또는 pDate)   |
+| useEndDate    | 계약 종료일 (contract.endDate)          |
+| memo          | optionInfo (차량번호 등)                |
+| deleteYN      | `N`                                     |
 
 ---
 
@@ -91,17 +91,17 @@
 
 추가 결제 요청 시 **항상** 1건 INSERT.
 
-| 컬럼 | 용도 |
-|------|------|
-| esntlId | PK, `HISTORY` + 10자리 숫자 |
-| gosiwonEsntlId, roomEsntlId, contractEsntlId | 계약·방·고시원 |
-| content | `"추가 결제 요청: N건, 총액: X원, 수신자: ..., 발송일: ..."` |
-| category | `EXTRA_PAYMENT` |
-| priority | `NORMAL` |
-| publicRange | 0 |
-| writerAdminId | 토큰 관리자 ID |
-| writerType | `ADMIN` |
-| deleteYN | `N` |
+| 컬럼                              | 용도                                    |
+|-----------------------------------|-----------------------------------------|
+| esntlId                           | PK, `HISTORY` + 10자리 숫자             |
+| gosiwonEsntlId, roomEsntlId, contractEsntlId | 계약·방·고시원                      |
+| content                           | `"추가 결제 요청: N건, 총액: X원, 수신자: ..., 발송일: ..."` |
+| category                          | `EXTRA_PAYMENT`                         |
+| priority                          | `NORMAL`                                |
+| publicRange                       | 0                                       |
+| writerAdminId                     | 토큰 관리자 ID                          |
+| writerType                        | `ADMIN`                                 |
+| deleteYN                          | `N`                                     |
 
 ---
 
@@ -235,12 +235,12 @@ history ── (항상 1건) contractEsntlId, gosiwonEsntlId, roomEsntlId, categ
 
 ## 정리
 
-| 구분 | 테이블 | 사용 시점 |
-|------|--------|-----------|
-| **조회** | roomContract, room, customer | 계약 검증 및 ID 채우기 |
-| **저장** | extraPayment | 항목별 1건씩 INSERT |
-| **조건부** | gosiwonParking | optionName 자동차/오토바이 + 해당 고시원 주차장 존재 시 |
-| **조건부** | parkStatus | 위와 동일 조건 시 1건 INSERT |
-| **로그** | history | 요청마다 1건 INSERT (EXTRA_PAYMENT) |
+| 구분       | 테이블          | 사용 시점                                    |
+|-----------|-----------------|----------------------------------------------|
+| **조회**   | roomContract, room, customer | 계약 검증 및 ID 채우기                        |
+| **저장**   | extraPayment    | 항목별 1건씩 INSERT                           |
+| **조건부** | gosiwonParking  | optionName 자동차/오토바이 + 해당 고시원 주차장 존재 시 |
+| **조건부** | parkStatus      | 위와 동일 조건 시 1건 INSERT                  |
+| **로그**   | history         | 요청마다 1건 INSERT (EXTRA_PAYMENT)           |
 
 全部 트랜잭션 내에서 처리하며, 예외 시 전부 rollback 됩니다.

@@ -550,6 +550,7 @@ router.get('/refundData', refundController.getRefundData);
  *                       description: 퇴실 사유
  *                     liabilityReason:
  *                       type: string
+ *                       enum: [OWNER, OCCUPANT]
  *                       nullable: true
  *                       description: '귀책사유 (OWNER: 사장님, OCCUPANT: 입실자)'
  *                       example: OCCUPANT
