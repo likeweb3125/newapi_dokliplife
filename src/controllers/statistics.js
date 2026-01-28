@@ -844,3 +844,176 @@ exports.getRealTimeList = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 계약현황 통계 조회
+exports.getContractStats = async (req, res, next) => {
+	try {
+		const { year, month, day } = req.body;
+
+		if (!year || !month || !day) {
+			errorHandler.errorThrow(400, 'year, month, day는 필수입니다.');
+		}
+
+		// 월, 일을 2자리로 포맷팅
+		const monthFormatted = String(month).padStart(2, '0');
+		const dayFormatted = String(day).padStart(2, '0');
+
+		// 오늘 날짜 (서울 시간 기준)
+		const now = new Date();
+		const seoulTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+		const todayYear = seoulTime.getUTCFullYear();
+		const todayMonth = String(seoulTime.getUTCMonth() + 1).padStart(2, '0');
+		const todayDay = String(seoulTime.getUTCDate()).padStart(2, '0');
+		const todayDateStr = `${todayYear}-${todayMonth}-${todayDay}`;
+
+		const targetDateStr = `${year}-${monthFormatted}-${dayFormatted}`;
+		const yearInt = parseInt(year);
+		const monthInt = parseInt(monthFormatted);
+		const dayInt = parseInt(dayFormatted);
+
+		// 한 해 전, 한 달 전, 하루 전 날짜 계산
+		// YEAR_AGO: 한 해 전의 같은 연도 전체
+		const oneYearAgoYear = yearInt - 1;
+		
+		// MONTH_AGO: 한 달 전의 같은 월 전체
+		const oneMonthAgoDate = new Date(yearInt, monthInt - 1, 1);
+		oneMonthAgoDate.setMonth(oneMonthAgoDate.getMonth() - 1);
+		const oneMonthAgoYear = oneMonthAgoDate.getFullYear();
+		const oneMonthAgoMonth = oneMonthAgoDate.getMonth() + 1;
+		
+		// DAY_AGO: 하루 전 날짜
+		const oneDayAgoDate = new Date(yearInt, monthInt - 1, dayInt);
+		oneDayAgoDate.setDate(oneDayAgoDate.getDate() - 1);
+		const oneDayAgoYear = oneDayAgoDate.getFullYear();
+		const oneDayAgoMonth = oneDayAgoDate.getMonth() + 1;
+		const oneDayAgoDay = oneDayAgoDate.getDate();
+		const oneDayAgo = `${oneDayAgoYear}-${String(oneDayAgoMonth).padStart(2, '0')}-${String(oneDayAgoDay).padStart(2, '0')}`;
+
+		// 1) 건수: roomContract (contractDate 기준)
+		const countQuery = `
+			SELECT 'YEAR' AS period,
+				COUNT(CASE WHEN status != 'CANCEL' THEN 1 END) AS paymentCnt,
+				COUNT(CASE WHEN status = 'CANCEL' THEN 1 END) AS refundCnt
+			FROM roomContract WHERE YEAR(contractDate) = ?
+			UNION ALL
+			SELECT 'MONTH',
+				COUNT(CASE WHEN status != 'CANCEL' THEN 1 END),
+				COUNT(CASE WHEN status = 'CANCEL' THEN 1 END)
+			FROM roomContract WHERE YEAR(contractDate) = ? AND MONTH(contractDate) = ?
+			UNION ALL
+			SELECT 'DAY',
+				COUNT(CASE WHEN status != 'CANCEL' THEN 1 END),
+				COUNT(CASE WHEN status = 'CANCEL' THEN 1 END)
+			FROM roomContract WHERE DATE(contractDate) = ?
+			UNION ALL
+			SELECT 'YEAR_AGO',
+				COUNT(CASE WHEN status != 'CANCEL' THEN 1 END),
+				COUNT(CASE WHEN status = 'CANCEL' THEN 1 END)
+			FROM roomContract WHERE YEAR(contractDate) = ?
+			UNION ALL
+			SELECT 'MONTH_AGO',
+				COUNT(CASE WHEN status != 'CANCEL' THEN 1 END),
+				COUNT(CASE WHEN status = 'CANCEL' THEN 1 END)
+			FROM roomContract WHERE YEAR(contractDate) = ? AND MONTH(contractDate) = ?
+			UNION ALL
+			SELECT 'DAY_AGO',
+				COUNT(CASE WHEN status != 'CANCEL' THEN 1 END),
+				COUNT(CASE WHEN status = 'CANCEL' THEN 1 END)
+			FROM roomContract WHERE DATE(contractDate) = ?
+		`;
+
+		// 2) 금액: paymentLog + roomContract (contractDate 기준, calculateStatus SUCCESS)
+		const amountQuery = `
+			SELECT 'YEAR' AS period,
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType != 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED) AS paymentAmount,
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType = 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED) AS refundAmount
+			FROM paymentLog pl
+			JOIN roomContract rc ON pl.contractEsntlId = rc.esntlId
+			WHERE pl.calculateStatus = 'SUCCESS' AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+				AND YEAR(rc.contractDate) = ?
+			UNION ALL
+			SELECT 'MONTH',
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType != 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED),
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType = 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED)
+			FROM paymentLog pl
+			JOIN roomContract rc ON pl.contractEsntlId = rc.esntlId
+			WHERE pl.calculateStatus = 'SUCCESS' AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+				AND YEAR(rc.contractDate) = ? AND MONTH(rc.contractDate) = ?
+			UNION ALL
+			SELECT 'DAY',
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType != 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED),
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType = 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED)
+			FROM paymentLog pl
+			JOIN roomContract rc ON pl.contractEsntlId = rc.esntlId
+			WHERE pl.calculateStatus = 'SUCCESS' AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+				AND DATE(rc.contractDate) = ?
+			UNION ALL
+			SELECT 'YEAR_AGO',
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType != 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED),
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType = 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED)
+			FROM paymentLog pl
+			JOIN roomContract rc ON pl.contractEsntlId = rc.esntlId
+			WHERE pl.calculateStatus = 'SUCCESS' AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+				AND YEAR(rc.contractDate) = ?
+			UNION ALL
+			SELECT 'MONTH_AGO',
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType != 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED),
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType = 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED)
+			FROM paymentLog pl
+			JOIN roomContract rc ON pl.contractEsntlId = rc.esntlId
+			WHERE pl.calculateStatus = 'SUCCESS' AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+				AND YEAR(rc.contractDate) = ? AND MONTH(rc.contractDate) = ?
+			UNION ALL
+			SELECT 'DAY_AGO',
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType != 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED),
+				CAST(COALESCE(SUM(CASE WHEN pl.paymentType = 'REFUND' THEN CAST(pl.paymentAmount AS DECIMAL(20,0)) ELSE 0 END), 0) AS UNSIGNED)
+			FROM paymentLog pl
+			JOIN roomContract rc ON pl.contractEsntlId = rc.esntlId
+			WHERE pl.calculateStatus = 'SUCCESS' AND pl.gosiwonEsntlId <> 'GOSI0000000199'
+				AND DATE(rc.contractDate) = ?
+		`;
+
+		const [countRows, amountRows] = await Promise.all([
+			mariaDBSequelize.query(countQuery, {
+				replacements: [yearInt, yearInt, monthInt, targetDateStr, oneYearAgoYear, oneMonthAgoYear, oneMonthAgoMonth, oneDayAgo],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(amountQuery, {
+				replacements: [yearInt, yearInt, monthInt, targetDateStr, oneYearAgoYear, oneMonthAgoYear, oneMonthAgoMonth, oneDayAgo],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+		]);
+
+		const countP = {};
+		const countR = {};
+		countRows.forEach((r) => {
+			countP[r.period] = r.paymentCnt != null ? parseInt(r.paymentCnt, 10) : 0;
+			countR[r.period] = r.refundCnt != null ? parseInt(r.refundCnt, 10) : 0;
+		});
+		const amountP = {};
+		const amountRef = {};
+		amountRows.forEach((r) => {
+			amountP[r.period] = r.paymentAmount != null ? Number(r.paymentAmount) : 0;
+			amountRef[r.period] = r.refundAmount != null ? Number(r.refundAmount) : 0;
+		});
+
+		const mainPeriods = ['YEAR', 'MONTH', 'DAY'];
+		const finalResult = mainPeriods.map((period) => {
+			const row = {
+				type: period,
+				paymentAmount: amountP[period] ?? 0,
+				paymentCnt: countP[period] ?? 0,
+				refundAmount: amountRef[period] ?? 0,
+				refundCnt: countR[period] ?? 0,
+			};
+			if (period === 'YEAR') row.ago = { yearAgo: countP['YEAR_AGO'] ?? 0 };
+			else if (period === 'MONTH') row.ago = { monthAgo: countP['MONTH_AGO'] ?? 0 };
+			else row.ago = { dayAgo: countP['DAY_AGO'] ?? 0 };
+			return row;
+		});
+
+		errorHandler.successThrow(res, '계약현황 통계 조회 성공', finalResult);
+	} catch (err) {
+		next(err);
+	}
+};

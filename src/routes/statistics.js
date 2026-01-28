@@ -295,4 +295,101 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  */
 router.post('/realTimeList', isAuthMiddleware.isAuthAdmin, statController.getRealTimeList);
 
+/**
+ * @swagger
+ * /v1/stats/contractStats:
+ *   post:
+ *     summary: 계약현황 통계 조회
+ *     description: 년, 월, 일을 입력받아 해당 기간의 계약 통계를 조회합니다. YEAR, MONTH, DAY 세 타입만 반환하며, 각각 paymentAmount, paymentCnt, refundAmount, refundCnt와 해당 기간의 ago(한 해 전/한 달 전/하루 전) 데이터를 포함합니다.
+ *     tags: [계약현황]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - year
+ *               - month
+ *               - day
+ *             properties:
+ *               year:
+ *                 type: integer
+ *                 description: 년도
+ *                 example: 2025
+ *               month:
+ *                 type: integer
+ *                 description: 월
+ *                 example: 3
+ *               day:
+ *                 type: integer
+ *                 description: 일
+ *                 example: 5
+ *     responses:
+ *       200:
+ *         description: 계약현황 통계 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 계약현황 통계 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       type:
+ *                         type: string
+ *                         enum: [YEAR, MONTH, DAY]
+ *                         description: 기간 타입
+ *                         example: YEAR
+ *                       paymentAmount:
+ *                         type: integer
+ *                         description: 결제 금액 합계
+ *                         example: 4510372306
+ *                       paymentCnt:
+ *                         type: integer
+ *                         description: 결제 건수
+ *                         example: 10225
+ *                       refundAmount:
+ *                         type: integer
+ *                         description: 환불 금액 합계
+ *                         example: 120000000
+ *                       refundCnt:
+ *                         type: integer
+ *                         description: 환불 건수
+ *                         example: 657
+ *                       ago:
+ *                         type: object
+ *                         description: 비교 데이터 (type에 따라 yearAgo / monthAgo / dayAgo 중 하나만 포함, paymentCnt만)
+ *                         properties:
+ *                           yearAgo:
+ *                             type: integer
+ *                             description: 한 해 전 결제 건수 (type이 YEAR일 때만)
+ *                             example: 9000
+ *                           monthAgo:
+ *                             type: integer
+ *                             description: 한 달 전 결제 건수 (type이 MONTH일 때만)
+ *                             example: 950
+ *                           dayAgo:
+ *                             type: integer
+ *                             description: 하루 전 결제 건수 (type이 DAY일 때만)
+ *                             example: 15
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/contractStats', isAuthMiddleware.isAuthAdmin, statController.getContractStats);
+
 module.exports = router;
