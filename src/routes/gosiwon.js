@@ -1566,6 +1566,9 @@ router.put('/config', gosiwonController.updateGosiwonConfig);
  *                       paymentCount:
  *                         type: integer
  *                         description: 결제 건수
+ *                       manager:
+ *                         type: string
+ *                         description: 'youtube 컬럼을 manager 이름으로 노출'
  *                       is_controlled:
  *                         type: integer
  *                         description: '구분 (0: 일반, 1: 관리)'
