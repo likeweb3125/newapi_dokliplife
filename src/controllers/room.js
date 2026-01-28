@@ -195,7 +195,24 @@ exports.getRoomList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		errorHandler.successThrow(res, '방 목록 조회 성공', roomList);
+		// 고시원 이름 조회
+		const [gosiwonInfo] = await mariaDBSequelize.query(
+			`SELECT name FROM gosiwon WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [goID],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+
+		const gosiwonName = gosiwonInfo?.name || null;
+
+		// 리턴값에 고시원 이름 추가
+		const result = {
+			gosiwonName: gosiwonName,
+			rooms: roomList,
+		};
+
+		errorHandler.successThrow(res, '방 목록 조회 성공', result);
 	} catch (err) {
 		next(err);
 	}

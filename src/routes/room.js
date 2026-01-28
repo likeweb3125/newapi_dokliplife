@@ -72,95 +72,102 @@ const roomCategoryController = require('../controllers/roomCategory');
  *                   type: string
  *                   example: 방 목록 조회 성공
  *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       esntlId:
- *                         type: string
- *                         description: 방 고유 아이디
- *                       roomType:
- *                         type: string
- *                         description: 방 타입
- *                       roomCategory:
- *                         type: string
- *                         description: 방 카테고리 고유아이디
- *                       roomCategoryName:
- *                         type: string
- *                         description: 방 카테고리명
- *                       availableGender:
- *                         type: string
- *                         enum: [DEFAULT, MALE, FEMALE]
- *                         description: "이용 가능 성별 (DEFAULT: 제한없음, MALE: 남성, FEMALE: 여성)"
- *                       rom_deposit:
- *                         type: number
- *                         description: 보증금(만원 단위)
- *                       monthlyRent:
- *                         type: string
- *                         description: 입실료
- *                       window:
- *                         type: string
- *                         description: 창 타입
- *                       option:
- *                         type: string
- *                         description: 방 옵션
- *                       orderOption:
- *                         type: string
- *                         description: 방 옵션 정렬 값
- *                       roomNumber:
- *                         type: string
- *                         description: 방번호
- *                       floor:
- *                         type: string
- *                         description: 층
- *                       intro:
- *                         type: string
- *                         description: 소개
- *                       empty:
- *                         type: string
- *                         description: 빈방 여부
- *                       status:
- *                         type: string
- *                         description: 방 상태
- *                       description:
- *                         type: string
- *                         description: 방 설명
- *                       top:
- *                         type: string
- *                         description: 상단 표시 여부
- *                       rom_checkout_expected_date:
- *                         type: string
- *                         description: 예정 퇴실일
- *                       startDate:
- *                         type: string
- *                         description: 계약 시작일 (roomContract)
- *                       endDate:
- *                         type: string
- *                         description: 계약 종료일 (roomContract)
- *                       month:
- *                         type: string
- *                         description: 계약 기간 (roomContract)
- *                       customerEsntlId:
- *                         type: string
- *                         description: 사용자 고유아이디
- *                       rom_successor_eid:
- *                         type: string
- *                         description: 승계 방 고유아이디
- *                       rom_dp_at:
- *                         type: string
- *                         description: DP방 여부
- *                       deleteYN:
- *                         type: string
- *                         description: 삭제 여부
- *                       see:
- *                         type: integer
- *                         description: 조회수 (roomSee 카운트)
- *                       likes:
- *                         type: integer
- *                         description: 좋아요 수 (roomLike 카운트)
- *                       ror_sn:
- *                         type: string
- *                         description: 예약 고유번호 (il_room_reservation, WAIT 상태만)
+ *                   type: object
+ *                   properties:
+ *                     gosiwonName:
+ *                       type: string
+ *                       description: 고시원 이름
+ *                       example: '독립생활 고시원'
+ *                     rooms:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
+ *                           roomType:
+ *                             type: string
+ *                             description: 방 타입
+ *                           roomCategory:
+ *                             type: string
+ *                             description: 방 카테고리 고유아이디
+ *                           roomCategoryName:
+ *                             type: string
+ *                             description: 방 카테고리명
+ *                           availableGender:
+ *                             type: string
+ *                             enum: [DEFAULT, MALE, FEMALE]
+ *                             description: "이용 가능 성별 (DEFAULT: 제한없음, MALE: 남성, FEMALE: 여성)"
+ *                           rom_deposit:
+ *                             type: number
+ *                             description: 보증금(만원 단위)
+ *                           monthlyRent:
+ *                             type: string
+ *                             description: 입실료
+ *                           window:
+ *                             type: string
+ *                             description: 창 타입
+ *                           option:
+ *                             type: string
+ *                             description: 방 옵션
+ *                           orderOption:
+ *                             type: string
+ *                             description: 방 옵션 정렬 값
+ *                           roomNumber:
+ *                             type: string
+ *                             description: 방번호
+ *                           floor:
+ *                             type: string
+ *                             description: 층
+ *                           intro:
+ *                             type: string
+ *                             description: 소개
+ *                           empty:
+ *                             type: string
+ *                             description: 빈방 여부
+ *                           status:
+ *                             type: string
+ *                             description: 방 상태
+ *                           description:
+ *                             type: string
+ *                             description: 방 설명
+ *                           top:
+ *                             type: string
+ *                             description: 상단 표시 여부
+ *                           rom_checkout_expected_date:
+ *                             type: string
+ *                             description: 예정 퇴실일
+ *                           startDate:
+ *                             type: string
+ *                             description: 계약 시작일 (roomContract)
+ *                           endDate:
+ *                             type: string
+ *                             description: 계약 종료일 (roomContract)
+ *                           month:
+ *                             type: string
+ *                             description: 계약 기간 (roomContract)
+ *                           customerEsntlId:
+ *                             type: string
+ *                             description: 사용자 고유아이디
+ *                           rom_successor_eid:
+ *                             type: string
+ *                             description: 승계 방 고유아이디
+ *                           rom_dp_at:
+ *                             type: string
+ *                             description: DP방 여부
+ *                           deleteYN:
+ *                             type: string
+ *                             description: 삭제 여부
+ *                           see:
+ *                             type: integer
+ *                             description: 조회수 (roomSee 카운트)
+ *                           likes:
+ *                             type: integer
+ *                             description: 좋아요 수 (roomLike 카운트)
+ *                           ror_sn:
+ *                             type: string
+ *                             description: 예약 고유번호 (il_room_reservation, WAIT 상태만)
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
