@@ -1022,9 +1022,9 @@ exports.getRefundRequestData = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		if (!result) {
-			return errorHandler.successThrow(res, '환불 요청 데이터가 없습니다.', null);
-		}
+		// if (!result) {
+		// 	return errorHandler.successThrow(res, '환불 요청 데이터가 없습니다.', null);
+		// }
 
 		return errorHandler.successThrow(res, '환불 요청 데이터 조회 성공', result);
 	} catch (error) {
