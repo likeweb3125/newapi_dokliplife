@@ -188,8 +188,8 @@ const roomContractController = require('../controllers/roomContract');
  *                             description: 전체 개수
  *                           status:
  *                             type: string
- *                             description: 계약상태
- *                             example: ACTIVE
+ *                             description: 계약상태 (room 테이블의 status 값)
+ *                             example: IN_USE
  *                           contractType:
  *                             type: string
  *                             enum: [month, part]

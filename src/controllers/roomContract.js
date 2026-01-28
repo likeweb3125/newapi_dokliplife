@@ -146,7 +146,7 @@ exports.getContractList = async (req, res, next) => {
 				FORMAT(COALESCE(PL.cPercent, 0), 0) AS cPercent,
 				1 AS paymentCount,
 				COUNT(*) OVER() AS totcnt,
-				RC.status AS status,
+				R.status AS status,
 				CASE
 					WHEN DATE_ADD(RC.startDate, INTERVAL 1 MONTH) = RC.endDate THEN 'month'
 					ELSE 'part'
