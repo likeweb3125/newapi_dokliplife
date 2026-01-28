@@ -239,6 +239,10 @@ router.get('/reservationList', depositController.getReservationList);
  *               - amount
  *               - roomEsntlId
  *             properties:
+ *               contractEsntlId:
+ *                 type: string
+ *                 description: 계약서 고유 아이디 (선택, 해당 계약서와 예약금을 연결할 때 사용)
+ *                 example: RCTT0000000001
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유 아이디 (roomEsntlId로 고시원 정보 자동 조회)

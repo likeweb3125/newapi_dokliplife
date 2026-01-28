@@ -736,8 +736,16 @@ exports.registerDeposit = async (req, res, next) => {
 	try {
 		const decodedToken = verifyAdminToken(req);
 
-		// 1. 입금일자, 입금자, 납입금액을 받는다. (contractEsntlId는 받지 않음, type은 RESERVATION 고정)
-		const { depositDate, depositorName, paidAmount, amount, roomEsntlId, gosiwonEsntlId } = req.body;
+		// 1. 입금일자, 입금자, 납입금액을 받는다. (type은 RESERVATION 고정, contractEsntlId는 선택)
+		const {
+			depositDate,
+			depositorName,
+			paidAmount,
+			amount,
+			roomEsntlId,
+			gosiwonEsntlId,
+			contractEsntlId,
+		} = req.body;
 
 		// amount 또는 paidAmount 둘 중 하나를 받음 (Swagger 문서는 amount 사용)
 		const inputPaidAmount = paidAmount !== undefined && paidAmount !== null ? paidAmount : amount;
@@ -772,8 +780,8 @@ exports.registerDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(400, '고시원 정보를 찾을 수 없습니다.');
 		}
 
-		// 4. contractEsntlId는 받지 않음 (예약금 등록은 계약서 없이 가능)
-		const finalContractEsntlId = null;
+		// 4. contractEsntlId는 선택값 (예약금 등록을 특정 계약서와 연결하고 싶을 때 사용)
+		const finalContractEsntlId = contractEsntlId || null;
 		const finalRoomEsntlId = roomEsntlId;
 		const customerEsntlId = null;
 		const contractorEsntlId = null;
