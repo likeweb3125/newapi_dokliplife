@@ -555,7 +555,11 @@ exports.createGosiwon = async (req, res, next) => {
 				district: district || null,
 				adminEsntlId: decodedToken.admin || decodedToken.partner,
 				is_controlled: is_controlled !== undefined ? (is_controlled === true || is_controlled === 'true' || is_controlled === 1 ? 1 : 0) : 0,
-				penaltyRate: penaltyRate !== undefined ? penaltyRate : null,
+				// penaltyRate는 INT 컬럼이므로 빈 문자열이 들어오면 null 처리
+				penaltyRate:
+					penaltyRate !== undefined && penaltyRate !== ''
+						? parseInt(penaltyRate, 10)
+						: null,
 				penaltyMin: penaltyMin !== undefined ? penaltyMin : 0,
 				qrPoint: qrPoint || null,
 				use_deposit: use_deposit !== undefined ? (use_deposit === true || use_deposit === 'true' || use_deposit === 1 ? 1 : 0) : 0,
@@ -821,7 +825,15 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (req.body.is_controlled !== undefined) {
 			updateData.is_controlled = req.body.is_controlled === true || req.body.is_controlled === 'true' || req.body.is_controlled === 1 ? 1 : 0;
 		}
-		if (req.body.penaltyRate !== undefined) updateData.penaltyRate = req.body.penaltyRate;
+		if (req.body.penaltyRate !== undefined) {
+			// 빈 문자열이 오면 null, 숫자 문자열이면 정수 변환
+			if (req.body.penaltyRate === '' || req.body.penaltyRate === null) {
+				updateData.penaltyRate = null;
+			} else {
+				const parsed = parseInt(req.body.penaltyRate, 10);
+				updateData.penaltyRate = Number.isNaN(parsed) ? null : parsed;
+			}
+		}
 		if (req.body.penaltyMin !== undefined)
 			updateData.penaltyMin =
 				req.body.penaltyMin !== null && req.body.penaltyMin !== undefined
