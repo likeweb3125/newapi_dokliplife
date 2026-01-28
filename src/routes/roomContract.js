@@ -186,6 +186,30 @@ const roomContractController = require('../controllers/roomContract');
  *                           totcnt:
  *                             type: integer
  *                             description: 전체 개수
+ *                           status:
+ *                             type: string
+ *                             description: 계약상태
+ *                             example: ACTIVE
+ *                           contractType:
+ *                             type: string
+ *                             enum: [month, part]
+ *                             description: 계약유형 (startDate 기준 1달 후 날짜가 endDate와 같으면 month, 그 외는 part)
+ *                             example: month
+ *                           contractCategory:
+ *                             type: string
+ *                             enum: [extend, new]
+ *                             description: 계약구분 (checkInTime이 RCTT로 시작되면 extend, 그 외는 new)
+ *                             example: new
+ *                           paymentCategory:
+ *                             type: string
+ *                             enum: [refund, pay]
+ *                             description: 결제구분 (status가 CANCEL이면 refund, 그 외는 pay)
+ *                             example: pay
+ *                           depositStatus:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 보증금 상태 (deposit 테이블에서 방ID 기준 마지막 상태값)
+ *                             example: COMPLETED
  *                     totcnt:
  *                       type: integer
  *                       description: 전체 개수

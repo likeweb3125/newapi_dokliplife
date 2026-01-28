@@ -145,7 +145,26 @@ exports.getContractList = async (req, res, next) => {
 				FORMAT(COALESCE(PL.cAmount, 0), 0) AS cAmount,
 				FORMAT(COALESCE(PL.cPercent, 0), 0) AS cPercent,
 				1 AS paymentCount,
-				COUNT(*) OVER() AS totcnt
+				COUNT(*) OVER() AS totcnt,
+				RC.status AS status,
+				CASE
+					WHEN DATE_ADD(RC.startDate, INTERVAL 1 MONTH) = RC.endDate THEN 'month'
+					ELSE 'part'
+				END AS contractType,
+				CASE
+					WHEN RC.checkInTime LIKE 'RCTT%' THEN 'extend'
+					ELSE 'new'
+				END AS contractCategory,
+				CASE
+					WHEN RC.status = 'CANCEL' THEN 'refund'
+					ELSE 'pay'
+				END AS paymentCategory,
+				(SELECT status 
+				 FROM deposit 
+				 WHERE roomEsntlId = RC.roomEsntlId 
+				   AND deleteYN = 'N'
+				 ORDER BY createdAt DESC 
+				 LIMIT 1) AS depositStatus
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
