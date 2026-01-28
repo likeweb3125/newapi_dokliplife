@@ -1566,6 +1566,15 @@ router.put('/config', gosiwonController.updateGosiwonConfig);
  *                       paymentCount:
  *                         type: integer
  *                         description: 결제 건수
+ *                       is_controlled:
+ *                         type: integer
+ *                         description: '구분 (0: 일반, 1: 관리)'
+ *                       use_settlement:
+ *                         type: integer
+                         description: '정산 여부 (0: 미사용, 1: 사용)'
+ *                       status:
+                         type: string
+                         description: '고시원 상태 (예: READY, OPERATE, STOP 등)'
  *                       totcnt:
  *                         type: integer
  *                         description: 전체 개수

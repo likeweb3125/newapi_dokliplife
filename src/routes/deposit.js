@@ -106,6 +106,11 @@ const depositController = require('../controllers/deposit');
  *                             nullable: true
  *                             description: 예약금 고유 아이디 (해당 방의 가장 최근 deposit.esntlId, 없으면 null)
  *                             example: DEPO0000000001
+ *                           contractEsntlId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 현재 활성 계약의 고유 아이디 (roomContract.status = 'CONTRACT' 중 최신 계약)
+ *                             example: RCTT0000000001
  *                           roomEsntlId:
  *                             type: string
  *                             description: 방 고유 아이디

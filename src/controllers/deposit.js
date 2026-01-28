@@ -1500,6 +1500,7 @@ exports.getReservationList = async (req, res, next) => {
 				R.roomNumber,
 				R.gosiwonEsntlId,
 				G.name as gosiwonName,
+				RC.esntlId as contractEsntlId,
 				RS.status as roomStatus,
 				RC.checkinName as reservationName,
 				RC.checkinPhone as reservationPhone,
@@ -1605,6 +1606,7 @@ exports.getReservationList = async (req, res, next) => {
 			return {
 				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
+				contractEsntlId: row.contractEsntlId || null,
 				roomNumber: row.roomNumber,
 				gosiwonEsntlId: row.gosiwonEsntlId || null,
 				gosiwonName: row.gosiwonName || null,

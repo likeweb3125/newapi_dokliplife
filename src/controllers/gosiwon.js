@@ -1564,7 +1564,11 @@ exports.selectListToAdminNew = async (req, res, next) => {
 				COALESCE(DP.deposit_yn, 'F') AS deposit_yn,
 				COALESCE(RL_AGG.likes, 0) AS likes,
 				COALESCE(RS_AGG.see, 0) AS see,
-				COALESCE(G.commision, '') AS commision
+				COALESCE(G.commision, '') AS commision,
+				-- gosiwon 테이블의 주요 상태 값
+				COALESCE(G.is_controlled, 0) AS is_controlled,
+				COALESCE(G.use_settlement, 0) AS use_settlement,
+				COALESCE(G.status, '') AS status
 			FROM gosiwon G
 			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			LEFT JOIN (
