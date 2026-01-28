@@ -560,7 +560,11 @@ exports.createGosiwon = async (req, res, next) => {
 					penaltyRate !== undefined && penaltyRate !== ''
 						? parseInt(penaltyRate, 10)
 						: null,
-				penaltyMin: penaltyMin !== undefined ? penaltyMin : 0,
+				// penaltyMin도 숫자 컬럼이므로 빈 문자열이면 0, 숫자면 정수로 변환
+				penaltyMin:
+					penaltyMin !== undefined && penaltyMin !== ''
+						? parseInt(penaltyMin, 10) || 0
+						: 0,
 				qrPoint: qrPoint || null,
 				use_deposit: use_deposit !== undefined ? (use_deposit === true || use_deposit === 'true' || use_deposit === 1 ? 1 : 0) : 0,
 				use_sale_commision: use_sale_commision !== undefined ? (use_sale_commision === true || use_sale_commision === 'true' || use_sale_commision === 1 ? 1 : 0) : 0,
@@ -834,11 +838,15 @@ exports.updateGosiwon = async (req, res, next) => {
 				updateData.penaltyRate = Number.isNaN(parsed) ? null : parsed;
 			}
 		}
-		if (req.body.penaltyMin !== undefined)
-			updateData.penaltyMin =
-				req.body.penaltyMin !== null && req.body.penaltyMin !== undefined
-					? req.body.penaltyMin
-					: 0;
+		if (req.body.penaltyMin !== undefined) {
+			// penaltyMin도 숫자 컬럼이므로 빈 문자열이면 0, 숫자면 정수로 변환
+			if (req.body.penaltyMin === '' || req.body.penaltyMin === null) {
+				updateData.penaltyMin = 0;
+			} else {
+				const parsedMin = parseInt(req.body.penaltyMin, 10);
+				updateData.penaltyMin = Number.isNaN(parsedMin) ? 0 : parsedMin;
+			}
+		}
 		if (req.body.qrPoint !== undefined) updateData.qrPoint = req.body.qrPoint;
 		if (req.body.use_deposit !== undefined) {
 			updateData.use_deposit = req.body.use_deposit === true || req.body.use_deposit === 'true' || req.body.use_deposit === 1 ? 1 : 0;
