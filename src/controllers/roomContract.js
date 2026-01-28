@@ -95,7 +95,20 @@ exports.getContractList = async (req, res, next) => {
 			}
 
 			if (roomStatus) {
-				conditions.push('RS.status = ?');
+				// roomStatus는 roomStatus 테이블의 최신 상태를 기준으로 필터링 (JOIN 대신 EXISTS 사용)
+				conditions.push(`
+					EXISTS (
+						SELECT 1
+						FROM roomStatus RS
+						WHERE RS.contractEsntlId = RC.esntlId
+						  AND RS.status = ?
+						  AND RS.updatedAt = (
+							  SELECT MAX(updatedAt)
+							  FROM roomStatus
+							  WHERE contractEsntlId = RC.esntlId
+						  )
+					)
+				`);
 				values.push(roomStatus);
 			}
 
@@ -169,7 +182,6 @@ exports.getContractList = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
-			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			LEFT JOIN (
 				SELECT 
 					contractEsntlId,
@@ -199,7 +211,6 @@ exports.getContractList = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
-			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			LEFT JOIN paymentLog PL ON RC.esntlId = PL.contractEsntlId
 			WHERE ${whereClause}
 		`;
@@ -222,7 +233,6 @@ exports.getContractList = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
-			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			WHERE ${whereClause}
 		`;
 
