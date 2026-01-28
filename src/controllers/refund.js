@@ -1023,7 +1023,7 @@ exports.getRefundRequestData = async (req, res, next) => {
 		});
 
 		if (!result) {
-			errorHandler.errorThrow(404, '환불 요청 데이터를 찾을 수 없습니다.');
+			return errorHandler.successThrow(res, '환불 요청 데이터가 없습니다.', null);
 		}
 
 		return errorHandler.successThrow(res, '환불 요청 데이터 조회 성공', result);
