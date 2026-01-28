@@ -368,21 +368,9 @@ router.post('/realTimeList', isAuthMiddleware.isAuthAdmin, statController.getRea
  *                         description: 환불 건수
  *                         example: 657
  *                       ago:
- *                         type: object
- *                         description: 비교 데이터 (type에 따라 yearAgo / monthAgo / dayAgo 중 하나만 포함, paymentCnt만)
- *                         properties:
- *                           yearAgo:
- *                             type: integer
- *                             description: 한 해 전 결제 건수 (type이 YEAR일 때만)
- *                             example: 9000
- *                           monthAgo:
- *                             type: integer
- *                             description: 한 달 전 결제 건수 (type이 MONTH일 때만)
- *                             example: 950
- *                           dayAgo:
- *                             type: integer
- *                             description: 하루 전 결제 건수 (type이 DAY일 때만)
- *                             example: 15
+ *                         type: integer
+ *                         description: 비교 결제 건수 (YEAR=한 해 전, MONTH=한 달 전, DAY=하루 전)
+ *                         example: 37
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

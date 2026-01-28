@@ -1006,9 +1006,9 @@ exports.getContractStats = async (req, res, next) => {
 				refundAmount: amountRef[period] ?? 0,
 				refundCnt: countR[period] ?? 0,
 			};
-			if (period === 'YEAR') row.ago = { yearAgo: countP['YEAR_AGO'] ?? 0 };
-			else if (period === 'MONTH') row.ago = { monthAgo: countP['MONTH_AGO'] ?? 0 };
-			else row.ago = { dayAgo: countP['DAY_AGO'] ?? 0 };
+			if (period === 'YEAR') row.ago = countP['YEAR_AGO'] ?? 0;
+			else if (period === 'MONTH') row.ago = countP['MONTH_AGO'] ?? 0;
+			else row.ago = countP['DAY_AGO'] ?? 0;
 			return row;
 		});
 
