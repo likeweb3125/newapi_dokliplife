@@ -326,7 +326,38 @@ exports.getContractDetail = async (req, res, next) => {
 			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
 		}
 
-		// 결제 내역 조회 (extraPayment만 사용)
+		// 연동 결제 내역 조회 (paymentLog, isExtra = 0인 것 = 일반 연장 결제)
+		const paymentLogQuery = `
+			SELECT 
+				PL.esntlId,
+				PL.pDate,
+				PL.pTime,
+				PL.pyl_goods_amount,
+				FORMAT(IFNULL(PL.paymentAmount, 0), 0) AS paymentAmount,
+				PL.paymentType,
+				PL.calculateStatus,
+				PL.code,
+				PL.reason,
+				PL.withdrawalStatus,
+				0 AS isExtra
+			FROM paymentLog PL
+			WHERE PL.contractEsntlId = ?
+				AND PL.isExtra = 0
+			ORDER BY PL.pDate DESC, PL.pTime DESC
+		`;
+
+		const paymentLogList = await mariaDBSequelize.query(paymentLogQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 메인 결제 상태 (isExtra=0인 paymentLog 기준, 최신 건의 calculateStatus)
+		contractInfo.paymentStatus =
+			paymentLogList && paymentLogList.length > 0
+				? (paymentLogList[0].calculateStatus ?? paymentLogList[0].calculatestatus ?? null)
+				: null;
+
+		// 추가 결제 내역 조회 (extraPayment)
 		const paymentQuery = `
 			SELECT 
 				ep.pDate,
@@ -386,6 +417,7 @@ exports.getContractDetail = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
 			contractInfo: contractInfo,
+			paymentLogList: paymentLogList || [],
 			paymentList: paymentList || [],
 		});
 	} catch (err) {

@@ -351,6 +351,10 @@ router.get('/list', roomContractController.getContractList);
  *                           type: string
  *                           description: '계약 상태 (예: CONTRACT, RESERVE, VBANK, CANCEL)'
  *                           example: CONTRACT
+ *                         paymentStatus:
+ *                           type: string
+ *                           description: '메인 결제 상태 (paymentLog isExtra=0 기준 최신 건의 calculateStatus, 예: SUCCESS, REQUEST)'
+ *                           example: SUCCESS
  *                         isRoomMoveScheduled:
  *                           type: boolean
  *                           description: 방이동 예정 여부 (roomMoveStatus 테이블의 status가 PENDING인 경우 true)
@@ -360,9 +364,46 @@ router.get('/list', roomContractController.getContractList);
  *                           format: date-time
  *                           description: 방이동 예정 날짜 (moveDate, isRoomMoveScheduled가 true일 때만 반환)
  *                           example: '2025-11-15T00:00:00'
+ *                     paymentLogList:
+ *                       type: array
+ *                       description: '연동 결제 내역 (paymentLog, isExtra=0인 일반 연장 결제)'
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: paymentLog 고유 아이디
+ *                           pDate:
+ *                             type: string
+ *                             description: 결제일
+ *                           pTime:
+ *                             type: string
+ *                             description: 결제 시간
+ *                           pyl_goods_amount:
+ *                             type: number
+ *                             description: 상품 금액
+ *                           paymentAmount:
+ *                             type: string
+ *                             description: 결제 금액 (포맷팅)
+ *                           paymentType:
+ *                             type: string
+ *                             description: 결제 타입
+ *                           code:
+ *                             type: string
+ *                             description: 성공 여부 코드
+ *                           reason:
+ *                             type: string
+ *                             description: 실패 시 사유
+ *                           withdrawalStatus:
+ *                             type: string
+ *                             description: 결제 취소 여부
+ *                           isExtra:
+ *                             type: integer
+ *                             description: '0 (일반 연장 결제)'
+ *                             example: 0
  *                     paymentList:
  *                       type: array
- *                       description: 결제 내역 목록
+ *                       description: 추가 결제 내역 목록 (extraPayment)
  *                       items:
  *                         type: object
  *                         properties:
