@@ -380,6 +380,10 @@ exports.getContractDetail = async (req, res, next) => {
 			contractInfo.roomMoveEsntlId = null;
 		}
 
+		// 계약 상태(contractStatus) 응답에 포함 (드라이버별 컬럼명 차이 대응)
+		contractInfo.contractStatus =
+			contractInfo.contractStatus ?? contractInfo.contractstatus ?? null;
+
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
 			contractInfo: contractInfo,
 			paymentList: paymentList || [],

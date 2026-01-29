@@ -349,7 +349,8 @@ router.get('/list', roomContractController.getContractList);
  *                           description: 계약 종료일
  *                         contractStatus:
  *                           type: string
- *                           description: 계약 상태
+ *                           description: 계약 상태 (예: CONTRACT, RESERVE, VBANK, CANCEL)
+ *                           example: CONTRACT
  *                         isRoomMoveScheduled:
  *                           type: boolean
  *                           description: 방이동 예정 여부 (roomMoveStatus 테이블의 status가 PENDING인 경우 true)
