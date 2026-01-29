@@ -98,7 +98,7 @@ exports.mngChartMain = async (req, res, next) => {
 		const endDateStr = endDate.toISOString().slice(0, 10);
 		const startDateStr = startDate.toISOString().slice(0, 10);
 
-		// 1. Groups 데이터 조회 (활성 방 목록) - 중복 방지를 위해 DISTINCT와 서브쿼리로 최신 roomStatus만 가져옴
+		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, 없으면 room.status 매핑
 		const groupsQuery = `
 			SELECT DISTINCT
 				R.esntlId AS id,
@@ -109,7 +109,17 @@ exports.mngChartMain = async (req, res, next) => {
 				R.monthlyRent,
 				R.gosiwonEsntlId,
 				R.orderNo AS value,
-				COALESCE(RS.status, 'BEFORE_SALES') AS status,
+				R.status AS roomStatus,
+				COALESCE(
+					RS.status,
+					CASE 
+						WHEN R.status = 'CONTRACT' THEN 'IN_USE'
+						WHEN R.status = 'RESERVE' THEN 'RESERVED'
+						WHEN R.status = 'VBANK' THEN 'PENDING'
+						WHEN R.status = 'EMPTY' OR R.status = '' OR R.status IS NULL THEN 'BEFORE_SALES'
+						ELSE 'BEFORE_SALES'
+					END
+				) AS status,
 				COALESCE(RS.customerName, '') AS currentGuest,
 				COALESCE(CONCAT(
 					DATE_FORMAT(RS.statusStartDate, '%y-%m-%d'),
