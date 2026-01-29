@@ -58,6 +58,8 @@ db.parking = require('./parking')(mariaDBSequelize, Sequelize);
 db.roomMemo = require('./roomMemo')(mariaDBSequelize, Sequelize);
 db.deposit = require('./deposit')(mariaDBSequelize, Sequelize);
 db.depositHistory = require('./depositHistory')(mariaDBSequelize, Sequelize);
+db.ilRoomDeposit = require('./ilRoomDeposit')(mariaDBSequelize, Sequelize);
+db.ilRoomDepositHistory = require('./ilRoomDepositHistory')(mariaDBSequelize, Sequelize);
 db.depositDeduction = require('./depositDeduction')(mariaDBSequelize, Sequelize);
 db.depositRefund = require('./depositRefund')(mariaDBSequelize, Sequelize);
 db.memo = require('./memo')(mariaDBSequelize, Sequelize);
@@ -166,6 +168,38 @@ db.depositHistory.hasMany(db.depositDeduction, {
 db.depositDeduction.belongsTo(db.depositHistory, {
 	as: 'depositHistory',
 	foreignKey: 'depositHistoryEsntlId',
+	targetKey: 'esntlId',
+});
+
+// il_room_deposit 관계 설정
+db.room.hasMany(db.ilRoomDeposit, {
+	as: 'ilRoomDeposits',
+	foreignKey: 'roomEsntlId',
+	sourceKey: 'esntlId',
+});
+db.ilRoomDeposit.belongsTo(db.room, {
+	as: 'room',
+	foreignKey: 'roomEsntlId',
+	targetKey: 'esntlId',
+});
+db.gosiwon.hasMany(db.ilRoomDeposit, {
+	as: 'ilRoomDeposits',
+	foreignKey: 'gosiwonEsntlId',
+	sourceKey: 'esntlId',
+});
+db.ilRoomDeposit.belongsTo(db.gosiwon, {
+	as: 'gosiwon',
+	foreignKey: 'gosiwonEsntlId',
+	targetKey: 'esntlId',
+});
+db.ilRoomDeposit.hasMany(db.ilRoomDepositHistory, {
+	as: 'histories',
+	foreignKey: 'depositEsntlId',
+	sourceKey: 'esntlId',
+});
+db.ilRoomDepositHistory.belongsTo(db.ilRoomDeposit, {
+	as: 'ilRoomDeposit',
+	foreignKey: 'depositEsntlId',
 	targetKey: 'esntlId',
 });
 

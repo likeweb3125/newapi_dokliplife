@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const {
-	deposit,
-	depositHistory,
+	ilRoomDeposit,
+	ilRoomDepositHistory,
 	depositDeduction,
 	depositRefund,
 	room,
@@ -12,6 +12,7 @@ const {
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -38,64 +39,16 @@ const verifyAdminToken = (req) => {
 	return decodedToken;
 };
 
-const DEPOSIT_PREFIX = 'DEPO';
-const DEPOSIT_PADDING = 10;
-const DEPOSITHISTORY_PREFIX = 'DEHI';
-const DEPOSITHISTORY_PADDING = 10;
 const DEPOSITDEDUCTION_PREFIX = 'DEDU';
 const DEPOSITDEDUCTION_PADDING = 10;
 const DEPOSITREFUND_PREFIX = 'DERF';
 const DEPOSITREFUND_PADDING = 10;
 
-// ID 생성 함수
-const generateDepositId = async (transaction) => {
-	const latest = await deposit.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${DEPOSIT_PREFIX}${String(1).padStart(DEPOSIT_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(DEPOSIT_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${DEPOSIT_PREFIX}${String(nextNumber).padStart(
-		DEPOSIT_PADDING,
-		'0'
-	)}`;
-};
-
-const generateDepositHistoryId = async (transaction) => {
-	const latest = await depositHistory.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${DEPOSITHISTORY_PREFIX}${String(1).padStart(
-			DEPOSITHISTORY_PADDING,
-			'0'
-		)}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(DEPOSITHISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${DEPOSITHISTORY_PREFIX}${String(nextNumber).padStart(
-		DEPOSITHISTORY_PADDING,
-		'0'
-	)}`;
-};
+// ID 생성: IDS 테이블 사용 (il_room_deposit prefix RDP, il_room_deposit_history prefix RDP)
+const generateIlRoomDepositId = (transaction) =>
+	idsNext('il_room_deposit', 'RDP', transaction);
+const generateIlRoomDepositHistoryId = (transaction) =>
+	idsNext('il_room_deposit_history', 'RDP', transaction);
 
 const generateDepositDeductionId = async (transaction) => {
 	const latest = await depositDeduction.findOne({
@@ -160,7 +113,7 @@ exports.getDepositInfo = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		const depositInfo = await deposit.findOne({
+		const depositInfo = await ilRoomDeposit.findOne({
 			where: {
 				esntlId: esntlId,
 			},
@@ -196,27 +149,19 @@ exports.getDepositInfo = async (req, res, next) => {
 			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
 		}
 
-		// 입금/반환 이력 조회
-		const histories = await depositHistory.findAll({
+		// 입금/반환 이력 조회 (il_room_deposit_history)
+		const histories = await ilRoomDepositHistory.findAll({
 			where: {
 				depositEsntlId: esntlId,
 			},
-			include: [
-				{
-					model: depositDeduction,
-					as: 'deductions',
-					attributes: ['esntlId', 'deductionName', 'deductionAmount'],
-					required: false,
-				},
-			],
 			order: [['createdAt', 'DESC']],
 		});
 
 		const depositData = depositInfo.toJSON();
 		depositData.histories = histories;
 
-		// 총 입금액 계산
-		const totalDepositAmount = await depositHistory.sum('amount', {
+		// 총 입금액 계산 (il_room_deposit_history)
+		const totalDepositAmount = await ilRoomDepositHistory.sum('amount', {
 			where: {
 				depositEsntlId: esntlId,
 				type: 'DEPOSIT',
@@ -229,8 +174,7 @@ exports.getDepositInfo = async (req, res, next) => {
 		depositData.totalDepositAmount = totalDepositAmount || 0;
 		depositData.unpaidAmount = Math.max(
 			0,
-			(depositInfo.amount || depositInfo.depositAmount || depositInfo.reservationDepositAmount) -
-				(totalDepositAmount || 0)
+			(depositInfo.amount || 0) - (totalDepositAmount || 0)
 		);
 
 		return errorHandler.successThrow(res, '보증금 정보 조회 성공', depositData);
@@ -338,9 +282,9 @@ exports.createDeposit = async (req, res, next) => {
 			finalContractorEsntlId = contractorEsntlId;
 		}
 
-		const esntlId = await generateDepositId(transaction);
+		const esntlId = await generateIlRoomDepositId(transaction);
 
-		const newDeposit = await deposit.create(
+		const newDeposit = await ilRoomDeposit.create(
 			{
 				esntlId,
 				roomEsntlId,
@@ -348,18 +292,12 @@ exports.createDeposit = async (req, res, next) => {
 				customerEsntlId: finalCustomerEsntlId,
 				contractorEsntlId: finalContractorEsntlId,
 				contractEsntlId: contractEsntlId || null,
-				type: type,
 				amount: finalAmount,
-				// 하위 호환성을 위해 기존 필드도 저장
-				reservationDepositAmount: reservationDepositAmount || 0,
+				paidAmount: 0,
+				unpaidAmount: finalAmount,
 				accountBank: accountBank || null,
 				accountNumber: accountNumber || null,
 				accountHolder: accountHolder || null,
-				expectedOccupantName: expectedOccupantName || null,
-				expectedOccupantPhone: expectedOccupantPhone || null,
-				moveInDate: moveInDate || null,
-				moveOutDate: moveOutDate || null,
-				contractStatus: contractStatus || null,
 				status: 'PENDING',
 				depositDate: depositDate || null,
 				depositorName: depositorName || null,
@@ -371,13 +309,13 @@ exports.createDeposit = async (req, res, next) => {
 			{ transaction }
 		);
 
-		// 입금대기 이력 생성
-		const historyId = await generateDepositHistoryId(transaction);
-		await depositHistory.create(
+		// 입금대기 이력 생성 (il_room_deposit_history)
+		const historyId = await generateIlRoomDepositHistoryId(transaction);
+		await ilRoomDepositHistory.create(
 			{
 				esntlId: historyId,
 				depositEsntlId: esntlId,
-				roomEsntlId: roomEsntlId, // 방 고유아이디 저장
+				roomEsntlId: roomEsntlId,
 				contractEsntlId: contractEsntlId || null,
 				type: 'DEPOSIT',
 				amount: 0,
@@ -431,7 +369,7 @@ exports.updateDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		const depositInfo = await deposit.findOne({
+		const depositInfo = await ilRoomDeposit.findOne({
 			where: { esntlId: esntlId },
 			transaction,
 		});
@@ -444,15 +382,7 @@ exports.updateDeposit = async (req, res, next) => {
 		const changes = []; // 변경된 항목 추적
 
 		if (customerEsntlId !== undefined && customerEsntlId !== depositInfo.customerEsntlId) {
-			// customerEsntlId 존재 여부 확인 (값이 있는 경우만)
-			// type이 RESERVATION이거나 변경하려는 type이 RESERVATION인 경우는 null로 저장
-			const currentType = type !== undefined ? type : depositInfo.type;
-			if (currentType === 'RESERVATION') {
-				// RESERVATION인 경우 외래키 제약조건 회피를 위해 null로 저장
-				updateData.customerEsntlId = null;
-				changes.push(`예약자/입실자: ${depositInfo.customerEsntlId || '없음'} → 없음 (예약금은 입실예정자 정보로 관리)`);
-			} else if (customerEsntlId) {
-				// DEPOSIT인 경우만 customer 존재 여부 확인
+			if (customerEsntlId) {
 				const customerInfo = await customer.findOne({
 					where: { esntlId: customerEsntlId },
 					transaction,
@@ -468,15 +398,7 @@ exports.updateDeposit = async (req, res, next) => {
 			}
 		}
 		if (contractorEsntlId !== undefined && contractorEsntlId !== depositInfo.contractorEsntlId) {
-			// contractorEsntlId 존재 여부 확인 (값이 있는 경우만)
-			// type이 RESERVATION이거나 변경하려는 type이 RESERVATION인 경우는 null로 저장
-			const currentType = type !== undefined ? type : depositInfo.type;
-			if (currentType === 'RESERVATION') {
-				// RESERVATION인 경우 외래키 제약조건 회피를 위해 null로 저장
-				updateData.contractorEsntlId = null;
-				changes.push(`계약자: ${depositInfo.contractorEsntlId || '없음'} → 없음 (예약금은 입실예정자 정보로 관리)`);
-			} else if (contractorEsntlId) {
-				// DEPOSIT인 경우만 customer 존재 여부 확인
+			if (contractorEsntlId) {
 				const contractorInfo = await customer.findOne({
 					where: { esntlId: contractorEsntlId },
 					transaction,
@@ -495,36 +417,20 @@ exports.updateDeposit = async (req, res, next) => {
 			updateData.contractEsntlId = contractEsntlId;
 			changes.push(`계약서ID: ${depositInfo.contractEsntlId || '없음'} → ${contractEsntlId || '없음'}`);
 		}
-		if (type !== undefined && type !== depositInfo.type) {
-			if (!['RESERVATION', 'DEPOSIT'].includes(type)) {
-				errorHandler.errorThrow(400, 'type은 RESERVATION 또는 DEPOSIT이어야 합니다.');
-			}
-			updateData.type = type;
-			changes.push(`타입: ${depositInfo.type || '없음'} → ${type}`);
-		}
 		if (amount !== undefined && amount !== depositInfo.amount) {
 			if (amount <= 0) {
 				errorHandler.errorThrow(400, 'amount는 0보다 큰 값이어야 합니다.');
 			}
 			updateData.amount = amount;
 			changes.push(`금액: ${depositInfo.amount || 0}원 → ${amount}원`);
-			// 하위 호환성을 위해 기존 필드도 업데이트
-			const currentType = type !== undefined ? type : depositInfo.type;
-			if (currentType === 'RESERVATION') {
-				updateData.reservationDepositAmount = amount;
-			}
-		}
-		// 하위 호환성: 기존 필드로부터 업데이트
-		if (reservationDepositAmount !== undefined && reservationDepositAmount !== depositInfo.reservationDepositAmount) {
-			updateData.reservationDepositAmount = reservationDepositAmount;
-			if (!updateData.amount && depositInfo.type === 'RESERVATION') {
-				updateData.amount = reservationDepositAmount;
-			}
-			changes.push(`예약금: ${depositInfo.reservationDepositAmount || 0}원 → ${reservationDepositAmount}원`);
 		}
 		if (depositAmount !== undefined && depositAmount !== depositInfo.amount) {
-				updateData.amount = depositAmount;
-			changes.push(`보증금: ${depositInfo.amount || depositInfo.depositAmount || 0}원 → ${depositAmount}원`);
+			updateData.amount = depositAmount;
+			changes.push(`보증금: ${depositInfo.amount || 0}원 → ${depositAmount}원`);
+		}
+		if (reservationDepositAmount !== undefined && reservationDepositAmount !== depositInfo.amount) {
+			updateData.amount = reservationDepositAmount;
+			changes.push(`예약금: ${depositInfo.amount || 0}원 → ${reservationDepositAmount}원`);
 		}
 		if (accountBank !== undefined && accountBank !== depositInfo.accountBank) {
 			updateData.accountBank = accountBank;
@@ -538,26 +444,6 @@ exports.updateDeposit = async (req, res, next) => {
 			updateData.accountHolder = accountHolder;
 			changes.push(`예금주: ${depositInfo.accountHolder || '없음'} → ${accountHolder || '없음'}`);
 		}
-		if (expectedOccupantName !== undefined && expectedOccupantName !== depositInfo.expectedOccupantName) {
-			updateData.expectedOccupantName = expectedOccupantName;
-			changes.push(`입실예정자명: ${depositInfo.expectedOccupantName || '없음'} → ${expectedOccupantName || '없음'}`);
-		}
-		if (expectedOccupantPhone !== undefined && expectedOccupantPhone !== depositInfo.expectedOccupantPhone) {
-			updateData.expectedOccupantPhone = expectedOccupantPhone;
-			changes.push(`입실예정자연락처: ${depositInfo.expectedOccupantPhone || '없음'} → ${expectedOccupantPhone || '없음'}`);
-		}
-		if (moveInDate !== undefined && moveInDate !== depositInfo.moveInDate) {
-			updateData.moveInDate = moveInDate;
-			changes.push(`입실일: ${depositInfo.moveInDate || '없음'} → ${moveInDate || '없음'}`);
-		}
-		if (moveOutDate !== undefined && moveOutDate !== depositInfo.moveOutDate) {
-			updateData.moveOutDate = moveOutDate;
-			changes.push(`퇴실일: ${depositInfo.moveOutDate || '없음'} → ${moveOutDate || '없음'}`);
-		}
-		if (contractStatus !== undefined && contractStatus !== depositInfo.contractStatus) {
-			updateData.contractStatus = contractStatus;
-			changes.push(`계약상태: ${depositInfo.contractStatus || '없음'} → ${contractStatus || '없음'}`);
-		}
 		if (virtualAccountNumber !== undefined && virtualAccountNumber !== depositInfo.virtualAccountNumber) {
 			updateData.virtualAccountNumber = virtualAccountNumber;
 			changes.push(`가상계좌번호: ${depositInfo.virtualAccountNumber || '없음'} → ${virtualAccountNumber || '없음'}`);
@@ -569,22 +455,22 @@ exports.updateDeposit = async (req, res, next) => {
 
 		// 변경사항이 있는 경우에만 업데이트 및 이력 생성
 		if (Object.keys(updateData).length > 0) {
-			await deposit.update(updateData, {
+			await ilRoomDeposit.update(updateData, {
 				where: { esntlId: esntlId },
 				transaction,
 			});
 
-			// 수정 이력 생성 (메모에 변경 내용 기록)
-			const historyId = await generateDepositHistoryId(transaction);
-			await depositHistory.create(
+			// 수정 이력 생성 (il_room_deposit_history)
+			const historyId = await generateIlRoomDepositHistoryId(transaction);
+			await ilRoomDepositHistory.create(
 				{
 					esntlId: historyId,
 					depositEsntlId: esntlId,
-					roomEsntlId: depositInfo.roomEsntlId, // 방 고유아이디 저장
+					roomEsntlId: depositInfo.roomEsntlId,
 					contractEsntlId: contractEsntlId !== undefined ? contractEsntlId : depositInfo.contractEsntlId,
-					type: 'DEPOSIT', // 수정은 DEPOSIT 타입으로 기록 (또는 별도 타입 추가 가능)
+					type: 'DEPOSIT',
 					amount: 0,
-					status: depositInfo.status, // 현재 상태 유지
+					status: depositInfo.status,
 					manager: decodedToken.admin?.name || '관리자',
 					memo: `보증금 정보 수정: ${changes.join(', ')}`,
 				},
@@ -613,7 +499,7 @@ exports.deleteDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		const depositInfo = await deposit.findOne({
+		const depositInfo = await ilRoomDeposit.findOne({
 			where: { esntlId: esntlId },
 			transaction,
 		});
@@ -622,14 +508,11 @@ exports.deleteDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
 		}
 
-		// 보증금 삭제 처리
-		const writerAdminId = getWriterAdminId(decodedToken);
-		await deposit.update(
-			{ 
-				deleteYN: 'Y', 
+		// 보증금 삭제 처리 (il_room_deposit)
+		await ilRoomDeposit.update(
+			{
+				deleteYN: 'Y',
 				status: 'DELETED',
-				deletedBy: writerAdminId,
-				deletedAt: new Date(),
 			},
 			{
 				where: { esntlId: esntlId },
@@ -637,15 +520,15 @@ exports.deleteDeposit = async (req, res, next) => {
 			}
 		);
 
-		// 삭제 이력 생성
-		const historyId = await generateDepositHistoryId(transaction);
-		await depositHistory.create(
+		// 삭제 이력 생성 (il_room_deposit_history)
+		const historyId = await generateIlRoomDepositHistoryId(transaction);
+		await ilRoomDepositHistory.create(
 			{
 				esntlId: historyId,
 				depositEsntlId: esntlId,
-				roomEsntlId: depositInfo.roomEsntlId, // 방 고유아이디 저장
-					contractEsntlId: depositInfo.contractEsntlId || null,
-				type: 'DEPOSIT', // 삭제는 DEPOSIT 타입으로 기록
+				roomEsntlId: depositInfo.roomEsntlId,
+				contractEsntlId: depositInfo.contractEsntlId || null,
+				type: 'DEPOSIT',
 				amount: 0,
 				status: 'DELETED',
 				manager: decodedToken.admin?.name || '관리자',
@@ -663,7 +546,7 @@ exports.deleteDeposit = async (req, res, next) => {
 	}
 };
 
-// 보증금 삭제 (type=DEPOSIT만)
+// 보증금 삭제 (il_room_deposit 단일 개념이므로 type 구분 없음)
 exports.deleteDepositOnly = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
@@ -675,7 +558,7 @@ exports.deleteDepositOnly = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
-		const depositInfo = await deposit.findOne({
+		const depositInfo = await ilRoomDeposit.findOne({
 			where: { esntlId: esntlId },
 			transaction,
 		});
@@ -684,19 +567,11 @@ exports.deleteDepositOnly = async (req, res, next) => {
 			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
 		}
 
-		// type이 DEPOSIT이 아닌 경우 오류
-		if (depositInfo.type !== 'DEPOSIT') {
-			errorHandler.errorThrow(400, 'type이 DEPOSIT인 보증금만 삭제할 수 있습니다.');
-		}
-
-		// 보증금 삭제 처리
-		const writerAdminId = getWriterAdminId(decodedToken);
-		await deposit.update(
-			{ 
-				deleteYN: 'Y', 
+		// 보증금 삭제 처리 (il_room_deposit)
+		await ilRoomDeposit.update(
+			{
+				deleteYN: 'Y',
 				status: 'DELETED',
-				deletedBy: writerAdminId,
-				deletedAt: new Date(),
 			},
 			{
 				where: { esntlId: esntlId },
@@ -704,15 +579,15 @@ exports.deleteDepositOnly = async (req, res, next) => {
 			}
 		);
 
-		// 삭제 이력 생성
-		const historyId = await generateDepositHistoryId(transaction);
-		await depositHistory.create(
+		// 삭제 이력 생성 (il_room_deposit_history)
+		const historyId = await generateIlRoomDepositHistoryId(transaction);
+		await ilRoomDepositHistory.create(
 			{
 				esntlId: historyId,
 				depositEsntlId: esntlId,
-				roomEsntlId: depositInfo.roomEsntlId, // 방 고유아이디 저장
-					contractEsntlId: depositInfo.contractEsntlId || null,
-				type: 'DEPOSIT', // 삭제는 DEPOSIT 타입으로 기록
+				roomEsntlId: depositInfo.roomEsntlId,
+				contractEsntlId: depositInfo.contractEsntlId || null,
+				type: 'DEPOSIT',
 				amount: 0,
 				status: 'DELETED',
 				manager: decodedToken.admin?.name || '관리자',
@@ -788,24 +663,20 @@ exports.registerDeposit = async (req, res, next) => {
 		const isContractEsntlIdProvided = false;
 
 		const paidAmountInt = parseInt(inputPaidAmount);
-		// contractEsntlId가 없으므로 항상 새로운 예약금으로 등록 (type: RESERVATION 고정)
-		const isNewDeposit = true;
-		const depositAmountValue = paidAmountInt; // depositAmountValue에 paidAmount 값 저장
-		const unpaidAmount = 0; // 예약금 등록은 미납금액 없음
-		const totalPaidAmount = 0;
-		const currentTotalPaid = 0;
+		// 예약금 = 보증금 단일 개념 (il_room_deposit, type 구분 없음)
+		const depositAmountValue = paidAmountInt;
+		const unpaidAmount = 0;
 		const newStatus = 'PENDING';
 
-		// 새로운 예약금 레코드 생성 (type: RESERVATION 고정)
 		const managerId = getWriterAdminId(decodedToken);
-		const newDepositId = await generateDepositId(transaction);
-		
-		// 예약금 등록은 depositAmountValue에만 금액 등록 (paidAmount, unpaidAmount는 모두 0)
+		const newDepositId = await generateIlRoomDepositId(transaction);
+
 		const finalAmount = depositAmountValue;
 		const finalPaidAmount = 0;
 		const finalUnpaidAmount = 0;
-		
-		const newDeposit = await deposit.create(
+
+		// il_room_deposit 메인 레코드 생성 (예약금 입력 = 보증금으로 등록)
+		await ilRoomDeposit.create(
 			{
 				esntlId: newDepositId,
 				roomEsntlId: finalRoomEsntlId,
@@ -813,7 +684,6 @@ exports.registerDeposit = async (req, res, next) => {
 				customerEsntlId: customerEsntlId,
 				contractorEsntlId: contractorEsntlId,
 				contractEsntlId: finalContractEsntlId,
-				type: 'RESERVATION', // 고정
 				amount: finalAmount,
 				paidAmount: finalPaidAmount,
 				unpaidAmount: finalUnpaidAmount,
@@ -824,6 +694,7 @@ exports.registerDeposit = async (req, res, next) => {
 				manager: managerId,
 				depositDate: depositDate,
 				depositorName: depositorName || null,
+				depositorPhone: null,
 				virtualAccountNumber: null,
 				virtualAccountExpiryDate: null,
 				deleteYN: 'N',
@@ -831,9 +702,9 @@ exports.registerDeposit = async (req, res, next) => {
 			{ transaction }
 		);
 
-		// 입금 이력 생성
-		const historyId = await generateDepositHistoryId(transaction);
-		await depositHistory.create(
+		// 입금 이력 생성 (il_room_deposit_history)
+		const historyId = await generateIlRoomDepositHistoryId(transaction);
+		await ilRoomDepositHistory.create(
 			{
 				esntlId: historyId,
 				depositEsntlId: newDepositId,
@@ -845,8 +716,8 @@ exports.registerDeposit = async (req, res, next) => {
 				depositorName: depositorName || null,
 				depositDate: depositDate,
 				manager: decodedToken.admin?.name || '관리자',
-					},
-					{ transaction }
+			},
+			{ transaction }
 		);
 
 		await transaction.commit();
@@ -902,7 +773,7 @@ exports.getDepositHistory = async (req, res, next) => {
 
 		const offset = (parseInt(page) - 1) * parseInt(limit);
 
-		const { count, rows } = await depositHistory.findAndCountAll({
+		const { count, rows } = await ilRoomDepositHistory.findAndCountAll({
 			where: whereCondition,
 			order: [['createdAt', 'DESC']],
 			limit: parseInt(limit),
@@ -967,7 +838,7 @@ exports.getDepositHistory = async (req, res, next) => {
 			return rowData;
 		});
 
-		return 		errorHandler.successThrow(res, '입금/반환 이력 조회 성공', {
+		return errorHandler.successThrow(res, '입금/반환 이력 조회 성공', {
 			total: count,
 			page: parseInt(page),
 			limit: parseInt(limit),
@@ -989,25 +860,28 @@ exports.getDepositGroupByDepositor = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
 		}
 
-		// 해당 방의 예약금 내역 조회 (입실일, 입실자 정보 포함, 최대 30개)
+		// 해당 방의 보증금 내역 조회 (il_room_deposit 실제 컬럼: rdp_*, rom_eid, gsw_eid)
 		const query = `
 			SELECT 
-				D.roomEsntlId,
-				D.gosiwonEsntlId,
-				D.status,
-				D.amount,
+				D.rom_eid as roomEsntlId,
+				D.gsw_eid as gosiwonEsntlId,
+				CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as status,
+				D.rdp_price as amount,
 				DATE(RC.startDate) as checkInDate,
-				D.depositorName as checkinName,
-				D.depositorPhone as checkinPhone,
-				D.manager,
-				DATE(DATE_ADD(D.createdAt, INTERVAL 9 HOUR)) as recordDate,
-				DATE_FORMAT(DATE_ADD(D.createdAt, INTERVAL 9 HOUR), '%H:%i') as recordTime
-			FROM deposit D
-			LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
-			WHERE D.roomEsntlId = ?
-				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
-				AND D.type = 'RESERVATION'
-			ORDER BY D.createdAt DESC
+				D.rdp_customer_name as checkinName,
+				D.rdp_customer_phone as checkinPhone,
+				NULL as manager,
+				DATE(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR)) as recordDate,
+				DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%H:%i') as recordTime
+			FROM il_room_deposit D
+			LEFT JOIN (
+				SELECT RC1.* FROM roomContract RC1
+				INNER JOIN (SELECT roomEsntlId, MAX(contractDate) as maxContractDate FROM roomContract WHERE status = 'CONTRACT' GROUP BY roomEsntlId) RC2
+				ON RC1.roomEsntlId = RC2.roomEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
+			) RC ON RC.roomEsntlId = D.rom_eid
+			WHERE D.rom_eid = ?
+				AND D.rdp_delete_dtm IS NULL
+			ORDER BY D.rdp_regist_dtm DESC
 			LIMIT 30
 		`;
 
@@ -1131,19 +1005,10 @@ exports.getRoomDepositList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
 		}
 
-		const upperType = (type || '').toString().toUpperCase();
-		const allowedTypes = ['RESERVATION', 'DEPOSIT'];
-		if (!upperType || !allowedTypes.includes(upperType)) {
-			errorHandler.errorThrow(
-				400,
-				`type은 ${allowedTypes.join(', ')} 중 하나여야 합니다.`
-			);
-		}
-
-		const rows = await deposit.findAll({
+		// il_room_deposit 기준 조회 (type 구분 없음, type 파라미터는 하위 호환용으로 무시)
+		const rows = await ilRoomDeposit.findAll({
 			where: {
 				roomEsntlId: roomEsntlId,
-				type: upperType,
 				deleteYN: { [Op.or]: [null, 'N'] },
 			},
 			attributes: [
@@ -1339,19 +1204,13 @@ exports.getGosiwonList = async (req, res, next) => {
 				g.esntlId,
 				g.name,
 					COUNT(DISTINCT CASE 
-						WHEN d.contractEsntlId IS NOT NULL 
-						AND NOT EXISTS (
-							SELECT 1 
-							FROM deposit d2 
-							WHERE d2.contractEsntlId = d.contractEsntlId 
-							AND d2.status = 'COMPLETED' 
-							AND (d2.deleteYN IS NULL OR d2.deleteYN = 'N')
-						)
-						AND (d.deleteYN IS NULL OR d.deleteYN = 'N')
-						THEN d.contractEsntlId 
+						WHEN d.rom_eid IS NOT NULL 
+						AND d.rdp_completed_dtm IS NULL
+						AND d.rdp_delete_dtm IS NULL
+						THEN d.rom_eid 
 					END) as pendingCount
 			FROM gosiwon g
-			LEFT JOIN deposit d ON g.esntlId = d.gosiwonEsntlId 
+			LEFT JOIN il_room_deposit d ON g.esntlId = d.gsw_eid 
 			WHERE g.status = 'OPERATE'
 			GROUP BY g.esntlId, g.name
 			) as gosiwonCounts
@@ -1452,48 +1311,35 @@ exports.getReservationList = async (req, res, next) => {
 			)`);
 		}
 		
-		// reservationStatus 필터: 해당 방의 가장 최근 deposit의 status가 COMPLETED가 아닌 경우만 보기
+		// reservationStatus 필터: 해당 방의 가장 최근 il_room_deposit이 미완료(rdp_completed_dtm IS NULL)인 경우만 보기
 		if (reservationStatus === 'true' || reservationStatus === true) {
 			whereConditions.push(`(
 				(
-					SELECT D4.status
-					FROM deposit D4
-					WHERE D4.roomEsntlId = R.esntlId
-						AND (D4.deleteYN IS NULL OR D4.deleteYN = 'N')
-						AND D4.type = 'RESERVATION'
-					ORDER BY D4.createdAt DESC
+					SELECT D4.rdp_completed_dtm
+					FROM il_room_deposit D4
+					WHERE D4.rom_eid = R.esntlId
+						AND D4.rdp_delete_dtm IS NULL
+					ORDER BY D4.rdp_regist_dtm DESC
 					LIMIT 1
-				) IS NOT NULL
-				AND (
-					SELECT D4.status
-					FROM deposit D4
-					WHERE D4.roomEsntlId = R.esntlId
-						AND (D4.deleteYN IS NULL OR D4.deleteYN = 'N')
-						AND D4.type = 'RESERVATION'
-					ORDER BY D4.createdAt DESC
-					LIMIT 1
-				) != 'COMPLETED'
+				) IS NULL
 			)`);
 		}
 
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
 		// 기본적으로 모든 방이 나와야 하므로 LEFT JOIN 사용
-		// 정렬 기준: roomStatus.status가 ON_SALE이고 subStatus가 END가 아닌 경우의 statusStartDate 기준 내림차순
-		// 각 방별로 해당 계약서의 마지막 deposit.status를 가져오기 위해 서브쿼리 사용
-		// roomStatus가 여러 개일 경우를 처리하기 위해 서브쿼리로 최신 roomStatus만 가져옴
+		// il_room_deposit 기준 (type 구분 없음)
 		const query = `
 			SELECT
 				(
 					SELECT CASE 
-						WHEN D3.status = 'PENDING' THEN D3.esntlId
+						WHEN D3.rdp_completed_dtm IS NULL THEN D3.rdp_eid
 						ELSE NULL
 					END
-					FROM deposit D3
-					WHERE D3.roomEsntlId = R.esntlId
-						AND (D3.deleteYN IS NULL OR D3.deleteYN = 'N')
-						AND D3.type = 'RESERVATION'
-					ORDER BY D3.createdAt DESC
+					FROM il_room_deposit D3
+					WHERE D3.rom_eid = R.esntlId
+						AND D3.rdp_delete_dtm IS NULL
+					ORDER BY D3.rdp_regist_dtm DESC
 					LIMIT 1
 				) as depositEsntlId,
 				R.esntlId as roomEsntlId,
@@ -1510,12 +1356,11 @@ exports.getReservationList = async (req, res, next) => {
 				DATE(RC.endDate) as checkOutDate,
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
 				(
-					SELECT D2.status
-					FROM deposit D2
-					WHERE D2.roomEsntlId = R.esntlId
-						AND (D2.deleteYN IS NULL OR D2.deleteYN = 'N')
-						AND D2.type = 'RESERVATION'
-					ORDER BY D2.createdAt DESC
+					SELECT CASE WHEN D2.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END
+					FROM il_room_deposit D2
+					WHERE D2.rom_eid = R.esntlId
+						AND D2.rdp_delete_dtm IS NULL
+					ORDER BY D2.rdp_regist_dtm DESC
 					LIMIT 1
 				) as depositStatus
 			FROM room R
@@ -1541,9 +1386,8 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
-			LEFT JOIN deposit D ON R.esntlId = D.roomEsntlId
-				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
-				AND D.type = 'RESERVATION'
+			LEFT JOIN il_room_deposit D ON R.esntlId = D.rom_eid
+				AND D.rdp_delete_dtm IS NULL
 			${whereClause}
 			ORDER BY 
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN 0 ELSE 1 END,
@@ -1579,9 +1423,8 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
-			LEFT JOIN deposit D ON R.esntlId = D.roomEsntlId
-				AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
-				AND D.type = 'RESERVATION'
+			LEFT JOIN il_room_deposit D ON R.esntlId = D.rom_eid
+				AND D.rdp_delete_dtm IS NULL
 			${countWhereClause}
 		`;
 
@@ -1621,27 +1464,26 @@ exports.getReservationList = async (req, res, next) => {
 			};
 		});
 
-		// 각 방의 예약금 내역 조회 (depositor-group 데이터)
+		// 각 방의 보증금 내역 조회 (il_room_deposit)
 		const depositHistoryList = await Promise.all(
 			resultList.map(async (room) => {
 				const depositQuery = `
 					SELECT 
-						D.roomEsntlId,
-						D.gosiwonEsntlId,
-						D.status,
-						D.amount,
-						DATE(RC.startDate) as checkInDate,
-						D.depositorName as checkinName,
-						D.depositorPhone as checkinPhone,
-						D.manager,
-						DATE(DATE_ADD(D.createdAt, INTERVAL 9 HOUR)) as recordDate,
-						DATE_FORMAT(DATE_ADD(D.createdAt, INTERVAL 9 HOUR), '%H:%i') as recordTime
-					FROM deposit D
-					LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
-					WHERE D.roomEsntlId = ?
-						AND (D.deleteYN IS NULL OR D.deleteYN = 'N')
-						AND D.type = 'RESERVATION'
-					ORDER BY D.createdAt DESC
+						D.rom_eid as roomEsntlId,
+						D.gsw_eid as gosiwonEsntlId,
+						CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as status,
+						D.rdp_price as amount,
+						D.rdp_check_in_date as checkInDate,
+						D.rdp_customer_name as checkinName,
+						D.rdp_customer_phone as checkinPhone,
+						NULL as manager,
+						DATE(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR)) as recordDate,
+						DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%H:%i') as recordTime
+					FROM il_room_deposit D
+					LEFT JOIN roomContract RC ON RC.roomEsntlId = D.rom_eid
+					WHERE D.rom_eid = ?
+						AND D.rdp_delete_dtm IS NULL
+					ORDER BY D.rdp_regist_dtm DESC
 					LIMIT 30
 				`;
 
@@ -1765,22 +1607,19 @@ exports.getDepositList = async (req, res, next) => {
 			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
 
-		// disableDeleted 필터: deposit.deleteYN이 N인 경우만 보기
+		// disableDeleted 필터: il_room_deposit 미삭제(rdp_delete_dtm IS NULL)만 보기
 		if (disableDeleted === 'true' || disableDeleted === true) {
-			whereConditions.push('(D.deleteYN IS NULL OR D.deleteYN = \'N\')');
+			whereConditions.push('D.rdp_delete_dtm IS NULL');
 		}
 
-		// disableCompleted 필터: deposit.status가 COMPLETED인 경우 안보이게
+		// disableCompleted 필터: il_room_deposit 미완료(rdp_completed_dtm IS NULL)만 보기
 		if (disableCompleted === 'true' || disableCompleted === true) {
-			whereConditions.push('(D.status IS NULL OR D.status != \'COMPLETED\')');
+			whereConditions.push('D.rdp_completed_dtm IS NULL');
 		}
 
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-		// 기본적으로 모든 방이 나와야 하므로 LEFT JOIN 사용
-		// 정렬: deposit.createdAt 기준 신규일자순 (DESC)
-		// roomStatus는 최신 상태만 가져옴
-		// deposit도 최신 것만 가져옴
+		// il_room_deposit 기준 (type 구분 없음)
 		const query = `
 			SELECT
 				D.esntlId as depositEsntlId,
@@ -1802,29 +1641,26 @@ exports.getDepositList = async (req, res, next) => {
 				DATE(RC.endDate) as moveOutDate,
 				RC.status as contractStatus,
 				(
-					SELECT D2.status
-					FROM deposit D2
+					SELECT D2.\`status\`
+					FROM il_room_deposit D2
 					WHERE D2.contractEsntlId = D.contractEsntlId
 						AND (D2.deleteYN IS NULL OR D2.deleteYN = 'N')
-						AND D2.type = 'DEPOSIT'
 					ORDER BY D2.createdAt DESC
 					LIMIT 1
 				) as depositStatus,
 				(
 					SELECT D4.paidAmount
-					FROM deposit D4
+					FROM il_room_deposit D4
 					WHERE D4.contractEsntlId = D.contractEsntlId
 						AND (D4.deleteYN IS NULL OR D4.deleteYN = 'N')
-						AND D4.type = 'DEPOSIT'
 					ORDER BY D4.createdAt DESC
 					LIMIT 1
 				) as depositLastestAmount,
 				(
 					SELECT DATE_FORMAT(DATE_ADD(D5.createdAt, INTERVAL 9 HOUR), '%Y-%m-%d %H:%i')
-					FROM deposit D5
+					FROM il_room_deposit D5
 					WHERE D5.contractEsntlId = D.contractEsntlId
 						AND (D5.deleteYN IS NULL OR D5.deleteYN = 'N')
-						AND D5.type = 'DEPOSIT'
 					ORDER BY D5.createdAt DESC
 					LIMIT 1
 				) as depositLastestTime,
@@ -1859,17 +1695,15 @@ exports.getDepositList = async (req, res, next) => {
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
 				SELECT D1.*
-				FROM deposit D1
+				FROM il_room_deposit D1
 				INNER JOIN (
 					SELECT roomEsntlId, MAX(createdAt) as maxCreatedAt
-					FROM deposit
+					FROM il_room_deposit
 					WHERE (deleteYN IS NULL OR deleteYN = 'N')
-						AND type = 'DEPOSIT'
 					GROUP BY roomEsntlId
 				) D2 ON D1.roomEsntlId = D2.roomEsntlId 
 					AND D1.createdAt = D2.maxCreatedAt
 					AND (D1.deleteYN IS NULL OR D1.deleteYN = 'N')
-					AND D1.type = 'DEPOSIT'
 			) D ON R.esntlId = D.roomEsntlId
 			LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
 			${whereClause}
@@ -1896,17 +1730,15 @@ exports.getDepositList = async (req, res, next) => {
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
 				SELECT D1.*
-				FROM deposit D1
+				FROM il_room_deposit D1
 				INNER JOIN (
 					SELECT roomEsntlId, MAX(createdAt) as maxCreatedAt
-					FROM deposit
+					FROM il_room_deposit
 					WHERE (deleteYN IS NULL OR deleteYN = 'N')
-						AND type = 'DEPOSIT'
 					GROUP BY roomEsntlId
 				) D2 ON D1.roomEsntlId = D2.roomEsntlId 
 					AND D1.createdAt = D2.maxCreatedAt
 					AND (D1.deleteYN IS NULL OR D1.deleteYN = 'N')
-					AND D1.type = 'DEPOSIT'
 			) D ON R.esntlId = D.roomEsntlId
 			LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
 			${countWhereClause}
