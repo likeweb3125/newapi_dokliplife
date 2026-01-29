@@ -125,7 +125,7 @@ exports.getRoomList = async (req, res, next) => {
 		const rcStatus = contractStatus || null;
 
 		// WHERE 조건 구성
-		let whereClause = 'WHERE R.gosiwonEsntlId = :goID';
+		let whereClause = 'WHERE R.gosiwonEsntlId = :goID AND R.deleteYN = \'N\'';
 		const replacements = { goID: goID };
 
 		// roomName이 있으면 추가 검색 조건
