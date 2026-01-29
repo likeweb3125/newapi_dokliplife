@@ -349,7 +349,7 @@ router.get('/list', roomContractController.getContractList);
  *                           description: 계약 종료일
  *                         contractStatus:
  *                           type: string
- *                           description: 계약 상태 (예: CONTRACT, RESERVE, VBANK, CANCEL)
+ *                           description: '계약 상태 (예: CONTRACT, RESERVE, VBANK, CANCEL)'
  *                           example: CONTRACT
  *                         isRoomMoveScheduled:
  *                           type: boolean
