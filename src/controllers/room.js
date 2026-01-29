@@ -134,12 +134,6 @@ exports.getRoomList = async (req, res, next) => {
 			replacements.roomName = `%${roomName}%`;
 		}
 
-		// contractStatus가 지정된 경우, 해당 상태의 계약이 있는 방만 조회
-		// (아래 roomContract 서브쿼리에서 상태로 필터링하고, 여기서는 존재 여부만 확인)
-		if (rcStatus !== null) {
-			whereClause += ' AND RC.esntlId IS NOT NULL';
-		}
-
 		// 정렬 기준 설정 (기본값: orderNo)
 		let orderByClause = 'ORDER BY R.orderNo ASC';
 		if (sortBy) {
@@ -184,14 +178,8 @@ exports.getRoomList = async (req, res, next) => {
 				(SELECT IFNULL(ror_sn, '') FROM il_room_reservation AS RR WHERE rom_sn = R.esntlId AND RR.ror_status_cd = 'WAIT' ORDER BY RR.ror_update_dtm DESC LIMIT 1) AS ror_sn
 			FROM room R
 			LEFT OUTER JOIN roomContract RC
-				ON RC.esntlId = (
-					SELECT RC2.esntlId
-					FROM roomContract RC2
-					WHERE RC2.roomEsntlId = R.esntlId
-					${rcStatus !== null ? 'AND RC2.status = :rcStatus' : ''}
-					ORDER BY RC2.startDate DESC, RC2.esntlId DESC
-					LIMIT 1
-				)
+				ON RC.roomEsntlId = R.esntlId
+				${rcStatus !== null ? 'AND RC.status = :rcStatus' : ''}
 			LEFT OUTER JOIN roomCategory RCAT
 				ON R.roomCategory = RCAT.esntlId
 			${whereClause}

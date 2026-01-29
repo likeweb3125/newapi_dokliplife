@@ -1568,9 +1568,7 @@ exports.selectListToAdminNew = async (req, res, next) => {
 				-- gosiwon 테이블의 주요 상태 값
 				COALESCE(G.is_controlled, 0) AS is_controlled,
 				COALESCE(G.use_settlement, 0) AS use_settlement,
-				COALESCE(G.status, '') AS status,
-				-- youtube 컬럼을 manager 라는 이름으로 노출
-				COALESCE(G.youtube, '') AS manager
+				COALESCE(G.status, '') AS status
 			FROM gosiwon G
 			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			LEFT JOIN (
