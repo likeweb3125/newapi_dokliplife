@@ -103,3 +103,58 @@ exports.sendSMS = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 발송 메시지 리스트 (messageSmsHistory) - 페이징
+exports.getMessageHistory = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const page = Math.max(parseInt(req.query.page) || 1, 1);
+		const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 500);
+		const offset = (page - 1) * limit;
+
+		const countQuery = `SELECT COUNT(*) AS total FROM messageSmsHistory`;
+		const countResult = await mariaDBSequelize.query(countQuery, {
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+		const total = Number(countResult[0]?.total ?? 0);
+
+		const listQuery = `
+			SELECT
+				DATE_FORMAT(M.createdAt, '%y-%m-%d') AS sentDate,
+				M.createdBy AS sentById,
+				M.title,
+				M.content,
+				G.name AS gosiwonName,
+				C.name AS userName
+			FROM messageSmsHistory M
+			LEFT JOIN gosiwon G ON G.esntlId = M.gosiwonEsntlId
+			LEFT JOIN customer C ON C.esntlId = M.userEsntlId
+			ORDER BY M.createdAt DESC
+			LIMIT ? OFFSET ?
+		`;
+		const rows = await mariaDBSequelize.query(listQuery, {
+			replacements: [limit, offset],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const list = (Array.isArray(rows) ? rows : []).map((row) => ({
+			sentDate: row.sentDate || '',
+			sentById: row.sentById || '',
+			title: row.title || '',
+			content: row.content || '',
+			gosiwonName: row.gosiwonName || '',
+			userName: row.userName || '',
+		}));
+
+		errorHandler.successThrow(res, '조회 성공', {
+			list,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit) || 0,
+		});
+	} catch (err) {
+		next(err);
+	}
+};

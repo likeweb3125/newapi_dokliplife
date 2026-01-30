@@ -65,4 +65,89 @@ const messageController = require('../controllers/message');
  */
 router.post('/send', messageController.sendSMS);
 
+/**
+ * @swagger
+ * /v1/message/history:
+ *   get:
+ *     summary: 발송 메시지 리스트
+ *     description: messageSmsHistory 테이블에서 발송한 메시지 이력을 페이징하여 조회합니다.
+ *     tags: [Message]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: 한 페이지에 보일 데이터 수 (1~500)
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     list:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           sentDate:
+ *                             type: string
+ *                             description: "보낸날짜 (YY-MM-DD 형식, 예: 26-01-30)"
+ *                             example: "26-01-30"
+ *                           sentById:
+ *                             type: string
+ *                             description: 보낸 ID (createdBy)
+ *                             example: ADMN0000000001
+ *                           title:
+ *                             type: string
+ *                             description: 제목
+ *                           content:
+ *                             type: string
+ *                             description: 내용
+ *                           gosiwonName:
+ *                             type: string
+ *                             description: 고시원명 (gosiwon 조인)
+ *                           userName:
+ *                             type: string
+ *                             description: 사용자명 (수신자 customer 조인)
+ *                     total:
+ *                       type: integer
+ *                       description: 전체 건수
+ *                     page:
+ *                       type: integer
+ *                       description: 현재 페이지
+ *                     limit:
+ *                       type: integer
+ *                       description: 한 페이지 데이터 수
+ *                     totalPages:
+ *                       type: integer
+ *                       description: 전체 페이지 수
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/history', messageController.getMessageHistory);
+
 module.exports = router;
