@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS `IDS` (
   `tableName` VARCHAR(100) NOT NULL COMMENT '테이블명 (예: il_room_deposit_history, paymentLog)',
   `prefix` VARCHAR(20) NOT NULL DEFAULT '' COMMENT 'ID 접두사 (예: RDP, DEPO)',
   `count` INT(11) NOT NULL DEFAULT 0 COMMENT '현재까지 사용한 번호 (next 호출 시 1 증가)',
-  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`tableName`),
   INDEX `idx_prefix` (`prefix`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci COMMENT='테이블별 ID 시퀀스';

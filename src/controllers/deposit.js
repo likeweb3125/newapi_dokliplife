@@ -1326,22 +1326,12 @@ exports.getReservationList = async (req, res, next) => {
 		}
 
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+		const countWhereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-		// 기본적으로 모든 방이 나와야 하므로 LEFT JOIN 사용
-		// il_room_deposit 기준 (type 구분 없음)
+		// 방별 il_room_deposit 최신 1건만 조인 (상관 서브쿼리 2개 제거 → 1회 조인으로 대체)
 		const query = `
 			SELECT
-				(
-					SELECT CASE 
-						WHEN D3.rdp_completed_dtm IS NULL THEN D3.rdp_eid
-						ELSE NULL
-					END
-					FROM il_room_deposit D3
-					WHERE D3.rom_eid = R.esntlId
-						AND D3.rdp_delete_dtm IS NULL
-					ORDER BY D3.rdp_regist_dtm DESC
-					LIMIT 1
-				) as depositEsntlId,
+				CASE WHEN D_latest.rdp_completed_dtm IS NULL THEN D_latest.rdp_eid ELSE NULL END as depositEsntlId,
 				R.esntlId as roomEsntlId,
 				R.roomNumber,
 				R.gosiwonEsntlId,
@@ -1355,14 +1345,7 @@ exports.getReservationList = async (req, res, next) => {
 				DATE(RC.startDate) as checkInDate,
 				DATE(RC.endDate) as checkOutDate,
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
-				(
-					SELECT CASE WHEN D2.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END
-					FROM il_room_deposit D2
-					WHERE D2.rom_eid = R.esntlId
-						AND D2.rdp_delete_dtm IS NULL
-					ORDER BY D2.rdp_regist_dtm DESC
-					LIMIT 1
-				) as depositStatus
+				CASE WHEN D_latest.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as depositStatus
 			FROM room R
 			LEFT JOIN gosiwon G ON R.gosiwonEsntlId = G.esntlId
 			LEFT JOIN (
@@ -1386,8 +1369,17 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
-			LEFT JOIN il_room_deposit D ON R.esntlId = D.rom_eid
-				AND D.rdp_delete_dtm IS NULL
+			LEFT JOIN (
+				SELECT D_inner.rom_eid, D_inner.rdp_eid, D_inner.rdp_completed_dtm
+				FROM il_room_deposit D_inner
+				INNER JOIN (
+					SELECT rom_eid, MAX(rdp_regist_dtm) as max_regist
+					FROM il_room_deposit
+					WHERE rdp_delete_dtm IS NULL
+					GROUP BY rom_eid
+				) T ON D_inner.rom_eid = T.rom_eid AND D_inner.rdp_regist_dtm = T.max_regist
+				WHERE D_inner.rdp_delete_dtm IS NULL
+			) D_latest ON R.esntlId = D_latest.rom_eid
 			${whereClause}
 			ORDER BY 
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN 0 ELSE 1 END,
@@ -1395,9 +1387,6 @@ exports.getReservationList = async (req, res, next) => {
 				R.roomNumber ASC
 			LIMIT ? OFFSET ?
 		`;
-
-		// 전체 개수 조회 (메인 쿼리와 동일한 조건으로 필터링)
-		const countWhereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
 		const countQuery = `
 			SELECT COUNT(DISTINCT R.esntlId) as total
@@ -1423,8 +1412,7 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
-			LEFT JOIN il_room_deposit D ON R.esntlId = D.rom_eid
-				AND D.rdp_delete_dtm IS NULL
+			LEFT JOIN il_room_deposit D ON R.esntlId = D.rom_eid AND D.rdp_delete_dtm IS NULL
 			${countWhereClause}
 		`;
 
@@ -1432,15 +1420,17 @@ exports.getReservationList = async (req, res, next) => {
 		const queryReplacements = [...replacements, parseInt(limit), offset];
 		const countReplacements = [...replacements];
 
-		const rows = await mariaDBSequelize.query(query, {
-			replacements: queryReplacements,
-			type: mariaDBSequelize.QueryTypes.SELECT,
-		});
-
-		const countResult = await mariaDBSequelize.query(countQuery, {
-			replacements: countReplacements,
-			type: mariaDBSequelize.QueryTypes.SELECT,
-		});
+		// count 쿼리와 메인 쿼리 병렬 실행
+		const [rows, countResult] = await Promise.all([
+			mariaDBSequelize.query(query, {
+				replacements: queryReplacements,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(countQuery, {
+				replacements: countReplacements,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+		]);
 
 		const total = countResult && countResult[0] ? parseInt(countResult[0].total) : 0;
 
@@ -1464,60 +1454,60 @@ exports.getReservationList = async (req, res, next) => {
 			};
 		});
 
-		// 각 방의 보증금 내역 조회 (il_room_deposit)
-		const depositHistoryList = await Promise.all(
-			resultList.map(async (room) => {
-				const depositQuery = `
-					SELECT 
-						D.rom_eid as roomEsntlId,
-						D.gsw_eid as gosiwonEsntlId,
-						CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as status,
-						D.rdp_price as amount,
-						D.rdp_check_in_date as checkInDate,
-						D.rdp_customer_name as checkinName,
-						D.rdp_customer_phone as checkinPhone,
-						NULL as manager,
-						DATE(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR)) as recordDate,
-						DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%H:%i') as recordTime
-					FROM il_room_deposit D
-					LEFT JOIN roomContract RC ON RC.roomEsntlId = D.rom_eid
-					WHERE D.rom_eid = ?
-						AND D.rdp_delete_dtm IS NULL
-					ORDER BY D.rdp_regist_dtm DESC
-					LIMIT 30
-				`;
-
-				const depositRows = await mariaDBSequelize.query(depositQuery, {
-					replacements: [room.roomEsntlId],
+		// 각 방의 보증금 내역 1회 배치 조회 (N+1 제거: 방 수만큼 쿼리 → 1회 IN 조회 후 그룹핑)
+		const roomEsntlIds = resultList.map((r) => r.roomEsntlId).filter(Boolean);
+		let depositByRoom = {};
+		if (roomEsntlIds.length > 0) {
+			const depositRows = await mariaDBSequelize.query(
+				`
+				SELECT 
+					D.rom_eid as roomEsntlId,
+					D.gsw_eid as gosiwonEsntlId,
+					CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as status,
+					D.rdp_price as amount,
+					D.rdp_check_in_date as checkInDate,
+					D.rdp_customer_name as checkinName,
+					D.rdp_customer_phone as checkinPhone,
+					DATE(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR)) as recordDate,
+					DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%H:%i') as recordTime
+				FROM il_room_deposit D
+				WHERE D.rom_eid IN (${roomEsntlIds.map(() => '?').join(',')})
+					AND D.rdp_delete_dtm IS NULL
+				ORDER BY D.rom_eid, D.rdp_regist_dtm DESC
+				`,
+				{
+					replacements: roomEsntlIds,
 					type: mariaDBSequelize.QueryTypes.SELECT,
-				});
-
-				return depositRows.map((depositRow) => {
-					return {
-						roomEsntlId: depositRow.roomEsntlId,
-						gosiwonEsntlId: depositRow.gosiwonEsntlId,
+				}
+			);
+			// 방별 최대 30건만 유지
+			const DEPOSIT_HISTORY_PER_ROOM = 30;
+			for (const row of depositRows || []) {
+				const id = row.roomEsntlId;
+				if (!depositByRoom[id]) depositByRoom[id] = [];
+				if (depositByRoom[id].length < DEPOSIT_HISTORY_PER_ROOM) {
+					depositByRoom[id].push({
+						roomEsntlId: row.roomEsntlId,
+						gosiwonEsntlId: row.gosiwonEsntlId,
 						content: {
-							status: depositRow.status,
-							amount: depositRow.amount,
-							checkInDate: depositRow.checkInDate || null,
-							checkinName: depositRow.checkinName || null,
-							checkinPhone: depositRow.checkinPhone || null,
+							status: row.status,
+							amount: row.amount,
+							checkInDate: row.checkInDate || null,
+							checkinName: row.checkinName || null,
+							checkinPhone: row.checkinPhone || null,
 						},
-						manager: depositRow.manager || null,
-						recordDate: depositRow.recordDate || null,
-						recordTime: depositRow.recordTime || null,
-					};
-				});
-			})
-		);
+						manager: null,
+						recordDate: row.recordDate || null,
+						recordTime: row.recordTime || null,
+					});
+				}
+			}
+		}
 
-		// 각 방에 예약금 내역 추가
-		const resultListWithHistory = resultList.map((room, index) => {
-			return {
-				...room,
-				depositHistory: depositHistoryList[index] || [],
-			};
-		});
+		const resultListWithHistory = resultList.map((room) => ({
+			...room,
+			depositHistory: depositByRoom[room.roomEsntlId] || [],
+		}));
 
 		return errorHandler.successThrow(res, '예약금 예약 목록 조회 성공', {
 			total: total,
@@ -1619,10 +1609,10 @@ exports.getDepositList = async (req, res, next) => {
 
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-		// il_room_deposit 기준 (type 구분 없음)
+		// il_room_deposit 실제 컬럼: rdp_eid, rom_eid, rdp_price, rdp_regist_dtm, rdp_completed_dtm, rdp_delete_dtm (contractEsntlId 없음 → 방 기준 RC 조인)
 		const query = `
 			SELECT
-				D.esntlId as depositEsntlId,
+				D.rdp_eid as depositEsntlId,
 				R.esntlId as roomEsntlId,
 				R.roomNumber,
 				R.gosiwonEsntlId,
@@ -1635,40 +1625,19 @@ exports.getDepositList = async (req, res, next) => {
 				RC.checkinPhone,
 				RC.customerName as contractorName,
 				RC.customerPhone as contractorPhone,
-				D.amount as depositAmount,
+				D.rdp_price as depositAmount,
 				RC.esntlId as contractEsntlId,
 				DATE(RC.startDate) as moveInDate,
 				DATE(RC.endDate) as moveOutDate,
 				RC.status as contractStatus,
-				(
-					SELECT D2.\`status\`
-					FROM il_room_deposit D2
-					WHERE D2.contractEsntlId = D.contractEsntlId
-						AND (D2.deleteYN IS NULL OR D2.deleteYN = 'N')
-					ORDER BY D2.createdAt DESC
-					LIMIT 1
-				) as depositStatus,
-				(
-					SELECT D4.paidAmount
-					FROM il_room_deposit D4
-					WHERE D4.contractEsntlId = D.contractEsntlId
-						AND (D4.deleteYN IS NULL OR D4.deleteYN = 'N')
-					ORDER BY D4.createdAt DESC
-					LIMIT 1
-				) as depositLastestAmount,
-				(
-					SELECT DATE_FORMAT(DATE_ADD(D5.createdAt, INTERVAL 9 HOUR), '%Y-%m-%d %H:%i')
-					FROM il_room_deposit D5
-					WHERE D5.contractEsntlId = D.contractEsntlId
-						AND (D5.deleteYN IS NULL OR D5.deleteYN = 'N')
-					ORDER BY D5.createdAt DESC
-					LIMIT 1
-				) as depositLastestTime,
-				D.createdAt as depositCreatedAt,
+				CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as depositStatus,
+				D.rdp_price as depositLastestAmount,
+				DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%Y-%m-%d %H:%i') as depositLastestTime,
+				D.rdp_regist_dtm as depositCreatedAt,
 				(
 					SELECT DR.status
 					FROM depositRefund DR
-					WHERE DR.contractEsntlId = D.contractEsntlId
+					WHERE DR.contractEsntlId = RC.esntlId
 						AND (DR.deleteYN IS NULL OR DR.deleteYN = 'N')
 					ORDER BY DR.createdAt DESC
 					LIMIT 1
@@ -1676,7 +1645,7 @@ exports.getDepositList = async (req, res, next) => {
 				(
 					SELECT DATE_FORMAT(DATE_ADD(DR.createdAt, INTERVAL 9 HOUR), '%Y-%m-%d %H:%i')
 					FROM depositRefund DR
-					WHERE DR.contractEsntlId = D.contractEsntlId
+					WHERE DR.contractEsntlId = RC.esntlId
 						AND (DR.deleteYN IS NULL OR DR.deleteYN = 'N')
 					ORDER BY DR.createdAt DESC
 					LIMIT 1
@@ -1694,21 +1663,29 @@ exports.getDepositList = async (req, res, next) => {
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
-				SELECT D1.*
+				SELECT D1.rdp_eid, D1.rom_eid, D1.rdp_price, D1.rdp_regist_dtm, D1.rdp_completed_dtm, D1.rdp_delete_dtm
 				FROM il_room_deposit D1
 				INNER JOIN (
-					SELECT roomEsntlId, MAX(createdAt) as maxCreatedAt
+					SELECT rom_eid, MAX(rdp_regist_dtm) as max_regist
 					FROM il_room_deposit
-					WHERE (deleteYN IS NULL OR deleteYN = 'N')
+					WHERE rdp_delete_dtm IS NULL
+					GROUP BY rom_eid
+				) D2 ON D1.rom_eid = D2.rom_eid AND D1.rdp_regist_dtm = D2.max_regist
+				WHERE D1.rdp_delete_dtm IS NULL
+			) D ON R.esntlId = D.rom_eid
+			LEFT JOIN (
+				SELECT RC1.*
+				FROM roomContract RC1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(contractDate) as maxContractDate
+					FROM roomContract
+					WHERE status = 'CONTRACT'
 					GROUP BY roomEsntlId
-				) D2 ON D1.roomEsntlId = D2.roomEsntlId 
-					AND D1.createdAt = D2.maxCreatedAt
-					AND (D1.deleteYN IS NULL OR D1.deleteYN = 'N')
-			) D ON R.esntlId = D.roomEsntlId
-			LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
+				) RC2 ON RC1.roomEsntlId = RC2.roomEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
+			) RC ON R.esntlId = RC.roomEsntlId
 			${whereClause}
 			ORDER BY 
-				COALESCE(D.createdAt, '1970-01-01') DESC,
+				COALESCE(D.rdp_regist_dtm, '1970-01-01') DESC,
 				R.roomNumber ASC
 			LIMIT ? OFFSET ?
 		`;
@@ -1729,18 +1706,26 @@ exports.getDepositList = async (req, res, next) => {
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
-				SELECT D1.*
+				SELECT D1.rom_eid, D1.rdp_delete_dtm, D1.rdp_completed_dtm
 				FROM il_room_deposit D1
 				INNER JOIN (
-					SELECT roomEsntlId, MAX(createdAt) as maxCreatedAt
+					SELECT rom_eid, MAX(rdp_regist_dtm) as max_regist
 					FROM il_room_deposit
-					WHERE (deleteYN IS NULL OR deleteYN = 'N')
+					WHERE rdp_delete_dtm IS NULL
+					GROUP BY rom_eid
+				) D2 ON D1.rom_eid = D2.rom_eid AND D1.rdp_regist_dtm = D2.max_regist
+				WHERE D1.rdp_delete_dtm IS NULL
+			) D ON R.esntlId = D.rom_eid
+			LEFT JOIN (
+				SELECT RC1.*
+				FROM roomContract RC1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(contractDate) as maxContractDate
+					FROM roomContract
+					WHERE status = 'CONTRACT'
 					GROUP BY roomEsntlId
-				) D2 ON D1.roomEsntlId = D2.roomEsntlId 
-					AND D1.createdAt = D2.maxCreatedAt
-					AND (D1.deleteYN IS NULL OR D1.deleteYN = 'N')
-			) D ON R.esntlId = D.roomEsntlId
-			LEFT JOIN roomContract RC ON D.contractEsntlId = RC.esntlId
+				) RC2 ON RC1.roomEsntlId = RC2.roomEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
+			) RC ON R.esntlId = RC.roomEsntlId
 			${countWhereClause}
 		`;
 
