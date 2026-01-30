@@ -2,6 +2,7 @@ const axios = require('axios');
 const { mariaDBSequelize } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 // 공통 토큰 검증 함수 (관리자/파트너)
 const verifyAdminToken = (req) => {
@@ -48,25 +49,46 @@ exports.sendSMS = async (req, res, next) => {
 
 		const result = await aligoSMS.send({ receiver, message, title });
 
-		// 발송 이력 저장
+		// 발송 이력 저장 (esntlId: IDS 테이블 테이블명으로 조회, userEsntlId: 전화번호로 customer 중 최신 활성 사용자)
 		const firstReceiver = receiver.split(',')[0]?.trim() || receiver;
+		const historyEsntlId = await idsNext('messageSmsHistory');
+
+		// 전화번호로 customer 테이블에서 최신 활성 사용자(roomContract.status = 'USED') esntlId 조회
+		const userEsntlIdQuery = `
+			SELECT C.esntlId
+			FROM customer C
+			INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.status = 'USED'
+			WHERE C.phone = :receiverPhone
+			ORDER BY RC.contractDate DESC
+			LIMIT 1
+		`;
+		const userRows = await mariaDBSequelize.query(userEsntlIdQuery, {
+			replacements: { receiverPhone: firstReceiver },
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0
+			? userRows[0].esntlId
+			: (userEsntlId || null);
+
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO messageSmsHistory (
+				esntlId,
 				title,
 				content,
 				gosiwonEsntlId,
 				userEsntlId,
 				receiverPhone,
 				createdBy
-			) VALUES (?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
 		`,
 			{
 				replacements: [
+					historyEsntlId,
 					title || '문자 발송',
 					message,
 					gosiwonEsntlId || null,
-					userEsntlId || null,
+					resolvedUserEsntlId,
 					firstReceiver,
 					writerAdminId || null,
 				],
