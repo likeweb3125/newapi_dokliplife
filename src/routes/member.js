@@ -285,4 +285,85 @@ router.post('/customer/login', memberController.postCustomerLogin); //회원 로
  */
 router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (customer 테이블)
 
+/**
+ * @swagger
+ * /v1/admin/member/search:
+ *   get:
+ *     summary: memberSearch
+ *     description: 고시원코드, 이름/연락처 텍스트, 성별(선택)으로 customer 테이블을 검색합니다. 해당 고시원에 계약 이력이 있는 회원만 대상이며, 현재 계약이 활성 상태(roomContract.status = 'USED')인 경우 사용기간(startDate, endDate)도 함께 반환합니다.
+ *     tags: [Member]
+ *     parameters:
+ *       - in: query
+ *         name: gosiwonEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원코드
+ *       - in: query
+ *         name: searchText
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 이름 또는 연락처 검색 텍스트 (부분 일치)
+ *       - in: query
+ *         name: gender
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "성별 (없으면 전부, 예: M / F / 남 / 여)"
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     list:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 회원 고유 아이디
+ *                           name:
+ *                             type: string
+ *                             description: 이름
+ *                           phone:
+ *                             type: string
+ *                             description: 연락처
+ *                           gender:
+ *                             type: string
+ *                             description: 성별
+ *                           startDate:
+ *                             type: string
+ *                             description: 사용기간 시작일 (활성 계약이 있을 때만 포함)
+ *                           endDate:
+ *                             type: string
+ *                             description: 사용기간 종료일 (활성 계약이 있을 때만 포함)
+ *       400:
+ *         description: 고시원코드 누락
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ *       500:
+ *         description: 서버 내부 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardError'
+ */
+router.get('/search', memberController.getMemberSearch); // 회원 검색 (memberSearch)
+
 module.exports = router;

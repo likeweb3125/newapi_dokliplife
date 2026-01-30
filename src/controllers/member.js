@@ -457,3 +457,71 @@ exports.postCustomerLogin = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 회원 검색 (memberSearch) - 고시원코드, 이름/연락처 텍스트, 성별(선택)으로 customer 검색
+exports.getMemberSearch = async (req, res, next) => {
+	try {
+		const { gosiwonEsntlId, searchText, gender } = req.query;
+
+		if (!gosiwonEsntlId) {
+			errorHandler.errorThrow(400, '고시원코드(gosiwonEsntlId)를 입력해주세요.');
+		}
+
+		const searchPattern = searchText ? `%${searchText.trim()}%` : '%';
+		const hasGender = gender !== undefined && gender !== null && String(gender).trim() !== '';
+
+		const query = `
+			SELECT DISTINCT
+				C.esntlId,
+				C.name,
+				C.phone,
+				C.gender,
+				RC_ACTIVE.startDate,
+				RC_ACTIVE.endDate
+			FROM customer C
+			INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.gosiwonEsntlId = :gosiwonEsntlId
+			LEFT JOIN (
+				SELECT customerEsntlId, gosiwonEsntlId, startDate, endDate,
+					ROW_NUMBER() OVER (PARTITION BY customerEsntlId ORDER BY contractDate DESC) AS rn
+				FROM roomContract
+				WHERE gosiwonEsntlId = :gosiwonEsntlId2 AND status = 'USED'
+			) RC_ACTIVE ON RC_ACTIVE.customerEsntlId = C.esntlId AND RC_ACTIVE.gosiwonEsntlId = :gosiwonEsntlId3 AND RC_ACTIVE.rn = 1
+			WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
+			${hasGender ? 'AND C.gender = :gender' : ''}
+			ORDER BY (RC_ACTIVE.startDate IS NOT NULL) DESC, C.name
+		`;
+
+		const replacements = {
+			gosiwonEsntlId,
+			gosiwonEsntlId2: gosiwonEsntlId,
+			gosiwonEsntlId3: gosiwonEsntlId,
+			searchPattern,
+		};
+		if (hasGender) {
+			replacements.gender = normalizeGender(gender) || String(gender).trim();
+		}
+
+		const rows = await db.mariaDBSequelize.query(query, {
+			replacements,
+			type: db.mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const list = (Array.isArray(rows) ? rows : []).map((row) => {
+			const item = {
+				esntlId: row.esntlId,
+				name: row.name,
+				phone: row.phone,
+				gender: row.gender,
+			};
+			if (row.startDate != null && row.endDate != null) {
+				item.startDate = row.startDate;
+				item.endDate = row.endDate;
+			}
+			return item;
+		});
+
+		errorHandler.successThrow(res, '조회 성공', { list });
+	} catch (err) {
+		next(err);
+	}
+};
