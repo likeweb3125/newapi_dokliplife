@@ -1626,7 +1626,7 @@ exports.selectListToAdminNew = async (req, res, next) => {
 				GROUP BY gsw_eid
 			) DP ON G.esntlId = DP.gsw_eid
 			WHERE ${whereClause}
-			ORDER BY G.acceptDate ${orderDirection}, COALESCE(PL.pTime, '') ${orderDirection}
+			ORDER BY COALESCE(G.is_favorite, 0) DESC, (CASE WHEN COALESCE(G.status, '') = 'OPERATE' THEN 0 ELSE 1 END) ASC, G.name ASC
 			LIMIT ? OFFSET ?
 		`;
 

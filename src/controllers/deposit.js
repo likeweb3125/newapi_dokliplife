@@ -277,6 +277,41 @@ exports.createDeposit = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'amount는 0보다 큰 값이어야 합니다.');
 		}
 
+		// il_room_deposit에 저장할 이름/전화번호 (rdp_customer_name, rdp_customer_phone)
+		const customerNameForDeposit = (depositorName || expectedOccupantName || '').trim() || null;
+		const customerPhoneForDeposit = (depositorPhone || expectedOccupantPhone || '').trim() || null;
+
+		// 같은 고시원·방·이름·전화번호로 이미 미삭제 레코드가 있으면 금액(rdp_price)만 업데이트
+		const existingDeposit = await ilRoomDeposit.findOne({
+			where: {
+				gosiwonEsntlId,
+				roomEsntlId,
+				customerName: customerNameForDeposit,
+				customerPhone: customerPhoneForDeposit,
+				deleteDtm: null,
+			},
+			transaction,
+		});
+
+		if (existingDeposit) {
+			await ilRoomDeposit.update(
+				{
+					amount: finalAmount,
+					updateDtm: new Date(),
+					updaterId: registrantId,
+				},
+				{
+					where: { esntlId: existingDeposit.esntlId },
+					transaction,
+				}
+			);
+			await transaction.commit();
+			return errorHandler.successThrow(res, '보증금 등록 성공', {
+				esntlId: existingDeposit.esntlId,
+				updated: true,
+			});
+		}
+
 		// 방 존재 여부 확인
 		const roomInfo = await room.findOne({
 			where: { esntlId: roomEsntlId },
@@ -333,6 +368,8 @@ exports.createDeposit = async (req, res, next) => {
 				esntlId,
 				roomEsntlId,
 				gosiwonEsntlId,
+				customerName: customerNameForDeposit,
+				customerPhone: customerPhoneForDeposit,
 				customerEsntlId: finalCustomerEsntlId,
 				contractorEsntlId: finalContractorEsntlId,
 				contractEsntlId: contractEsntlId || null,
