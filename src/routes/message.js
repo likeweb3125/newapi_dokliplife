@@ -38,10 +38,6 @@ const messageController = require('../controllers/message');
  *                 type: string
  *                 description: 고시원 ID (이력 저장용)
  *                 example: GOSI0000000001
- *               userEsntlId:
- *                 type: string
- *                 description: 수신자 사용자 ID (이력 저장용)
- *                 example: CUS0000000001
  *     responses:
  *       200:
  *         description: 문자 발송 성공

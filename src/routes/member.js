@@ -345,6 +345,9 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                           gender:
  *                             type: string
  *                             description: 성별
+ *                           age:
+ *                             type: string
+ *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
  *                           startDate:
  *                             type: string
  *                             description: 사용기간 시작일 (활성 계약이 있을 때만 포함)
