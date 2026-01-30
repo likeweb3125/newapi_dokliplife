@@ -1308,7 +1308,7 @@ exports.getGosiwonList = async (req, res, next) => {
 	}
 };
 
-// 예약금 예약 목록 조회
+// 예약금 예약 목록 조회 (속도 개선: gosiwonName 서브쿼리 1회화, reservationStatus 상관 서브쿼리 제거 → D_latest 활용)
 exports.getReservationList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
@@ -1329,29 +1329,12 @@ exports.getReservationList = async (req, res, next) => {
 		const whereConditions = [];
 		const replacements = [];
 
-		// gosiwonName 필터 처리 (값이 있으면 WHERE 절에 추가)
+		// gosiwonName 필터: 서브쿼리로 한 번에 처리 (별도 findAll 제거 → 왕복 1회 감소)
 		if (gosiwonName) {
 			const gosiwonNameValue = String(gosiwonName).trim();
 			if (gosiwonNameValue) {
-				const gosiwonList = await gosiwon.findAll({
-					where: {
-						name: { [Op.like]: `%${gosiwonNameValue}%` },
-					},
-					attributes: ['esntlId'],
-				});
-				const gosiwonIds = gosiwonList.map((g) => g.esntlId);
-				if (gosiwonIds.length > 0) {
-					whereConditions.push('R.gosiwonEsntlId IN (' + gosiwonIds.map(() => '?').join(',') + ')');
-					replacements.push(...gosiwonIds);
-				} else {
-					// 검색 결과가 없으면 빈 결과 반환
-					return errorHandler.successThrow(res, '예약금 예약 목록 조회 성공', {
-						total: 0,
-						page: parseInt(page),
-						limit: parseInt(limit),
-						data: [],
-					});
-				}
+				whereConditions.push('R.gosiwonEsntlId IN (SELECT esntlId FROM gosiwon WHERE name LIKE ?)');
+				replacements.push(`%${gosiwonNameValue}%`);
 			}
 		}
 
@@ -1383,18 +1366,10 @@ exports.getReservationList = async (req, res, next) => {
 			)`);
 		}
 		
-		// reservationStatus 필터: 해당 방의 가장 최근 il_room_deposit이 미완료(rdp_completed_dtm IS NULL)인 경우만 보기
-		if (reservationStatus === 'true' || reservationStatus === true) {
-			whereConditions.push(`(
-				(
-					SELECT D4.rdp_completed_dtm
-					FROM il_room_deposit D4
-					WHERE D4.rom_eid = R.esntlId
-						AND D4.rdp_delete_dtm IS NULL
-					ORDER BY D4.rdp_regist_dtm DESC
-					LIMIT 1
-				) IS NULL
-			)`);
+		// reservationStatus 필터: D_latest(이미 조인된 방별 최신 예약금) 사용으로 상관 서브쿼리 제거
+		const useReservationStatusFilter = reservationStatus === 'true' || reservationStatus === true;
+		if (useReservationStatusFilter) {
+			whereConditions.push('D_latest.rdp_completed_dtm IS NULL');
 		}
 
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
@@ -1484,7 +1459,17 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
-			LEFT JOIN il_room_deposit D ON R.esntlId = D.rom_eid AND D.rdp_delete_dtm IS NULL
+			LEFT JOIN (
+				SELECT D_inner.rom_eid, D_inner.rdp_eid, D_inner.rdp_completed_dtm
+				FROM il_room_deposit D_inner
+				INNER JOIN (
+					SELECT rom_eid, MAX(rdp_regist_dtm) as max_regist
+					FROM il_room_deposit
+					WHERE rdp_delete_dtm IS NULL
+					GROUP BY rom_eid
+				) T ON D_inner.rom_eid = T.rom_eid AND D_inner.rdp_regist_dtm = T.max_regist
+				WHERE D_inner.rdp_delete_dtm IS NULL
+			) D_latest ON R.esntlId = D_latest.rom_eid
 			${countWhereClause}
 		`;
 
