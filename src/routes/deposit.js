@@ -1227,8 +1227,8 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  * @swagger
  * /v1/deposit/getRoomDepositList:
  *   get:
- *     summary: 방 보증금/예약금 이력 조회
- *     description: 'roomEsntlId와 type(RESERVATION, DEPOSIT)으로 deposit 테이블 이력을 조회합니다.'
+ *     summary: 방 기준 보증금·예약금 이력 조회
+ *     description: 'il_room_deposit_history 테이블에서 roomEsntlId(방 고유 아이디) 기준으로 이력을 조회합니다.'
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -1242,12 +1242,12 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *         example: ROOM0000000001
  *       - in: query
  *         name: type
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
- *           enum: [RESERVATION, DEPOSIT]
- *         description: '조회 타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *         example: RESERVATION
+ *           enum: [DEPOSIT, RETURN]
+ *         description: '조회 타입 (DEPOSIT: 보증금 입금, RETURN: 환불)'
+ *         example: DEPOSIT
  *     responses:
  *       200:
  *         description: 방 보증금/예약금 이력 조회 성공
@@ -1267,20 +1267,31 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *                   items:
  *                     type: object
  *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 이력 고유아이디
+ *                       depositEsntlId:
+ *                         type: string
+ *                         description: 보증금 고유아이디
+ *                       contractEsntlId:
+ *                         type: string
+ *                         description: 계약서 고유아이디
+ *                       type:
+ *                         type: string
+ *                         description: DEPOSIT(입금), RETURN(반환)
  *                       status:
  *                         type: string
- *                         description: 상태
- *                         example: PENDING
+ *                         description: 상태 (PENDING, COMPLETED 등)
  *                       date:
  *                         type: string
  *                         format: date-time
- *                         description: 날짜 (depositDate)
+ *                         description: 입금일시(depositDate) 또는 생성일
  *                       amount:
  *                         type: integer
  *                         description: 금액
  *                       paidAmount:
  *                         type: integer
- *                         description: 입금액
+ *                         description: 입금 완료액
  *                       unpaidAmount:
  *                         type: integer
  *                         description: 미납액

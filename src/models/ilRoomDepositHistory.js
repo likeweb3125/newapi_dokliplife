@@ -44,7 +44,14 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.STRING(50),
 				allowNull: false,
 				field: 'status',
-				comment: '상태',
+				comment: 'PENDING: 입금대기, PARTIAL: 부분입금, COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DELETED: 삭제됨',
+			},
+			unpaidAmount: {
+				type: DataTypes.INTEGER(11),
+				allowNull: true,
+				defaultValue: 0,
+				field: 'unpaidAmount',
+				comment: '미납액 (계약 보증금 - 그동안 입금 합계, DEPOSIT 입력 시)',
 			},
 			depositorName: {
 				type: DataTypes.STRING(100),

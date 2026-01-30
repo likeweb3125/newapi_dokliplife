@@ -44,11 +44,53 @@ const DEPOSITDEDUCTION_PADDING = 10;
 const DEPOSITREFUND_PREFIX = 'DERF';
 const DEPOSITREFUND_PADDING = 10;
 
-// ID 생성: IDS 테이블 사용 (il_room_deposit prefix RDP, il_room_deposit_history prefix RDP)
+// ID 생성: IDS 테이블 사용 (il_room_deposit prefix RDP, il_room_deposit_history prefix RDPH)
 const generateIlRoomDepositId = (transaction) =>
 	idsNext('il_room_deposit', 'RDP', transaction);
 const generateIlRoomDepositHistoryId = (transaction) =>
-	idsNext('il_room_deposit_history', 'RDP', transaction);
+	idsNext('il_room_deposit_history', 'RDPH', transaction);
+
+/**
+ * 계약서(방) 보증금 대비 납입 합계로 입금 상태 판단
+ * - PENDING: 입금대기, PARTIAL: 부분입금, COMPLETED: 입금완료, RETURN_COMPLETED: 반환완료, DELETED: 삭제됨
+ * @param {string} roomEsntlId - 방 고유아이디
+ * @param {string|null} contractEsntlId - 계약서 고유아이디 (있으면 계약서 기준 합산)
+ * @param {number} newAmount - 이번에 등록할 금액
+ * @param {object} [transaction] - Sequelize 트랜잭션
+ * @returns {Promise<{ depositStatus: 'PARTIAL'|'COMPLETED', contractDepositAmount: number, totalPaidAfter: number, unpaidAmount: number }>}
+ */
+const resolveDepositHistoryStatus = async (roomEsntlId, contractEsntlId, newAmount, transaction) => {
+	const roomInfo = await room.findOne({
+		where: { esntlId: roomEsntlId },
+		attributes: ['deposit'],
+		transaction,
+	});
+	const contractDepositAmount = Number(roomInfo?.deposit) || 0;
+
+	const whereHistory = {
+		type: 'DEPOSIT',
+		status: { [Op.in]: ['COMPLETED', 'PARTIAL'] },
+	};
+	if (contractEsntlId) {
+		whereHistory.contractEsntlId = contractEsntlId;
+	} else {
+		whereHistory.roomEsntlId = roomEsntlId;
+	}
+
+	const existingSum =
+		(await ilRoomDepositHistory.sum('amount', { where: whereHistory, transaction })) || 0;
+	const totalPaidAfter = existingSum + Number(newAmount) || 0;
+
+	const depositStatus =
+		contractDepositAmount <= 0 || totalPaidAfter >= contractDepositAmount
+			? 'COMPLETED'
+			: 'PARTIAL';
+
+	// 미납액 = 계약 보증금 - 그동안 입금 합계(이번 포함), 0 미만이면 0
+	const unpaidAmount = Math.max(0, contractDepositAmount - totalPaidAfter);
+
+	return { depositStatus, contractDepositAmount, totalPaidAfter, unpaidAmount };
+};
 
 const generateDepositDeductionId = async (transaction) => {
 	const latest = await depositDeduction.findOne({
@@ -160,14 +202,12 @@ exports.getDepositInfo = async (req, res, next) => {
 		const depositData = depositInfo.toJSON();
 		depositData.histories = histories;
 
-		// 총 입금액 계산 (il_room_deposit_history)
+		// 총 입금액 계산 (il_room_deposit_history) - 입금완료/부분입금만 합산
 		const totalDepositAmount = await ilRoomDepositHistory.sum('amount', {
 			where: {
 				depositEsntlId: esntlId,
 				type: 'DEPOSIT',
-				status: {
-					[Op.in]: ['DEPOSIT_COMPLETED', 'PARTIAL_DEPOSIT'],
-				},
+				status: { [Op.in]: ['COMPLETED', 'PARTIAL'] },
 			},
 		});
 
@@ -187,7 +227,8 @@ exports.getDepositInfo = async (req, res, next) => {
 exports.createDeposit = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const registrantId = decodedToken.admin || decodedToken.partner;
 
 		const {
 			roomEsntlId,
@@ -284,6 +325,9 @@ exports.createDeposit = async (req, res, next) => {
 
 		const esntlId = await generateIlRoomDepositId(transaction);
 
+		// 돈이 들어온 뒤 확정 입력이므로 COMPLETED로 등록 (completedDtm 설정)
+		const completedDtm = depositDate ? new Date(depositDate) : new Date();
+
 		const newDeposit = await ilRoomDeposit.create(
 			{
 				esntlId,
@@ -305,11 +349,22 @@ exports.createDeposit = async (req, res, next) => {
 				virtualAccountNumber: virtualAccountNumber || null,
 				virtualAccountExpiryDate: virtualAccountExpiryDate || null,
 				deleteYN: 'N',
+				registrantId,
+				updaterId: registrantId,
+				completedDtm,
 			},
 			{ transaction }
 		);
 
-		// 입금대기 이력 생성 (il_room_deposit_history)
+		// 계약서 보증금 대비 납입 합계로 PARTIAL/COMPLETED 및 미납액 결정
+		const { depositStatus, unpaidAmount } = await resolveDepositHistoryStatus(
+			roomEsntlId,
+			contractEsntlId || null,
+			finalAmount,
+			transaction
+		);
+
+		// 입금 확정 이력 생성 (il_room_deposit_history) - RDPH prefix, unpaidAmount = 계약 보증금 - 입금 합계
 		const historyId = await generateIlRoomDepositHistoryId(transaction);
 		await ilRoomDepositHistory.create(
 			{
@@ -318,8 +373,9 @@ exports.createDeposit = async (req, res, next) => {
 				roomEsntlId: roomEsntlId,
 				contractEsntlId: contractEsntlId || null,
 				type: 'DEPOSIT',
-				amount: 0,
-				status: 'PENDING',
+				amount: finalAmount,
+				status: depositStatus,
+				unpaidAmount,
 				depositorName: depositorName || null,
 				depositDate: depositDate || null,
 				manager: '시스템',
@@ -660,20 +716,22 @@ exports.registerDeposit = async (req, res, next) => {
 		const finalRoomEsntlId = roomEsntlId;
 		const customerEsntlId = null;
 		const contractorEsntlId = null;
-		const isContractEsntlIdProvided = false;
 
-		const paidAmountInt = parseInt(inputPaidAmount);
-		// 예약금 = 보증금 단일 개념 (il_room_deposit, type 구분 없음)
+		const paidAmountInt = parseInt(inputPaidAmount, 10) || 0;
 		const depositAmountValue = paidAmountInt;
-		const unpaidAmount = 0;
-		const newStatus = 'PENDING';
+
+		// 계약서(방) 보증금 대비 납입 합계로 PARTIAL/COMPLETED 및 미납액 결정
+		const { depositStatus, unpaidAmount } = await resolveDepositHistoryStatus(
+			finalRoomEsntlId,
+			finalContractEsntlId,
+			paidAmountInt,
+			transaction
+		);
 
 		const managerId = getWriterAdminId(decodedToken);
 		const newDepositId = await generateIlRoomDepositId(transaction);
 
 		const finalAmount = depositAmountValue;
-		const finalPaidAmount = 0;
-		const finalUnpaidAmount = 0;
 
 		// il_room_deposit 메인 레코드 생성 (예약금 입력 = 보증금으로 등록)
 		await ilRoomDeposit.create(
@@ -685,12 +743,12 @@ exports.registerDeposit = async (req, res, next) => {
 				contractorEsntlId: contractorEsntlId,
 				contractEsntlId: finalContractEsntlId,
 				amount: finalAmount,
-				paidAmount: finalPaidAmount,
-				unpaidAmount: finalUnpaidAmount,
+				paidAmount: 0,
+				unpaidAmount: 0,
 				accountBank: null,
 				accountNumber: null,
 				accountHolder: null,
-				status: newStatus,
+				status: depositStatus,
 				manager: managerId,
 				depositDate: depositDate,
 				depositorName: depositorName || null,
@@ -702,7 +760,7 @@ exports.registerDeposit = async (req, res, next) => {
 			{ transaction }
 		);
 
-		// 입금 이력 생성 (il_room_deposit_history)
+		// 입금 이력 생성 (il_room_deposit_history) - unpaidAmount = 계약 보증금 - 입금 합계
 		const historyId = await generateIlRoomDepositHistoryId(transaction);
 		await ilRoomDepositHistory.create(
 			{
@@ -711,8 +769,9 @@ exports.registerDeposit = async (req, res, next) => {
 				roomEsntlId: finalRoomEsntlId,
 				contractEsntlId: finalContractEsntlId,
 				type: 'DEPOSIT',
-				amount: finalPaidAmount,
-				status: newStatus,
+				amount: paidAmountInt,
+				status: depositStatus,
+				unpaidAmount,
 				depositorName: depositorName || null,
 				depositDate: depositDate,
 				manager: decodedToken.admin?.name || '관리자',
@@ -725,9 +784,9 @@ exports.registerDeposit = async (req, res, next) => {
 		return errorHandler.successThrow(res, '입금 등록 성공', {
 			depositEsntlId: newDepositId,
 			historyId: historyId,
-			status: newStatus,
-			paidAmount: finalPaidAmount,
-			unpaidAmount: finalUnpaidAmount,
+			status: depositStatus,
+			paidAmount: paidAmountInt,
+			unpaidAmount: 0,
 			amount: finalAmount,
 		});
 	} catch (error) {
@@ -994,7 +1053,8 @@ exports.getDepositHistoryReturnList = async (req, res, next) => {
 	}
 };
 
-// 방 기준 deposit 테이블 이력 조회 (입금 등록 화면용)
+// 방 고유 아이디 기준 il_room_deposit_history 이력 조회 (입금 등록 화면용)
+// type: DEPOSIT(보증금 입금), RETURN(환불) 필터 지원
 exports.getRoomDepositList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
@@ -1005,31 +1065,43 @@ exports.getRoomDepositList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
 		}
 
-		// il_room_deposit 기준 조회 (type 구분 없음, type 파라미터는 하위 호환용으로 무시)
-		const rows = await ilRoomDeposit.findAll({
-			where: {
-				roomEsntlId: roomEsntlId,
-				deleteYN: { [Op.or]: [null, 'N'] },
-			},
+		const where = { roomEsntlId };
+		// 조회 타입: DEPOSIT(보증금), RETURN(환불)
+		if (type === 'DEPOSIT' || type === 'RETURN') {
+			where.type = type;
+		}
+
+		const rows = await ilRoomDepositHistory.findAll({
+			where,
 			attributes: [
-				'status',
-				'depositDate',
+				'esntlId',
+				'depositEsntlId',
+				'roomEsntlId',
+				'contractEsntlId',
+				'type',
 				'amount',
-				'paidAmount',
+				'status',
 				'unpaidAmount',
-				'manager',
+				'depositDate',
 				'depositorName',
+				'manager',
+				'createdAt',
 			],
 			order: [['depositDate', 'DESC'], ['createdAt', 'DESC']],
 			raw: true,
 		});
 
+		// unpaidAmount는 DB에 저장된 값 사용 (계약 보증금 - 그동안 입금 합계)
 		const result = (rows || []).map((r) => ({
+			esntlId: r.esntlId || null,
+			depositEsntlId: r.depositEsntlId || null,
+			contractEsntlId: r.contractEsntlId || null,
+			type: r.type || null,
 			status: r.status || null,
-			date: r.depositDate || null,
+			date: r.depositDate || r.createdAt || null,
 			amount: r.amount ?? null,
-			paidAmount: r.paidAmount ?? null,
-			unpaidAmount: r.unpaidAmount ?? null,
+			paidAmount: (r.status === 'COMPLETED' || r.status === 'PARTIAL') ? (r.amount ?? 0) : 0,
+			unpaidAmount: r.unpaidAmount != null && r.unpaidAmount !== '' ? Number(r.unpaidAmount) : 0,
 			manager: r.manager || null,
 			depositorName: r.depositorName || null,
 		}));
