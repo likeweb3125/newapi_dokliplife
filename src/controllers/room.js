@@ -1327,10 +1327,11 @@ exports.roomReserve = async (req, res, next) => {
 
 		await transaction.commit();
 
-		// 알림톡 발송 데이터 준비
+		// 알림톡 발송 데이터 준비 (receiver 필수: YawnMessage.send() → _history() → yn_message_send_log.msl_send_tel_no)
+		const receiverPhone = (receiver && String(receiver).trim()) || (roomInfoData.gosiwon_receiver && String(roomInfoData.gosiwon_receiver).trim()) || '';
 		const data = {
 			...roomInfoData,
-			receiver: receiver,
+			receiver: receiverPhone,
 			product: `${roomInfoData.gsw_name} ${roomInfoData.rom_name}`,
 			paymentType: paymentType || 'accountPayment',
 		};
@@ -1355,11 +1356,11 @@ exports.roomReserve = async (req, res, next) => {
 		const result = await Kakao.send(templateId, [data]);
 
 		if (result.sel_success_cnt === 1) {
-			data.receiver = data.gosiwon_receiver;
+			const gosiwonReceiverPhone = (data.gosiwon_receiver && String(data.gosiwon_receiver).trim()) || receiverPhone;
 			await Kakao.send('AL_P_PAYMENT_REQUEST_ALERT', [{
-				receiver: data.receiver,
+				receiver: gosiwonReceiverPhone,
 				product: data.product,
-				req_number: receiver
+				req_number: receiverPhone
 			}]);
 		}
 		*/
