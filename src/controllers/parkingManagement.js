@@ -7,6 +7,7 @@ const {
 } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 const EXTR_PREFIX = 'EXTR';
 const EXTR_PADDING = 10;
@@ -77,20 +78,6 @@ const generateUniqueId = (pDate, esntlId) => {
 	// uniqueId 생성: 날짜(YYYYMMDD) + 숫자 부분(앞의 0 제거)
 	const uniqueId = dateStr && esntlIdNumeric ? `${dateStr}${esntlIdNumeric}` : null;
 	return uniqueId;
-};
-
-// parkStatus ID 생성 함수
-const generateParkStatusId = async (transaction) => {
-	const idQuery = `
-		SELECT CONCAT('PKST', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-		FROM parkStatus
-		WHERE esntlId LIKE 'PKST%'
-	`;
-	const [idResult] = await mariaDBSequelize.query(idQuery, {
-		type: mariaDBSequelize.QueryTypes.SELECT,
-		transaction,
-	});
-	return idResult?.nextId || 'PKST0000000001';
 };
 
 // history ID 생성 함수
@@ -235,8 +222,8 @@ exports.createParking = async (req, res, next) => {
 			}
 		}
 
-		// parkStatus 생성
-		const parkStatusId = await generateParkStatusId(transaction);
+		// parkStatus 생성 (IDS 테이블 parkStatus PKST)
+		const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 		const parkNumber = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
 		const parkStatusMemo = memo && memo.trim() !== '' ? memo.trim() : null;
 		const parkStatusCost = Math.abs(parseInt(cost, 10)) || 0;

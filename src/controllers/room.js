@@ -3,6 +3,7 @@ const { room, memo, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -115,14 +116,11 @@ exports.getRoomList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { goID, roomName, sortBy, contractStatus } = req.query;
+		const { goID, roomName, sortBy } = req.query;
 
 		if (!goID) {
 			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
 		}
-
-		// roomContract status 필터 (기본값: null이면 모든 상태)
-		const rcStatus = contractStatus || null;
 
 		// WHERE 조건 구성
 		let whereClause = 'WHERE R.gosiwonEsntlId = :goID AND R.deleteYN = \'N\'';
@@ -152,6 +150,7 @@ exports.getRoomList = async (req, res, next) => {
 		}
 
 		// SQL 쿼리 구성
+		// startDate, endDate, nowStatus는 roomStatus 테이블의 해당 방 최신 레코드에서 조회
 		const query = `
 			SELECT 
 				R.esntlId,
@@ -170,25 +169,34 @@ exports.getRoomList = async (req, res, next) => {
 				R.availableGender,
 				R.rom_dp_at,
 				RCAT.name AS roomCategoryName,
-				RC.startDate,
-				RC.endDate,
-				RC.month,
-				(SELECT count(*) FROM roomSee RS WHERE RS.roomEsntlId = R.esntlId) AS see,
+				DATE_FORMAT(RS_LATEST.statusStartDate, '%Y-%m-%d') AS startDate,
+				DATE_FORMAT(RS_LATEST.statusEndDate, '%Y-%m-%d') AS endDate,
+				RS_LATEST.status AS nowStatus,
+				(CASE WHEN RS_LATEST.statusStartDate IS NOT NULL AND RS_LATEST.statusEndDate IS NOT NULL
+					THEN TIMESTAMPDIFF(MONTH, RS_LATEST.statusStartDate, RS_LATEST.statusEndDate) + 1
+					ELSE NULL END) AS month,
+				(SELECT count(*) FROM roomSee RSee WHERE RSee.roomEsntlId = R.esntlId) AS see,
 				(SELECT count(*) FROM roomLike RL WHERE RL.roomEsntlId = R.esntlId) AS likes,
 				(SELECT IFNULL(ror_sn, '') FROM il_room_reservation AS RR WHERE rom_sn = R.esntlId AND RR.ror_status_cd = 'WAIT' ORDER BY RR.ror_update_dtm DESC LIMIT 1) AS ror_sn
 			FROM room R
-			LEFT OUTER JOIN roomContract RC
-				ON RC.roomEsntlId = R.esntlId
-				${rcStatus !== null ? 'AND RC.status = :rcStatus' : ''}
+			LEFT OUTER JOIN (
+				SELECT rs1.roomEsntlId, rs1.statusStartDate, rs1.statusEndDate, rs1.status
+				FROM roomStatus rs1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(createdAt) AS max_createdAt
+					FROM roomStatus
+					GROUP BY roomEsntlId
+				) rs2 ON rs1.roomEsntlId = rs2.roomEsntlId AND rs1.createdAt = rs2.max_createdAt
+				WHERE rs1.esntlId = (
+					SELECT MAX(rs3.esntlId) FROM roomStatus rs3
+					WHERE rs3.roomEsntlId = rs1.roomEsntlId AND rs3.createdAt = rs2.max_createdAt
+				)
+			) RS_LATEST ON RS_LATEST.roomEsntlId = R.esntlId
 			LEFT OUTER JOIN roomCategory RCAT
 				ON R.roomCategory = RCAT.esntlId
 			${whereClause}
 			${orderByClause}
 		`;
-
-		if (rcStatus !== null) {
-			replacements.rcStatus = rcStatus;
-		}
 
 		const roomList = await mariaDBSequelize.query(query, {
 			replacements: replacements,
@@ -1383,19 +1391,6 @@ exports.startRoomSell = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'rooms 배열을 입력해주세요.');
 		}
 
-		// roomStatus ID 생성 함수
-		const generateRoomStatusId = async () => {
-			const [result] = await mariaDBSequelize.query(
-				`SELECT CONCAT('RSTA', LPAD(CAST(SUBSTRING(IFNULL(MAX(esntlId), 'RSTA0000000000'), 5) AS UNSIGNED) + 1, 10, '0')) AS nextId
-				FROM roomStatus`,
-				{
-					type: mariaDBSequelize.QueryTypes.SELECT,
-					transaction,
-				}
-			);
-			return result?.nextId || 'RSTA0000000001';
-		};
-
 		const results = [];
 
 		for (const roomData of rooms) {
@@ -1504,6 +1499,15 @@ exports.startRoomSell = async (req, res, next) => {
 								transaction,
 							}
 						);
+						// room 테이블 status를 OPEN으로 변경
+						await mariaDBSequelize.query(
+							`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
+							{
+								replacements: [singleRoomId],
+								type: mariaDBSequelize.QueryTypes.UPDATE,
+								transaction,
+							}
+						);
 						results.push({
 							roomId: singleRoomId,
 							action: 'updated',
@@ -1514,8 +1518,8 @@ exports.startRoomSell = async (req, res, next) => {
 						errorHandler.errorThrow(400, `해당 방의 상태가 'ON_SALE'이 아니어서 판매 시작을 할 수 없습니다. (현재 상태: ${existingStatus.status}, roomId: ${singleRoomId})`);
 					}
 				} else {
-					// 새 레코드 생성
-					const newStatusId = await generateRoomStatusId();
+					// 새 레코드 생성 (IDS 테이블 roomStatus RSTA)
+					const newStatusId = await idsNext('roomStatus', undefined, transaction);
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (
 							esntlId,
@@ -1540,6 +1544,15 @@ exports.startRoomSell = async (req, res, next) => {
 								finalEtcEndDate,
 							],
 							type: mariaDBSequelize.QueryTypes.INSERT,
+							transaction,
+						}
+					);
+					// room 테이블 status를 OPEN으로 변경
+					await mariaDBSequelize.query(
+						`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
+						{
+							replacements: [singleRoomId],
+							type: mariaDBSequelize.QueryTypes.UPDATE,
 							transaction,
 						}
 					);

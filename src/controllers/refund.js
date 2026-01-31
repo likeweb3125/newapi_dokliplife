@@ -8,6 +8,7 @@ const {
 } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
@@ -88,21 +89,6 @@ const verifyAdminToken = (req) => {
 	return decodedToken;
 };
 
-// roomStatus ID 생성 함수
-const generateRoomStatusId = async (transaction) => {
-	const [result] = await mariaDBSequelize.query(
-		`
-		SELECT CONCAT('RSTA', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-		FROM roomStatus
-		`,
-		{
-			type: mariaDBSequelize.QueryTypes.SELECT,
-			transaction,
-		}
-	);
-	return result?.nextId || 'RSTA0000000001';
-};
-
 // 방 사용 후 상태 설정 함수
 // 반환값: 생성된 roomStatus ID 배열
 const roomAfterUse = async (
@@ -138,7 +124,7 @@ const roomAfterUse = async (
 		}
 
 		// ON_SALE 상태 레코드 생성
-		const onSaleId = await generateRoomStatusId(transaction);
+		const onSaleId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(onSaleId);
 		const onSaleStartDate = new Date(sell_able_start_date);
 		const onSaleEndDate = new Date(sell_able_end_date);
@@ -173,7 +159,7 @@ const roomAfterUse = async (
 		);
 
 		// CAN_CHECKIN 상태 레코드 생성
-		const canCheckinId = await generateRoomStatusId(transaction);
+		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(canCheckinId);
 		const canCheckinStartDate = new Date(can_checkin_start_date);
 		const canCheckinEndDate = new Date(can_checkin_end_date);
@@ -242,7 +228,7 @@ const roomAfterUse = async (
 		const infiniteDate = new Date('9999-12-31 23:59:59');
 
 		// CAN_CHECKIN 상태 레코드 생성
-		const canCheckinId = await generateRoomStatusId(transaction);
+		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(canCheckinId);
 		await mariaDBSequelize.query(
 			`
@@ -275,7 +261,7 @@ const roomAfterUse = async (
 		);
 
 		// ON_SALE 상태 레코드 생성
-		const onSaleId = await generateRoomStatusId(transaction);
+		const onSaleId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(onSaleId);
 		await mariaDBSequelize.query(
 			`
@@ -309,7 +295,7 @@ const roomAfterUse = async (
 	} else if (check_basic_sell === false) {
 		if (unableCheckInReason) {
 			// unableCheckInReason이 있는 경우: BEFORE_SALES 상태 생성
-			const beforeSalesId = await generateRoomStatusId(transaction);
+			const beforeSalesId = await idsNext('roomStatus', undefined, transaction);
 			createdStatusIds.push(beforeSalesId);
 			const now = new Date();
 			const infiniteDate = new Date('9999-12-31 23:59:59');

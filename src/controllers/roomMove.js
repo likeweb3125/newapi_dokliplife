@@ -2,6 +2,7 @@ const { mariaDBSequelize, room } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { roomAfterUse } = require('./refund');
+const { next: idsNext } = require('../utils/idsNext');
 
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
@@ -30,21 +31,6 @@ const verifyAdminToken = (req) => {
 		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
 	}
 	return decodedToken;
-};
-
-// roomStatus ID 생성 함수
-const generateRoomStatusId = async (transaction) => {
-	const [result] = await mariaDBSequelize.query(
-		`
-		SELECT CONCAT('RSTA', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-		FROM roomStatus
-		`,
-		{
-			type: mariaDBSequelize.QueryTypes.SELECT,
-			transaction,
-		}
-	);
-	return result?.nextId || 'RSTA0000000001';
 };
 
 // roomMoveStatus ID 생성 함수
@@ -298,7 +284,7 @@ exports.processRoomMove = async (req, res, next) => {
 
 		// 4. 새로운 roomStatus 레코드 생성 (이동할 방용, 새로운 계약서 연결)
 		// statusStartDate는 moveDate, statusEndDate는 새 계약서의 endDate로 설정
-		const newRoomStatusId = await generateRoomStatusId(transaction);
+		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomStatus (

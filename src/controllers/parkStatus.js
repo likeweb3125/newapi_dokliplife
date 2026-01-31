@@ -3,6 +3,7 @@ const { parkStatus, history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -29,9 +30,6 @@ const verifyAdminToken = (req) => {
 	return decodedToken;
 };
 
-const PARKSTATUS_PREFIX = 'PKST';
-const PARKSTATUS_PADDING = 10;
-
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
 
@@ -55,30 +53,6 @@ const generateHistoryId = async (transaction) => {
 	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
 	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
 		HISTORY_PADDING,
-		'0'
-	)}`;
-};
-
-// 주차 상태 ID 생성 함수
-const generateParkStatusId = async (transaction) => {
-	const latest = await parkStatus.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${PARKSTATUS_PREFIX}${String(1).padStart(PARKSTATUS_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(PARKSTATUS_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${PARKSTATUS_PREFIX}${String(nextNumber).padStart(
-		PARKSTATUS_PADDING,
 		'0'
 	)}`;
 };
@@ -227,8 +201,8 @@ exports.createParkStatus = async (req, res, next) => {
 			}
 		}
 
-		// 주차 상태 ID 생성
-		const parkStatusId = await generateParkStatusId(transaction);
+		// 주차 상태 ID 생성 (IDS 테이블 parkStatus PKST)
+		const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 
 		// 주차 상태 생성
 		const newParkStatus = await parkStatus.create(

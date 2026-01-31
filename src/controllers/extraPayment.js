@@ -11,6 +11,7 @@ const {
 } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 const EXTR_PREFIX = 'EXTR';
 const EXTR_PADDING = 10;
@@ -252,22 +253,8 @@ exports.roomExtraPayment = async (req, res, next) => {
 						);
 					}
 
-					// parkStatus ID 생성 함수
-					const generateParkStatusId = async (transaction) => {
-						const idQuery = `
-							SELECT CONCAT('PKST', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-							FROM parkStatus
-							WHERE esntlId LIKE 'PKST%'
-						`;
-						const [idResult] = await mariaDBSequelize.query(idQuery, {
-							type: mariaDBSequelize.QueryTypes.SELECT,
-							transaction,
-						});
-						return idResult?.nextId || 'PKST0000000001';
-					};
-
-					// parkStatus 생성
-					const parkStatusId = await generateParkStatusId(transaction);
+					// parkStatus 생성 (IDS 테이블 parkStatus PKST)
+					const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 					// optionInfo를 memo에 저장 (차량번호, 차종 등)
 					const parkStatusMemo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
 					await parkStatus.create(

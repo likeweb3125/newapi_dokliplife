@@ -1087,30 +1087,17 @@ router.get('/depositInfo', depositController.getDepositInfo);
  *                 data:
  *                   type: object
  *                   properties:
- *                     depositEsntlId:
+ *                     esntlId:
  *                       type: string
- *                       description: 생성된 보증금 고유 아이디
- *                       example: DEPO0000000001
- *                     historyId:
+ *                       description: 생성/수정된 보증금 고유 아이디
+ *                       example: RDP0000000001
+ *                     updated:
+ *                       type: boolean
+ *                       description: 기존 레코드 금액만 업데이트된 경우 true
+ *                     receiver:
  *                       type: string
- *                       description: 생성된 이력 고유 아이디
- *                       example: HIST0000000001
- *                     status:
- *                       type: string
- *                       description: 입금 상태
- *                       example: PENDING
- *                     paidAmount:
- *                       type: integer
- *                       description: 입금액
- *                       example: 500000
- *                     unpaidAmount:
- *                       type: integer
- *                       description: 미납금액
- *                       example: 0
- *                     amount:
- *                       type: integer
- *                       description: 총 보증금액
- *                       example: 500000
+ *                       description: 수신자 휴대폰 번호 (depositorPhone/expectedOccupantPhone). 알림톡 발송 시 YawnMessage.send()의 targetData.receiver로 넘기면 msl_send_tel_no에 정상 저장됨
+ *                       example: '01012345678'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

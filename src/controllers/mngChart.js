@@ -1,5 +1,6 @@
 const { mariaDBSequelize, room, customer } = require('../models');
 const errorHandler = require('../middleware/error');
+const { next: idsNext } = require('../utils/idsNext');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -560,14 +561,6 @@ const generateCustomerId = async (transaction) => {
 	return result?.nextId || 'CUTR0000000001';
 };
 
-const generateRoomStatusId = async (transaction) => {
-	const [result] = await mariaDBSequelize.query(
-		`SELECT CONCAT('RSTA', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId FROM roomStatus WHERE esntlId LIKE 'RSTA%'`,
-		{ type: mariaDBSequelize.QueryTypes.SELECT, transaction }
-	);
-	return result?.nextId || 'RSTA0000000001';
-};
-
 const generateContractId = async (transaction) => {
 	const [result] = await mariaDBSequelize.query(
 		`SELECT CONCAT('RCTT', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId FROM roomContract WHERE esntlId LIKE 'RCTT%'`,
@@ -728,7 +721,7 @@ exports.createTestData = async (req, res, next) => {
 			}
 
 			// 3. 방 상태 데이터 생성 (랜덤 상태 할당)
-			const statusId = await generateRoomStatusId(transaction);
+			const statusId = await idsNext('roomStatus', undefined, transaction);
 			// 고객이 있으면 IN_USE 또는 RESERVED, 없으면 ON_SALE
 			const statusOptions = roomCustomers.length > 0 
 				? ['IN_USE', 'RESERVED', 'ON_SALE'] 
@@ -836,7 +829,7 @@ exports.createTestData = async (req, res, next) => {
 				const depositPendingDateObj = new Date(contractStartDate);
 				depositPendingDateObj.setDate(depositPendingDateObj.getDate() - 3);
 				const depositPendingDate = depositPendingDateObj.toISOString().slice(0, 10);
-				const depositPendingStatusId = await generateRoomStatusId(transaction);
+				const depositPendingStatusId = await idsNext('roomStatus', undefined, transaction);
 				
 				await mariaDBSequelize.query(
 					`INSERT INTO roomStatus (
@@ -864,7 +857,7 @@ exports.createTestData = async (req, res, next) => {
 				const reservedDateObj = new Date(contractStartDate);
 				reservedDateObj.setDate(reservedDateObj.getDate() - 1);
 				const reservedDate = reservedDateObj.toISOString().slice(0, 10);
-				const reservedStatusId = await generateRoomStatusId(transaction);
+				const reservedStatusId = await idsNext('roomStatus', undefined, transaction);
 				
 				await mariaDBSequelize.query(
 					`INSERT INTO roomStatus (
@@ -889,7 +882,7 @@ exports.createTestData = async (req, res, next) => {
 				createdData.roomStatuses.push({ esntlId: reservedStatusId, roomId, status: 'RESERVED' });
 
 				// 이용중 상태 (계약 시작일)
-				const inUseStatusId = await generateRoomStatusId(transaction);
+				const inUseStatusId = await idsNext('roomStatus', undefined, transaction);
 				await mariaDBSequelize.query(
 					`INSERT INTO roomStatus (
 						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
@@ -917,7 +910,7 @@ exports.createTestData = async (req, res, next) => {
 					const onSaleDateObj = new Date(contractStartDate);
 					onSaleDateObj.setDate(onSaleDateObj.getDate() - 5);
 					const onSaleDate = onSaleDateObj.toISOString().slice(0, 10);
-					const onSaleStatusId = await generateRoomStatusId(transaction);
+					const onSaleStatusId = await idsNext('roomStatus', undefined, transaction);
 					
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (

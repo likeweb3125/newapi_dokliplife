@@ -23,7 +23,7 @@ const roomCategoryController = require('../controllers/roomCategory');
  * /v1/room/list:
  *   get:
  *     summary: 방 목록 조회
- *     description: 고시원 ID로 방 목록을 조회합니다. roomContract, roomSee, roomLike, il_room_reservation 테이블을 조인하여 계약 정보, 조회수, 좋아요 수, 예약 정보를 포함합니다.
+ *     description: 고시원 ID로 방 목록을 조회합니다. roomStatus(방별 최신 레코드), roomSee, roomLike, il_room_reservation 테이블을 조인하여 판매/계약 기간, 상태, 조회수, 좋아요 수, 예약 정보를 포함합니다.
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -50,13 +50,6 @@ const roomCategoryController = require('../controllers/roomCategory');
  *           enum: [roomName, roomStatus, roomType, winType, rentFee]
  *         description: 정렬 기준 (선택사항, 기본값은 orderNo 오름차순)
  *         example: rentFee
- *       - in: query
- *         name: contractStatus
- *         required: false
- *         schema:
- *           type: string
- *         description: 계약 상태 필터 (선택사항, roomContract 테이블의 status 필터링)
- *         example: ACTIVE
  *     responses:
  *       200:
  *         description: 방 목록 조회 성공
@@ -140,13 +133,16 @@ const roomCategoryController = require('../controllers/roomCategory');
  *                             description: 예정 퇴실일
  *                           startDate:
  *                             type: string
- *                             description: 계약 시작일 (roomContract)
+ *                             description: 판매/계약 시작일 (roomStatus 방별 최신 레코드)
  *                           endDate:
  *                             type: string
- *                             description: 계약 종료일 (roomContract)
+ *                             description: 판매/계약 종료일 (roomStatus 방별 최신 레코드)
+ *                           nowStatus:
+ *                             type: string
+ *                             description: 방 현재 상태 (roomStatus.status, 예: ON_SALE, IN_USE 등)
  *                           month:
  *                             type: string
- *                             description: 계약 기간 (roomContract)
+ *                             description: 판매/계약 기간 월 수 (roomStatus 기간 기준)
  *                           customerEsntlId:
  *                             type: string
  *                             description: 사용자 고유아이디

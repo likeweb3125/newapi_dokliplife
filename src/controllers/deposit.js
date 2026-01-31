@@ -309,6 +309,7 @@ exports.createDeposit = async (req, res, next) => {
 			return errorHandler.successThrow(res, '보증금 등록 성공', {
 				esntlId: existingDeposit.esntlId,
 				updated: true,
+				receiver: customerPhoneForDeposit || undefined,
 			});
 		}
 
@@ -424,6 +425,7 @@ exports.createDeposit = async (req, res, next) => {
 
 		return errorHandler.successThrow(res, '보증금 등록 성공', {
 			esntlId: newDeposit.esntlId,
+			receiver: customerPhoneForDeposit || undefined,
 		});
 	} catch (error) {
 		await transaction.rollback();
