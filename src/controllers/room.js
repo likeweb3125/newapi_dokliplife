@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const aligoSMS = require('../module/aligo/sms');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -1093,6 +1094,37 @@ exports.deleteRoom = async (req, res, next) => {
 	}
 };
 
+// 예약 성공 시 계약 링크 문자 발송 (receiver 번호로, messageSmsHistory 저장)
+const sendContractLinkSMS = async (receiverPhone, roomEsntlId, writerAdminId, gosiwonEsntlId) => {
+	if (!receiverPhone || !String(receiverPhone).trim()) return;
+	try {
+		const link = `https://doklipuser.likeweb.co.kr/v2?page=contract&rom_eid=${roomEsntlId}`;
+		const title = '[독립생활] 계약 요청 안내';
+		const message = `아래 링크에서 계약을 진행해주세요.\n${link}`;
+		await aligoSMS.send({ receiver: receiverPhone.trim(), title, message });
+
+		const historyEsntlId = await idsNext('messageSmsHistory');
+		const firstReceiver = String(receiverPhone).trim().split(',')[0]?.trim() || String(receiverPhone).trim();
+		const userRows = await mariaDBSequelize.query(
+			`SELECT C.esntlId FROM customer C
+			 INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.status = 'USED'
+			 WHERE C.phone = :receiverPhone ORDER BY RC.contractDate DESC LIMIT 1`,
+			{ replacements: { receiverPhone: firstReceiver }, type: mariaDBSequelize.QueryTypes.SELECT }
+		);
+		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0 ? userRows[0].esntlId : null;
+		await mariaDBSequelize.query(
+			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			{
+				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiver, writerAdminId || null],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+			}
+		);
+	} catch (err) {
+		console.error('계약 링크 문자 발송 실패:', err);
+	}
+};
+
 // 방 예약 및 결제 요청
 exports.roomReserve = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -1209,20 +1241,7 @@ exports.roomReserve = async (req, res, next) => {
 			transaction,
 		});
 
-		// 2. 방 상태를 RESERVE로 업데이트
-		await room.update(
-			{
-				status: 'RESERVE',
-			},
-			{
-				where: {
-					esntlId: roomEsntlId,
-				},
-				transaction,
-			}
-		);
-
-		// 방 정보 조회하여 gosiwonEsntlId 가져오기 (메모 및 history 생성에 필요)
+		// 방 정보 조회하여 gosiwonEsntlId 가져오기 (room 업데이트, roomStatus 추가, 메모·history에 필요)
 		const roomBasicInfo = await room.findByPk(roomEsntlId, {
 			attributes: ['gosiwonEsntlId'],
 			transaction,
@@ -1232,7 +1251,50 @@ exports.roomReserve = async (req, res, next) => {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
 		}
 
-		// 3. History 기록 생성
+		// 2. room 테이블: 상태 RESERVE, 입실일·퇴실일 업데이트
+		await room.update(
+			{
+				status: 'RESERVE',
+				startDate: checkInDate || null,
+				endDate: rorContractEndDate || null,
+			},
+			{
+				where: {
+					esntlId: roomEsntlId,
+				},
+				transaction,
+			}
+		);
+
+		// 3. roomStatus 테이블: PENDING(입금대기중) 레코드 추가
+		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);
+		await mariaDBSequelize.query(
+			`INSERT INTO roomStatus (
+				esntlId,
+				roomEsntlId,
+				gosiwonEsntlId,
+				status,
+				reservationEsntlId,
+				statusStartDate,
+				statusEndDate,
+				createdAt,
+				updatedAt
+			) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+			{
+				replacements: [
+					newRoomStatusId,
+					roomEsntlId,
+					roomBasicInfo.gosiwonEsntlId,
+					reservationId,
+					checkInDate || null,
+					rorContractEndDate || null,
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+
+		// 4. History 기록 생성
 		try {
 			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 예약 생성: 예약ID ${reservationId}, 입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${rorPayMethod ? `, 결제방법 ${rorPayMethod}` : ''}`;
@@ -1258,7 +1320,7 @@ exports.roomReserve = async (req, res, next) => {
 			// History 생성 실패해도 예약 프로세스는 계속 진행
 		}
 
-		// 4. 메모 내용이 있으면 메모 생성
+		// 5. 메모 내용이 있으면 메모 생성
 		if (memoContent) {
 
 			// 메모 ID 생성
@@ -1286,6 +1348,7 @@ exports.roomReserve = async (req, res, next) => {
 		// 예약일이 오늘이 아니면 예약만 하고 종료
 		if (isReserve) {
 			await transaction.commit();
+			await sendContractLinkSMS(receiver, roomEsntlId, userSn, roomBasicInfo.gosiwonEsntlId);
 			errorHandler.successThrow(
 				res,
 				`결제 요청 발송이 예약(${checkInDate})되었습니다.`,
@@ -1329,6 +1392,7 @@ exports.roomReserve = async (req, res, next) => {
 
 		// 알림톡 발송 데이터 준비 (receiver 필수: YawnMessage.send() → _history() → yn_message_send_log.msl_send_tel_no)
 		const receiverPhone = (receiver && String(receiver).trim()) || (roomInfoData.gosiwon_receiver && String(roomInfoData.gosiwon_receiver).trim()) || '';
+		await sendContractLinkSMS(receiverPhone, roomEsntlId, userSn, roomBasicInfo.gosiwonEsntlId);
 		const data = {
 			...roomInfoData,
 			receiver: receiverPhone,

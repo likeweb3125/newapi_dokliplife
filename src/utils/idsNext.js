@@ -18,52 +18,79 @@ const ID_LENGTH = 14;
  * await next('deposit', 'DEPO');                  // 'DEPO0000000001'
  */
 async function next(tbl_name, prefix, transaction = null) {
-	const selectQuery = `SELECT prefix, count FROM IDS WHERE tableName = :tbl_name`;
-	const updateQuery = `INSERT INTO IDS (tableName, prefix, count) VALUES (:tbl_name, :prefix, 1) ON DUPLICATE KEY UPDATE count = count + 1`;
-
 	const replacements = {
 		tbl_name: tbl_name,
 		prefix: prefix != null && prefix !== '' ? prefix : null,
 	};
 
-	// prefix 미지정 시 기존 행 조회로 prefix 채우기
-	if (replacements.prefix === null) {
-		const existingRows = await mariaDBSequelize.query(
-			`SELECT prefix FROM IDS WHERE tableName = :tbl_name LIMIT 1`,
+	// 트랜잭션 없이 호출된 경우 PK 중복 방지를 위해 내부에서 트랜잭션 사용
+	const ownTransaction = transaction == null;
+	const txn = transaction || (await mariaDBSequelize.transaction());
+
+	try {
+		// 1) 행 없으면 생성 (prefix 필요)
+		if (replacements.prefix === null) {
+			const existingRows = await mariaDBSequelize.query(
+				`SELECT prefix FROM IDS WHERE tableName = :tbl_name LIMIT 1`,
+				{
+					replacements: { tbl_name: tbl_name },
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction: txn,
+				}
+			);
+			const existing = Array.isArray(existingRows) && existingRows.length > 0 ? existingRows[0] : null;
+			if (existing && existing.prefix != null) {
+				replacements.prefix = existing.prefix;
+			} else {
+				throw new Error(`IDS: tableName "${tbl_name}"에 대한 prefix가 없습니다. next(tbl_name, prefix) 로 prefix를 지정하세요.`);
+			}
+		}
+
+		await mariaDBSequelize.query(
+			`INSERT INTO IDS (tableName, prefix, count) VALUES (:tbl_name, :prefix, 0) ON DUPLICATE KEY UPDATE tableName = tableName`,
+			{ replacements: { tbl_name: tbl_name, prefix: replacements.prefix }, type: mariaDBSequelize.QueryTypes.INSERT, transaction: txn }
+		);
+
+		// 2) 행 잠금 후 현재 count 조회 (동시 요청 시 PK 중복 방지)
+		const rows = await mariaDBSequelize.query(
+			`SELECT prefix, count FROM IDS WHERE tableName = :tbl_name FOR UPDATE`,
 			{
 				replacements: { tbl_name: tbl_name },
 				type: mariaDBSequelize.QueryTypes.SELECT,
-				transaction,
+				transaction: txn,
 			}
 		);
-		const existing = Array.isArray(existingRows) && existingRows.length > 0 ? existingRows[0] : null;
-		if (existing && existing.prefix != null) {
-			replacements.prefix = existing.prefix;
-		} else {
-			throw new Error(`IDS: tableName "${tbl_name}"에 대한 prefix가 없습니다. next(tbl_name, prefix) 로 prefix를 지정하세요.`);
+		const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+		if (!row) {
+			throw new Error(`IDS: tableName "${tbl_name}" 행을 찾을 수 없습니다.`);
 		}
+		const currentCount = row.count != null ? Number(row.count) : 0;
+		const nextCount = currentCount + 1;
+
+		// 3) count를 다음 값으로 업데이트
+		await mariaDBSequelize.query(
+			`UPDATE IDS SET count = :nextCount WHERE tableName = :tbl_name`,
+			{
+				replacements: { tbl_name: tbl_name, nextCount },
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction: txn,
+			}
+		);
+
+		const _prefix = String(row.prefix ?? replacements.prefix);
+		const _count = String(nextCount).padStart(ID_LENGTH - _prefix.length, '0');
+		const result = _prefix.concat(_count);
+
+		if (ownTransaction) {
+			await txn.commit();
+		}
+		return result;
+	} catch (err) {
+		if (ownTransaction && txn) {
+			await txn.rollback();
+		}
+		throw err;
 	}
-
-	// 1) count 증가 (INSERT ... ON DUPLICATE KEY UPDATE)
-	await mariaDBSequelize.query(updateQuery, {
-		replacements,
-		transaction,
-	});
-
-	// 2) 증가된 count 조회
-	const rows = await mariaDBSequelize.query(selectQuery, {
-		replacements: { tbl_name: tbl_name },
-		type: mariaDBSequelize.QueryTypes.SELECT,
-		transaction,
-	});
-
-	const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-	const _prefix = String(row ? row.prefix : replacements.prefix);
-	const _count = String(row && row.count != null ? row.count : 1).padStart(
-		ID_LENGTH - _prefix.length,
-		'0'
-	);
-	return _prefix.concat(_count);
 }
 
 module.exports = { next, ID_LENGTH };

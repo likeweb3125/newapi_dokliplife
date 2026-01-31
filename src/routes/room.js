@@ -139,7 +139,7 @@ const roomCategoryController = require('../controllers/roomCategory');
  *                             description: 판매/계약 종료일 (roomStatus 방별 최신 레코드)
  *                           nowStatus:
  *                             type: string
- *                             description: 방 현재 상태 (roomStatus.status, 예: ON_SALE, IN_USE 등)
+ *                             description: '방 현재 상태 (roomStatus.status, 예: ON_SALE, IN_USE 등)'
  *                           month:
  *                             type: string
  *                             description: 판매/계약 기간 월 수 (roomStatus 기간 기준)
