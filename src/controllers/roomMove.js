@@ -130,11 +130,13 @@ exports.processRoomMove = async (req, res, next) => {
 		// adjustmentAmount가 0이면 adjustmentType은 NULL
 		const finalAdjustmentType = finalAdjustmentAmount > 0 ? adjustmentType : null;
 
-		// 계약 정보 및 원래 방 상태 조회
+		// 계약 정보 및 원래 방 상태 조회 (기존 계약 종료일은 RC.endDate → originalEndDate로 명시, RS 컬럼에 의해 덮어쓰임 방지)
 		const [contractInfo] = await mariaDBSequelize.query(
 			`
 			SELECT 
-				RC.*,
+				RC.esntlId, RC.roomEsntlId, RC.gosiwonEsntlId, RC.customerEsntlId,
+				RC.startDate, RC.endDate AS originalEndDate, RC.contractDate, RC.month, RC.status,
+				RC.monthlyRent, RC.memo, RC.memo2, RC.checkInTime,
 				RS.esntlId AS roomStatusEsntlId,
 				RS.customerEsntlId AS roomStatusCustomerEsntlId,
 				RS.customerName AS roomStatusCustomerName,
@@ -167,6 +169,13 @@ exports.processRoomMove = async (req, res, next) => {
 				'계약 정보 또는 CONTRACT 상태의 방 상태를 찾을 수 없습니다.'
 			);
 		}
+
+		// [roomMove 디버그] originalEndDate = roomContract.endDate(RC), statusEndDate = roomStatus(RS)
+		console.log('[roomMove] contractInfo 조회 직후:', {
+			'contractInfo.originalEndDate(RC.endDate)': contractInfo.originalEndDate,
+			'contractInfo.statusEndDate(RS.statusEndDate)': contractInfo.statusEndDate,
+			contractEsntlId: contractEsntlId,
+		});
 
 		// 이동할 방 정보 확인
 		const [targetRoom] = await mariaDBSequelize.query(
@@ -202,16 +211,34 @@ exports.processRoomMove = async (req, res, next) => {
 		const today = new Date();
 		const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-		// 1. 기존 계약서 중지 (endDate를 moveDate로 변경, status를 'ENDED'로 변경)
+		// 기존 계약 만료일: roomContract.endDate(RC)를 우선 사용. RC가 이동일과 같을 때만(이전 버그로 덮어쓴 경우) roomStatus.statusEndDate(RS) 사용.
+		// RS는 DATETIME이라 타임존 변환 시 하루 빠져 나올 수 있으므로 RC가 정상이면 반드시 RC 사용.
+		const toYmd = (v) => (v == null ? null : (typeof v === 'string' ? v.split(' ')[0].split('T')[0] : v.toISOString?.().slice(0, 10) || String(v).slice(0, 10)));
+		const rcEnd = toYmd(contractInfo.originalEndDate ?? contractInfo.endDate);
+		const rsEnd = toYmd(contractInfo.statusEndDate);
+		const originalContractEndDate = (rcEnd && rcEnd !== moveDateStr) ? rcEnd : (rsEnd && rsEnd > moveDateStr ? rsEnd : (rcEnd || rsEnd));
+		if (!originalContractEndDate) {
+			errorHandler.errorThrow(400, '기존 계약의 종료일(endDate)을 찾을 수 없습니다.');
+		}
+
+		// [roomMove 디버그] 사용할 날짜 값
+		console.log('[roomMove] 날짜 값:', {
+			moveDateStr,
+			'RC.endDate(originalEndDate)': rcEnd,
+			'RS.statusEndDate': rsEnd,
+			originalContractEndDate,
+			같은지: moveDateStr === originalContractEndDate,
+		});
+
+		// 1. 기존 계약서 중지 (endDate는 원래 만료일 유지, status만 'ENDED'로 변경)
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomContract 
-			SET endDate = ?,
-				status = 'ENDED'
+			SET status = 'ENDED'
 			WHERE esntlId = ?
 		`,
 			{
-				replacements: [moveDateStr, contractEsntlId],
+				replacements: [contractEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
 			}
@@ -238,7 +265,21 @@ exports.processRoomMove = async (req, res, next) => {
 		const contractDate = new Date();
 		const contractDateStr = `${contractDate.getFullYear()}-${String(contractDate.getMonth() + 1).padStart(2, '0')}-${String(contractDate.getDate()).padStart(2, '0')}`;
 		
-		// 기존 계약서 필드 복사하여 새 계약서 생성 (who 컬럼은 roomContractWho에서 별도 복사, roomContract에는 customerName 등·contractorEsntlId 없음)
+		// 기존 계약서 필드 복사하여 새 계약서 생성. endDate는 기존 계약 끝나는 날(originalContractEndDate). status=USED.
+		const insertReplacements = [
+			newContractEsntlId,
+			targetRoomEsntlId,
+			moveDateStr, // startDate: 이동일
+			originalContractEndDate, // endDate: 기존 계약 끝나는 날
+			contractDateStr, // contractDate: 오늘 날짜
+			contractEsntlId, // 기존 계약서 ID
+		];
+		console.log('[roomMove] roomContract INSERT 사용 값:', {
+			newContractEsntlId,
+			startDate: insertReplacements[2],
+			endDate: insertReplacements[3],
+			contractDate: insertReplacements[4],
+		});
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomContract (
@@ -249,24 +290,25 @@ exports.processRoomMove = async (req, res, next) => {
 			)
 			SELECT 
 				?, ?, gosiwonEsntlId, customerEsntlId,
-				?, endDate, ?, month, 'ACTIVE',
+				?, ?, ?, month, 'USED',
 				monthlyRent, memo, memo2,
 				checkInTime
 			FROM roomContract
 			WHERE esntlId = ?
 		`,
 			{
-				replacements: [
-					newContractEsntlId,
-					targetRoomEsntlId,
-					moveDateStr, // startDate: moveDate
-					contractDateStr, // contractDate: 오늘 날짜
-					contractEsntlId, // 기존 계약서 ID
-				],
+				replacements: insertReplacements,
 				type: mariaDBSequelize.QueryTypes.INSERT,
 				transaction,
 			}
 		);
+
+		// [roomMove 디버그] 방금 INSERT한 새 계약서의 DB 저장값 확인
+		const [insertedContract] = await mariaDBSequelize.query(
+			`SELECT esntlId, startDate, endDate, contractDate, status FROM roomContract WHERE esntlId = ?`,
+			{ replacements: [newContractEsntlId], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
+		);
+		console.log('[roomMove] roomContract INSERT 직후 DB 조회:', insertedContract || '없음');
 
 		// roomContractWho 복사 (기존 계약 → 새 계약)
 		await mariaDBSequelize.query(
@@ -325,7 +367,7 @@ exports.processRoomMove = async (req, res, next) => {
 					contractInfo.roomStatusContractorName,
 					newContractEsntlId, // 새로운 계약서 ID
 					moveDateStr, // statusStartDate: moveDate
-					contractInfo.endDate, // statusEndDate: 기존 계약서의 endDate (새 계약서도 동일)
+					originalContractEndDate, // statusEndDate: 기존 계약 끝나는 날
 					contractInfo.etcStartDate,
 					contractInfo.etcEndDate,
 					contractInfo.statusMemo,
@@ -374,29 +416,38 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
-		// room 테이블 상태값 (docs/room_move_logic.md, 스케줄러 제외)
+		// room 테이블: 타겟방 먼저 넣어야 계약날짜가 제대로 들어감 (docs/room_move_logic.md)
 		const isMoveToday = moveDateStr === todayStr;
-		if (isMoveToday) {
-			// 이동일이 오늘: 기존방 CONTRACT → EMPTY, 이동방 → CONTRACT
-			await room.update(
-				{ status: 'EMPTY' },
-				{ where: { esntlId: originalRoomEsntlId }, transaction }
-			);
-			await room.update(
-				{ status: 'CONTRACT' },
-				{ where: { esntlId: targetRoomEsntlId }, transaction }
-			);
-		} else {
-			// 이동일이 오늘이 아님: 기존방 CONTRACT → LEAVE, 이동방 → RESERVE
-			await room.update(
-				{ status: 'LEAVE' },
-				{ where: { esntlId: originalRoomEsntlId }, transaction }
-			);
-			await room.update(
-				{ status: 'RESERVE' },
-				{ where: { esntlId: targetRoomEsntlId }, transaction }
-			);
-		}
+		// 타겟방: startDate=이동일, endDate=기존 계약 끝나는 날, status=CONTRACT
+		console.log('[roomMove] room.update 타겟방:', {
+			targetRoomEsntlId,
+			startDate: moveDateStr,
+			endDate: originalContractEndDate,
+		});
+		await room.update(
+			{
+				startDate: moveDateStr,
+				endDate: originalContractEndDate,
+				status: 'CONTRACT',
+			},
+			{ where: { esntlId: targetRoomEsntlId }, transaction }
+		);
+		// [roomMove 디버그] room.update 직후 타겟방 DB 저장값 확인
+		const [updatedRoom] = await mariaDBSequelize.query(
+			`SELECT esntlId, startDate, endDate, status FROM room WHERE esntlId = ?`,
+			{ replacements: [targetRoomEsntlId], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
+		);
+		console.log('[roomMove] room.update 타겟방 직후 DB 조회:', updatedRoom || '없음');
+
+		// 기존 방: startDate, endDate null, status=roomAfterUse에 맞게 (오늘 이동: EMPTY, 미래 이동: LEAVE)
+		await room.update(
+			{
+				startDate: null,
+				endDate: null,
+				status: isMoveToday ? 'EMPTY' : 'LEAVE',
+			},
+			{ where: { esntlId: originalRoomEsntlId }, transaction }
+		);
 
 		// 이동일이 오늘일 때만: extraPayment, parkStatus의 contractEsntlId를 기존 → 신규 계약서 id로 변경 (docs/room_move_logic.md, 스케줄러 제외)
 		if (isMoveToday) {
@@ -442,6 +493,8 @@ exports.processRoomMove = async (req, res, next) => {
 			? `${memoWithContact} [STATUS_IDS:${JSON.stringify(statusIdsInfo)}]`
 			: `[STATUS_IDS:${JSON.stringify(statusIdsInfo)}]`;
 		
+		// 당일 이동이면 status=COMPLETED, 아니면 PENDING
+		const roomMoveStatusValue = isMoveToday ? 'COMPLETED' : 'PENDING';
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomMoveStatus (
@@ -461,7 +514,7 @@ exports.processRoomMove = async (req, res, next) => {
 				deleteYN,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, 'N', NOW(), NOW())
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', NOW(), NOW())
 		`,
 			{
 				replacements: [
@@ -472,6 +525,7 @@ exports.processRoomMove = async (req, res, next) => {
 					originalRoomEsntlId,
 					targetRoomEsntlId,
 					reason,
+					roomMoveStatusValue,
 					new Date(moveDate),
 					finalAdjustmentAmount,
 					finalAdjustmentType,
@@ -483,31 +537,30 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
-		// 4. roomAfterUse 함수 호출 (원래 방에 대해)
-		let createdRoomStatusIds = []; // roomAfterUse로 생성된 상태 ID들
-		if (
+		// 4. roomAfterUse 함수 호출 (기존 방 id로 새 roomStatus INSERT. 설정에 따라 ON_SALE/CAN_CHECKIN/BEFORE_SALES 등 생성)
+		// 클라이언트가 설정을 보내면 그대로 사용, 없으면 check_basic_sell: true로 고시원 설정(il_gosiwon_config) 기준 생성
+		let createdRoomStatusIds = [];
+		const hasRoomAfterUseParams =
 			check_basic_sell !== undefined ||
 			unableCheckInReason ||
 			check_room_only_config !== undefined ||
 			sell_able_start_date ||
-			can_checkin_start_date
-		) {
-			createdRoomStatusIds = await roomAfterUse(
-				{
-					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
-					roomEsntlId: originalRoomEsntlId,
-					check_basic_sell,
-					unableCheckInReason,
-					check_room_only_config,
-					sell_able_start_date,
-					sell_able_end_date,
-					can_checkin_start_date,
-					can_checkin_end_date,
-					baseDate: moveDate, // 방이동의 경우 moveDate를 기준 날짜로 사용
-				},
-				transaction
-			);
-		}
+			can_checkin_start_date;
+		createdRoomStatusIds = await roomAfterUse(
+			{
+				gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+				roomEsntlId: originalRoomEsntlId,
+				check_basic_sell: hasRoomAfterUseParams ? check_basic_sell : true,
+				unableCheckInReason: hasRoomAfterUseParams ? unableCheckInReason : undefined,
+				check_room_only_config: hasRoomAfterUseParams ? check_room_only_config : undefined,
+				sell_able_start_date: hasRoomAfterUseParams ? sell_able_start_date : undefined,
+				sell_able_end_date: hasRoomAfterUseParams ? sell_able_end_date : undefined,
+				can_checkin_start_date: hasRoomAfterUseParams ? can_checkin_start_date : undefined,
+				can_checkin_end_date: hasRoomAfterUseParams ? can_checkin_end_date : undefined,
+				baseDate: moveDate, // 방이동의 경우 moveDate를 기준 날짜로 사용
+			},
+			transaction
+		);
 
 		// roomAfterUse로 생성된 상태 ID들을 roomMoveStatus의 memo에 업데이트
 		// createdRoomStatusIds가 있거나 targetRoomOnSaleStatuses가 있으면 업데이트

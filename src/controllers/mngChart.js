@@ -358,6 +358,7 @@ exports.mngChartMain = async (req, res, next) => {
 				end: formatDateTime(endDate + ' 23:59:59'),
 				period: period,
 				currentGuest: guestName,
+				guestPhone: guestPhone,
 				className: className,
 				contractNumber: contract.id,
 				guest: guest,
