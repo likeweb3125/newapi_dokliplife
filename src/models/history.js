@@ -114,7 +114,7 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.DATE,
 				allowNull: false,
 				field: 'updatedAt',
-				defaultValue: sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+				defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
 				comment: '수정일',
 			},
 		},

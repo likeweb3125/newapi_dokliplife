@@ -18,7 +18,8 @@
     - **생성일(createdAt 등):**  
       `defaultValue: sequelize.literal('CURRENT_TIMESTAMP')`
     - **수정일(updatedAt 등):**  
-      `defaultValue: sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')`
+      `defaultValue: sequelize.literal('CURRENT_TIMESTAMP')`  
+      (INSERT 시 VALUES에 들어가므로 `ON UPDATE CURRENT_TIMESTAMP`는 사용하지 않는다. DB 테이블 정의에서만 사용 가능.)
   - DB 연결 시 세션 타임존은 `SET time_zone = 'Asia/Seoul'` 로 이미 설정되어 있으므로,  
     `CURRENT_TIMESTAMP` / `NOW()` 는 한국 시간(KST, +9)으로 저장된다.
 - **Raw SQL**에서 INSERT/UPDATE 시 현재 시각이 필요하면 `NOW()` 또는 `CURRENT_TIMESTAMP` 사용  

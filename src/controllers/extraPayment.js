@@ -288,24 +288,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 						}
 					}
 
-					// 사용 대수 증가
-					if (parkingOptionName === '자동차') {
-						await parking.update(
-							{ autoUse: (parkingInfo.autoUse || 0) + 1 },
-							{
-								where: { esntlId: parkingInfo.esntlId },
-								transaction,
-							}
-						);
-					} else if (parkingOptionName === '오토바이') {
-						await parking.update(
-							{ bikeUse: (parkingInfo.bikeUse || 0) + 1 },
-							{
-								where: { esntlId: parkingInfo.esntlId },
-								transaction,
-							}
-						);
-					}
+					// 추가결제 등록 시점에는 결제 미완료이므로 gosiwonParking autoUse/bikeUse는 증가하지 않음 (결제 완료 후 별도 처리)
 
 					// parkStatus 생성 (IDS 테이블 parkStatus PKST) - 추가결제 등록 시 상태는 PENDING 고정
 					const parkStatusId = await idsNext('parkStatus', undefined, transaction);
