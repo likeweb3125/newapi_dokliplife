@@ -1,5 +1,0 @@
-# MariaDB 서버 기본 타임존 = 한국 시간(KST)
-# 마운트 예: volumes: ["./docker/mariadb-timezone.cnf:/etc/mysql/conf.d/99-timezone.cnf"]
-# 또는 command: --default-time-zone=Asia/Seoul
-[mysqld]
-default-time-zone='Asia/Seoul'

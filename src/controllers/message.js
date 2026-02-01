@@ -82,7 +82,7 @@ exports.sendSMS = async (req, res, next) => {
 				createdBy,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 		`,
 			{
 				replacements: [

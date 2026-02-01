@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS `roomContractWho` (
   `customerGender` VARCHAR(20) NULL DEFAULT NULL COMMENT '고객 성별(계약서 기준)',
   `customerAge` INT(3) NULL DEFAULT NULL COMMENT '고객 나이(계약서 기준)',
   `emergencyContact` VARCHAR(250) NULL DEFAULT NULL COMMENT '비상연락망/관계 (예: 010-1234-5678 / 부모)',
-  `createdAt` DATETIME NULL DEFAULT NULL COMMENT '생성일',
-  `updatedAt` DATETIME NULL DEFAULT NULL COMMENT '수정일',
+  `createdAt` DATETIME NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
+  `updatedAt` DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
   PRIMARY KEY (`contractEsntlId`),
   CONSTRAINT `fk_roomContractWho_roomContract`
     FOREIGN KEY (`contractEsntlId`) REFERENCES `roomContract` (`esntlId`)
