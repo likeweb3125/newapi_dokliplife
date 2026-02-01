@@ -1108,7 +1108,7 @@ const sendContractLinkSMS = async (receiverPhone, roomEsntlId, writerAdminId, go
 		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0 ? userRows[0].esntlId : null;
 		await mariaDBSequelize.query(
 			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy, createdAt, updatedAt)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
 			{
 				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiver, writerAdminId || null],
 				type: mariaDBSequelize.QueryTypes.INSERT,
