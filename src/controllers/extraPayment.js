@@ -219,7 +219,8 @@ exports.roomExtraPayment = async (req, res, next) => {
 			// uniqueId 생성
 			const uniqueId = generateUniqueId(pDate, esntlId);
 
-			// extraPayment 생성
+			// extraPayment 생성 (extraCostName 또는 optionName이 '기타 비용'이면 자동차로 저장)
+			const savedOptionName = (extraCostName === '기타 비용' || optionName === '기타 비용') ? '자동차' : (optionName || null);
 			const extraPaymentRecord = await extraPayment.create(
 				{
 					esntlId: esntlId,
@@ -232,7 +233,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 					memo: memo || null,
 					optionInfo: optionInfo || null,
 					useStartDate: useStartDate || null,
-					optionName: optionName || null,
+					optionName: savedOptionName,
 					extendWithPayment: extendWithPayment ? 1 : 0,
 					pDate: pDate,
 					pTime: pTime,
@@ -255,8 +256,11 @@ exports.roomExtraPayment = async (req, res, next) => {
 
 			totalAmount += Math.abs(parseInt(cost, 10));
 
-			// optionName이 '자동차' 또는 '오토바이'인 경우 주차장 사용 대수 증가 및 parkStatus 업데이트
-			if (optionName === '자동차' || optionName === '오토바이') {
+			// 주차 로직: optionName이 '자동차'/'오토바이'일 때, '기타 비용'(extraCostName 또는 optionName)은 임시로 자동차로 인식
+			const parkingOptionName = (extraCostName === '기타 비용' || optionName === '기타 비용') ? '자동차' : optionName;
+			const isParkingTarget = parkingOptionName === '자동차' || parkingOptionName === '오토바이';
+
+			if (isParkingTarget) {
 				// gosiwonParking 조회
 				const parkingInfo = await parking.findOne({
 					where: { gosiwonEsntlId: contract.gosiwonEsntlId },
@@ -264,19 +268,19 @@ exports.roomExtraPayment = async (req, res, next) => {
 				});
 
 				if (parkingInfo) {
-					// extraCostName이 '주차비'일 때: autoUse/bikeUse가 한도(auto/bike)를 초과하면 경고(에러)
-					if (extraCostName === '주차비') {
+					// extraCostName이 '주차비' 또는 '기타 비용'일 때: autoUse/bikeUse가 한도(auto/bike)를 초과하면 경고(에러)
+					if (extraCostName === '주차비' || extraCostName === '기타 비용') {
 						const maxAuto = parkingInfo.auto ?? 0;
 						const maxBike = parkingInfo.bike ?? 0;
 						const currentAutoUse = parkingInfo.autoUse ?? 0;
 						const currentBikeUse = parkingInfo.bikeUse ?? 0;
-						if (optionName === '자동차' && currentAutoUse >= maxAuto) {
+						if (parkingOptionName === '자동차' && currentAutoUse >= maxAuto) {
 							errorHandler.errorThrow(
 								400,
 								`자동차 주차 가능 대수(${maxAuto}대)를 초과했습니다. 현재 사용 중: ${currentAutoUse}대.`
 							);
 						}
-						if (optionName === '오토바이' && currentBikeUse >= maxBike) {
+						if (parkingOptionName === '오토바이' && currentBikeUse >= maxBike) {
 							errorHandler.errorThrow(
 								400,
 								`오토바이 주차 가능 대수(${maxBike}대)를 초과했습니다. 현재 사용 중: ${currentBikeUse}대.`
@@ -285,7 +289,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 					}
 
 					// 사용 대수 증가
-					if (optionName === '자동차') {
+					if (parkingOptionName === '자동차') {
 						await parking.update(
 							{ autoUse: (parkingInfo.autoUse || 0) + 1 },
 							{
@@ -293,7 +297,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 								transaction,
 							}
 						);
-					} else if (optionName === '오토바이') {
+					} else if (parkingOptionName === '오토바이') {
 						await parking.update(
 							{ bikeUse: (parkingInfo.bikeUse || 0) + 1 },
 							{
@@ -303,9 +307,9 @@ exports.roomExtraPayment = async (req, res, next) => {
 						);
 					}
 
-					// parkStatus 생성 (IDS 테이블 parkStatus PKST)
+					// parkStatus 생성 (IDS 테이블 parkStatus PKST) - 추가결제 등록 시 상태는 PENDING 고정
 					const parkStatusId = await idsNext('parkStatus', undefined, transaction);
-					// optionInfo를 memo에 저장 (차량번호, 차종 등)
+					// optionInfo를 memo·parkNumber에 저장 (차량번호, 차종 등)
 					const parkStatusMemo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
 					await parkStatus.create(
 						{
@@ -313,10 +317,12 @@ exports.roomExtraPayment = async (req, res, next) => {
 							gosiwonEsntlId: contract.gosiwonEsntlId,
 							contractEsntlId: contractEsntlId,
 							customerEsntlId: contract.customerEsntlId || null,
-							status: 'IN_USE',
+							status: 'PENDING', // 추가결제 등록 시 대기 상태, 결제 완료 후 IN_USE 등으로 변경
 							useStartDate: useStartDate || pDate,
 							useEndDate: contract.endDate || null,
-							memo: parkStatusMemo, // 차량번호, 차종 등 메모 정보 (optionInfo에서 가져옴)
+							parkType: parkingOptionName, // 자동차 / 오토바이 (기타 비용은 자동차로 처리)
+							parkNumber: parkStatusMemo, // 차량번호 등
+							memo: parkStatusMemo,
 							deleteYN: 'N',
 						},
 						{ transaction }
