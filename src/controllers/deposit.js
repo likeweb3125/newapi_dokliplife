@@ -297,7 +297,7 @@ exports.createDeposit = async (req, res, next) => {
 			await ilRoomDeposit.update(
 				{
 					amount: finalAmount,
-					updateDtm: new Date(),
+					updateDtm: mariaDBSequelize.literal('NOW()'),
 					updaterId: registrantId,
 				},
 				{
@@ -361,8 +361,8 @@ exports.createDeposit = async (req, res, next) => {
 
 		const esntlId = await generateIlRoomDepositId(transaction);
 
-		// 돈이 들어온 뒤 확정 입력이므로 COMPLETED로 등록 (completedDtm 설정)
-		const completedDtm = depositDate ? new Date(depositDate) : new Date();
+		// 돈이 들어온 뒤 확정 입력이므로 COMPLETED로 등록 (completedDtm: 한국 시간 NOW() 또는 입금일)
+		const completedDtm = depositDate ? new Date(depositDate) : mariaDBSequelize.literal('NOW()');
 
 		const newDeposit = await ilRoomDeposit.create(
 			{
@@ -1391,8 +1391,8 @@ exports.getReservationList = async (req, res, next) => {
 			whereConditions.push(`(
 				R.roomNumber LIKE ? OR
 				R.esntlId LIKE ? OR
-				COALESCE(RCW.checkinName, RC.checkinName) LIKE ? OR
-				COALESCE(RCW.customerName, RC.customerName) LIKE ?
+				RCW.checkinName LIKE ? OR
+				RCW.customerName LIKE ?
 			)`);
 			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
@@ -1424,10 +1424,10 @@ exports.getReservationList = async (req, res, next) => {
 				G.name as gosiwonName,
 				RC.esntlId as contractEsntlId,
 				RS.status as roomStatus,
-				COALESCE(RCW.checkinName, RC.checkinName) as reservationName,
-				COALESCE(RCW.checkinPhone, RC.checkinPhone) as reservationPhone,
-				COALESCE(RCW.customerName, RC.customerName) as contractorName,
-				COALESCE(RCW.customerPhone, RC.customerPhone) as contractorPhone,
+				RCW.checkinName as reservationName,
+				RCW.checkinPhone as reservationPhone,
+				RCW.customerName as contractorName,
+				RCW.customerPhone as contractorPhone,
 				DATE(RC.startDate) as checkInDate,
 				DATE(RC.endDate) as checkOutDate,
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
@@ -1689,8 +1689,8 @@ exports.getDepositList = async (req, res, next) => {
 			whereConditions.push(`(
 				R.roomNumber LIKE ? OR
 				R.esntlId LIKE ? OR
-				COALESCE(RCW.checkinName, RC.checkinName) LIKE ? OR
-				COALESCE(RCW.customerName, RC.customerName) LIKE ?
+				RCW.checkinName LIKE ? OR
+				RCW.customerName LIKE ?
 			)`);
 			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
@@ -1719,10 +1719,10 @@ exports.getDepositList = async (req, res, next) => {
 				R.customerEsntlId as currentOccupantID,
 				C.bank as customerBank,
 				C.bankAccount as customerBankAccount,
-				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
-				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
-				COALESCE(RCW.customerName, RC.customerName) as contractorName,
-				COALESCE(RCW.customerPhone, RC.customerPhone) as contractorPhone,
+				RCW.checkinName AS checkinName,
+				RCW.checkinPhone AS checkinPhone,
+				RCW.customerName as contractorName,
+				RCW.customerPhone as contractorPhone,
 				D.rdp_price as depositAmount,
 				RC.esntlId as contractEsntlId,
 				DATE(RC.startDate) as moveInDate,

@@ -141,7 +141,7 @@ const roomAfterUse = async (
 				etcEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())
 			`,
 			{
 				replacements: [
@@ -176,7 +176,7 @@ const roomAfterUse = async (
 				etcEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, NOW(), NOW())
 			`,
 			{
 				replacements: [
@@ -243,7 +243,7 @@ const roomAfterUse = async (
 				etcEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, NOW(), NOW())
 			`,
 			{
 				replacements: [
@@ -276,7 +276,7 @@ const roomAfterUse = async (
 				etcEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())
 			`,
 			{
 				replacements: [
@@ -315,7 +315,7 @@ const roomAfterUse = async (
 					statusMemo,
 					createdAt,
 					updatedAt
-				) VALUES (?, ?, ?, 'BEFORE_SALES', ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+				) VALUES (?, ?, ?, 'BEFORE_SALES', ?, ?, ?, ?, ?, ?, NOW(), NOW())
 				`,
 				{
 					replacements: [
@@ -402,10 +402,10 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			`
 			SELECT 
 				RC.*,
-				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
-				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
-				COALESCE(RCW.customerName, RC.customerName) AS customerName,
-				COALESCE(RCW.customerPhone, RC.customerPhone) AS customerPhone,
+				RCW.checkinName AS checkinName,
+				RCW.checkinPhone AS checkinPhone,
+				RCW.customerName AS customerName,
+				RCW.customerPhone AS customerPhone,
 				C.name AS customerNameFromCustomer,
 				D.contractorEsntlId,
 				CT.name AS contractorName
@@ -506,7 +506,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			`
 			UPDATE roomStatus 
 			SET status = 'CHECKOUT_CONFIRMED',
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				updatedAt = NOW()
 			WHERE contractEsntlId = ?
 		`,
 			{

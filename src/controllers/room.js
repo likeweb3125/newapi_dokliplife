@@ -883,7 +883,7 @@ exports.reserveCancel = async (req, res, next) => {
 		const updateReservationQuery = `
 			UPDATE il_room_reservation 
 			SET ror_status_cd = 'CANCEL',
-				ror_update_dtm = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
+				ror_update_dtm = NOW(),
 				ror_updater_sn = ?
 			WHERE rom_sn = ?
 				AND ror_status_cd = 'WAIT'
@@ -1107,8 +1107,8 @@ const sendContractLinkSMS = async (receiverPhone, roomEsntlId, writerAdminId, go
 		);
 		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0 ? userRows[0].esntlId : null;
 		await mariaDBSequelize.query(
-			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy, createdAt, updatedAt)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 			{
 				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiver, writerAdminId || null],
 				type: mariaDBSequelize.QueryTypes.INSERT,
@@ -1206,9 +1206,9 @@ exports.roomReserve = async (req, res, next) => {
 				?,
 				?,
 				'WAIT',
-				DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
+				NOW(),
 				?,
-				DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
+				NOW(),
 				?,
 				?,
 				?,
@@ -1273,7 +1273,7 @@ exports.roomReserve = async (req, res, next) => {
 				statusEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+			) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, NOW(), NOW())`,
 			{
 				replacements: [
 					newRoomStatusId,
@@ -1543,7 +1543,7 @@ exports.startRoomSell = async (req, res, next) => {
 								statusEndDate = ?,
 								etcStartDate = ?,
 								etcEndDate = ?,
-								updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+								updatedAt = NOW()
 							WHERE roomEsntlId = ?`,
 							{
 								replacements: [
@@ -1591,7 +1591,7 @@ exports.startRoomSell = async (req, res, next) => {
 							etcEndDate,
 							createdAt,
 							updatedAt
-						) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+						) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())`,
 						{
 							replacements: [
 								newStatusId,

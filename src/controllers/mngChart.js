@@ -209,17 +209,17 @@ exports.mngChartMain = async (req, res, next) => {
 				C.name AS customerName,
 				C.phone AS customerPhone,
 				C.gender AS customerGender,
-				COALESCE(RCW.customerAge, RC.customerAge, ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365)) AS customerAge,
+				COALESCE(RCW.customerAge, ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365)) AS customerAge,
 				C.bank AS customerBank,
 				C.bankAccount AS customerBankAccount,
-				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
-				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
-				COALESCE(RCW.checkinGender, RC.checkinGender) AS checkinGender,
-				COALESCE(RCW.checkinAge, RC.checkinAge) AS checkinAge,
-				COALESCE(RCW.customerName, RC.customerName) AS contractorName,
-				COALESCE(RCW.customerPhone, RC.customerPhone) AS contractorPhone,
-				COALESCE(RCW.customerGender, RC.customerGender) AS contractorGender,
-				COALESCE(RCW.customerAge, RC.customerAge) AS contractorAge,
+				RCW.checkinName AS checkinName,
+				RCW.checkinPhone AS checkinPhone,
+				RCW.checkinGender AS checkinGender,
+				RCW.checkinAge AS checkinAge,
+				RCW.customerName AS contractorName,
+				RCW.customerPhone AS contractorPhone,
+				RCW.customerGender AS contractorGender,
+				RCW.customerAge AS contractorAge,
 				PL.paymentAmount,
 				PL.pyl_goods_amount
 			FROM roomContract RC
@@ -765,7 +765,7 @@ exports.createTestData = async (req, res, next) => {
 				`INSERT INTO roomStatus (
 					esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
 					statusStartDate, statusEndDate, createdAt, updatedAt
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 				{
 					replacements: [statusId, roomId, gosiwonEsntlId, status, customerId, customerName, statusStartDate, statusEndDate],
 					type: mariaDBSequelize.QueryTypes.INSERT,
@@ -836,7 +836,7 @@ exports.createTestData = async (req, res, next) => {
 					`INSERT INTO roomStatus (
 						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
 						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
-					) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+					) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, NOW(), NOW())`,
 					{
 						replacements: [
 							depositPendingStatusId,
@@ -864,7 +864,7 @@ exports.createTestData = async (req, res, next) => {
 					`INSERT INTO roomStatus (
 						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
 						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
-					) VALUES (?, ?, ?, 'RESERVED', ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+					) VALUES (?, ?, ?, 'RESERVED', ?, ?, ?, ?, ?, NOW(), NOW())`,
 					{
 						replacements: [
 							reservedStatusId,
@@ -888,7 +888,7 @@ exports.createTestData = async (req, res, next) => {
 					`INSERT INTO roomStatus (
 						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
 						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
-					) VALUES (?, ?, ?, 'IN_USE', ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+					) VALUES (?, ?, ?, 'IN_USE', ?, ?, ?, ?, ?, NOW(), NOW())`,
 					{
 						replacements: [
 							inUseStatusId,
@@ -916,7 +916,7 @@ exports.createTestData = async (req, res, next) => {
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (
 							esntlId, roomEsntlId, gosiwonEsntlId, status, createdAt, updatedAt
-						) VALUES (?, ?, ?, 'ON_SALE', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+						) VALUES (?, ?, ?, 'ON_SALE', NOW(), NOW())`,
 						{
 							replacements: [
 								onSaleStatusId,
@@ -960,7 +960,7 @@ exports.createTestData = async (req, res, next) => {
 							esntlId, contractEsntlId, gosiwonEsntlId, roomEsntlId, customerEsntlId,
 							extraCostName, paymentAmount, pyl_goods_amount, paymentStatus,
 							deleteYN, imp_uid, createdAt, updatedAt
-						) VALUES (?, ?, ?, ?, ?, '주차비', '100000', 100000, 'COMPLETED', 'N', 'TEST_IMP_UID', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))`,
+						) VALUES (?, ?, ?, ?, ?, '주차비', '100000', 100000, 'COMPLETED', 'N', 'TEST_IMP_UID', NOW(), NOW())`,
 						{
 							replacements: [extraPaymentId, contractId, gosiwonEsntlId, roomId, selectedCustomer.esntlId],
 							type: mariaDBSequelize.QueryTypes.INSERT,

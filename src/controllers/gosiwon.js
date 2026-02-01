@@ -660,14 +660,14 @@ exports.createGosiwon = async (req, res, next) => {
 			);
 
 			if (existingConfig) {
-				// UPDATE 시: 업데이트 시간과 업데이트한 관리자 ID 추가
-				configData.gsc_update_dtm = new Date();
+				// UPDATE 시: 업데이트 시간(NOW() = 한국 시간)과 업데이트한 관리자 ID 추가
+				configData.gsc_update_dtm = null; // SQL에서 NOW() 사용
 				configData.gsc_updater_id = registrantId;
-				
-				const configSetClause = Object.keys(configData)
-					.map((key) => `\`${key}\` = ?`)
+				const configKeys = Object.keys(configData);
+				const configSetClause = configKeys
+					.map((key) => (key === 'gsc_update_dtm' ? '`gsc_update_dtm` = NOW()' : `\`${key}\` = ?`))
 					.join(', ');
-				const configParams = [...Object.values(configData), esntlId];
+				const configParams = [...configKeys.filter((k) => k !== 'gsc_update_dtm').map((k) => configData[k]), esntlId];
 
 				await mariaDBSequelize.query(
 					`UPDATE il_gosiwon_config SET ${configSetClause} WHERE gsw_eid = ?`,
@@ -678,9 +678,8 @@ exports.createGosiwon = async (req, res, next) => {
 					}
 				);
 			} else {
-				// INSERT 시: 등록자 ID 추가
+				// INSERT 시: 등록자 ID 추가 (등록/수정 시각은 테이블 DEFAULT 또는 DB NOW())
 				configData.gsc_registrant_id = registrantId;
-				
 				const configColumns = Object.keys(configData)
 					.map((key) => `\`${key}\``)
 					.join(', ');
@@ -861,7 +860,7 @@ exports.updateGosiwon = async (req, res, next) => {
 			updateData.use_settlement = req.body.use_settlement === true || req.body.use_settlement === 'true' || req.body.use_settlement === 1 ? 1 : 0;
 		}
 		if (req.body.settlementReason !== undefined) updateData.settlementReason = req.body.settlementReason;
-		if (req.body.update_dtm !== undefined) updateData.update_dtm = new Date();
+		if (req.body.update_dtm !== undefined) updateData.update_dtm = mariaDBSequelize.literal('NOW()');
 
 		// gosiwon 테이블 업데이트
 		if (Object.keys(updateData).length > 0) {
@@ -1355,14 +1354,14 @@ exports.updateGosiwonConfig = async (req, res, next) => {
 		);
 
 		if (existingConfig) {
-			// UPDATE 시: 업데이트 시간과 업데이트한 관리자 ID 추가
-			configData.gsc_update_dtm = new Date();
+			// UPDATE 시: 업데이트 시간(NOW() = 한국 시간)과 업데이트한 관리자 ID 추가
+			configData.gsc_update_dtm = null; // SQL에서 NOW() 사용
 			configData.gsc_updater_id = registrantId;
-
-			const configSetClause = Object.keys(configData)
-				.map((key) => `\`${key}\` = ?`)
+			const configKeys = Object.keys(configData);
+			const configSetClause = configKeys
+				.map((key) => (key === 'gsc_update_dtm' ? '`gsc_update_dtm` = NOW()' : `\`${key}\` = ?`))
 				.join(', ');
-			const configParams = [...Object.values(configData), esntlId];
+			const configParams = [...configKeys.filter((k) => k !== 'gsc_update_dtm').map((k) => configData[k]), esntlId];
 
 			await mariaDBSequelize.query(
 				`UPDATE il_gosiwon_config SET ${configSetClause} WHERE gsw_eid = ?`,

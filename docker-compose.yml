@@ -13,4 +13,5 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=production
-      - TZ=Asia/Seoul 
+      # 컨테이너 시스템 시간을 한국 시간(KST, UTC+9)으로 동기화
+      - TZ=Asia/Seoul

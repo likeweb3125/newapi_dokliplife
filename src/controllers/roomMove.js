@@ -217,7 +217,7 @@ exports.processRoomMove = async (req, res, next) => {
 			UPDATE roomContract 
 			SET endDate = ?,
 				status = 'ENDED',
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				updatedAt = NOW()
 			WHERE esntlId = ?
 		`,
 			{
@@ -233,7 +233,7 @@ exports.processRoomMove = async (req, res, next) => {
 			UPDATE roomStatus 
 			SET subStatus = 'ROOM_MOVE_OUT',
 				statusEndDate = ?,
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				updatedAt = NOW()
 			WHERE esntlId = ?
 		`,
 			{
@@ -286,7 +286,7 @@ exports.processRoomMove = async (req, res, next) => {
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomContractWho (contractEsntlId, checkinName, checkinPhone, checkinGender, checkinAge, customerName, customerPhone, customerGender, customerAge, emergencyContact, createdAt, updatedAt)
-			SELECT ?, COALESCE(RCW.checkinName, RC.checkinName), COALESCE(RCW.checkinPhone, RC.checkinPhone), COALESCE(RCW.checkinGender, RC.checkinGender), COALESCE(RCW.checkinAge, RC.checkinAge), COALESCE(RCW.customerName, RC.customerName), COALESCE(RCW.customerPhone, RC.customerPhone), COALESCE(RCW.customerGender, RC.customerGender), COALESCE(RCW.customerAge, RC.customerAge), COALESCE(RCW.emergencyContact, RC.emergencyContact), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+			SELECT ?, RCW.checkinName, RCW.checkinPhone, RCW.checkinGender, RCW.checkinAge, RCW.customerName, RCW.customerPhone, RCW.customerGender, RCW.customerAge, RCW.emergencyContact, NOW(), NOW()
 			FROM roomContract RC
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			WHERE RC.esntlId = ?
@@ -324,7 +324,7 @@ exports.processRoomMove = async (req, res, next) => {
 				statusMemo,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'IN_USE', 'ROOM_MOVE_IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, 'IN_USE', 'ROOM_MOVE_IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 		`,
 			{
 				replacements: [
@@ -374,7 +374,7 @@ exports.processRoomMove = async (req, res, next) => {
 			UPDATE roomStatus 
 			SET statusEndDate = ?,
 				subStatus = 'END',
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				updatedAt = NOW()
 			WHERE roomEsntlId = ?
 				AND status = 'ON_SALE'
 				AND (statusEndDate IS NULL 
@@ -431,7 +431,7 @@ exports.processRoomMove = async (req, res, next) => {
 				deleteYN,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, 'N', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+			) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, 'N', NOW(), NOW())
 		`,
 			{
 				replacements: [
@@ -501,7 +501,7 @@ exports.processRoomMove = async (req, res, next) => {
 				`
 				UPDATE roomMoveStatus 
 				SET memo = ?,
-					updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+					updatedAt = NOW()
 				WHERE esntlId = ?
 			`,
 				{
@@ -529,7 +529,7 @@ exports.processRoomMove = async (req, res, next) => {
 				`
 				UPDATE roomMoveStatus 
 				SET memo = ?,
-					updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+					updatedAt = NOW()
 				WHERE esntlId = ?
 			`,
 				{
@@ -667,7 +667,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 				UPDATE roomContract 
 				SET endDate = ?,
 					status = 'ACTIVE',
-					updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+					updatedAt = NOW()
 				WHERE esntlId = ?
 			`,
 				{
@@ -685,7 +685,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 			SET subStatus = NULL,
 				statusEndDate = ?,
 				contractEsntlId = ?,
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				updatedAt = NOW()
 			WHERE contractEsntlId = ?
 				AND roomEsntlId = ?
 				AND status = 'IN_USE'
@@ -769,7 +769,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 					UPDATE roomStatus
 					SET subStatus = ?,
 						statusEndDate = ?,
-						updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+						updatedAt = NOW()
 					WHERE esntlId = ?
 						AND roomEsntlId = ?
 						AND status = 'ON_SALE'
@@ -828,7 +828,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 				UPDATE roomStatus
 				SET subStatus = NULL,
 					statusEndDate = ?,
-					updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+					updatedAt = NOW()
 				WHERE roomEsntlId = ?
 					AND status = 'ON_SALE'
 					AND subStatus = 'END'
@@ -904,8 +904,8 @@ exports.deleteRoomMove = async (req, res, next) => {
 			UPDATE roomMoveStatus 
 			SET deleteYN = 'Y',
 				deletedBy = ?,
-				deletedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR),
-				updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+				deletedAt = NOW(),
+				updatedAt = NOW()
 			WHERE esntlId = ?
 		`,
 			{

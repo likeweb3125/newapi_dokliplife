@@ -79,8 +79,10 @@ exports.sendSMS = async (req, res, next) => {
 				gosiwonEsntlId,
 				userEsntlId,
 				receiverPhone,
-				createdBy
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
+				createdBy,
+				createdAt,
+				updatedAt
+			) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 		`,
 			{
 				replacements: [

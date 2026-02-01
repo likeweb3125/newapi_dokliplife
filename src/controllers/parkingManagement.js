@@ -359,9 +359,9 @@ exports.getParkingNowList = async (req, res, next) => {
 				PS.contractEsntlId AS contractEsntlId,
 				RC.roomEsntlId AS roomEsntlId,
 				R.roomNumber AS roomNumber,
-				COALESCE(RCW.customerName, RC.customerName, C.name) AS customerName,
-				COALESCE(RCW.customerGender, RC.customerGender, C.gender) AS customerGender,
-				COALESCE(RCW.customerAge, RC.customerAge, 
+				COALESCE(RCW.customerName, C.name) AS customerName,
+				COALESCE(RCW.customerGender, C.gender) AS customerGender,
+				COALESCE(RCW.customerAge, 
 					CASE 
 						WHEN C.birth IS NOT NULL AND C.birth != '' 
 						THEN ROUND((TO_DAYS(NOW()) - TO_DAYS(C.birth)) / 365)
@@ -576,7 +576,7 @@ exports.deleteParking = async (req, res, next) => {
 
 		// parkStatus 소프트 삭제
 		await parkStatus.update(
-			{ deleteYN: 'Y', deletedBy: writerAdminId, deletedAt: new Date() },
+			{ deleteYN: 'Y', deletedBy: writerAdminId, deletedAt: mariaDBSequelize.literal('NOW()') },
 			{ where: { esntlId: parkingId }, transaction }
 		);
 

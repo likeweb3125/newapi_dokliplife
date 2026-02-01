@@ -507,7 +507,7 @@ exports.deleteHistory = async (req, res, next) => {
 			{
 				deleteYN: 'Y',
 				deletedBy: writerAdminId,
-				deletedAt: new Date(),
+				deletedAt: mariaDBSequelize.literal('NOW()'),
 			},
 			{
 				where: {
