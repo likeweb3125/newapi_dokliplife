@@ -402,12 +402,17 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			`
 			SELECT 
 				RC.*,
+				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
+				COALESCE(RCW.customerName, RC.customerName) AS customerName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) AS customerPhone,
 				C.name AS customerNameFromCustomer,
 				D.contractorEsntlId,
 				CT.name AS contractorName
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
 			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
 			WHERE RC.esntlId = ?

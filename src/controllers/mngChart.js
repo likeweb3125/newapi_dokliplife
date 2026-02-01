@@ -209,22 +209,23 @@ exports.mngChartMain = async (req, res, next) => {
 				C.name AS customerName,
 				C.phone AS customerPhone,
 				C.gender AS customerGender,
-				COALESCE(RC.customerAge, ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365)) AS customerAge,
+				COALESCE(RCW.customerAge, RC.customerAge, ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365)) AS customerAge,
 				C.bank AS customerBank,
 				C.bankAccount AS customerBankAccount,
-				RC.checkinName,
-				RC.checkinPhone,
-				RC.checkinGender,
-				RC.checkinAge,
-				RC.customerName AS contractorName,
-				RC.customerPhone AS contractorPhone,
-				RC.customerGender AS contractorGender,
-				RC.customerAge AS contractorAge,
+				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
+				COALESCE(RCW.checkinGender, RC.checkinGender) AS checkinGender,
+				COALESCE(RCW.checkinAge, RC.checkinAge) AS checkinAge,
+				COALESCE(RCW.customerName, RC.customerName) AS contractorName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) AS contractorPhone,
+				COALESCE(RCW.customerGender, RC.customerGender) AS contractorGender,
+				COALESCE(RCW.customerAge, RC.customerAge) AS contractorAge,
 				PL.paymentAmount,
 				PL.pyl_goods_amount
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN (
 				SELECT 
 					contractEsntlId,

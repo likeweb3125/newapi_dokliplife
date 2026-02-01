@@ -129,14 +129,14 @@ exports.getContractList = async (req, res, next) => {
 				C.name AS customerName,
 				C.phone AS customerPhone,
 				RC.customerEsntlId AS customerEsntlId,
-				RC.checkinName AS checkinName,
-				RC.checkinPhone AS checkinPhone,
-				RC.checkinGender AS checkinGender,
-				RC.checkinAge AS checkinAge,
-				RC.customerName AS contractCustomerName,
-				RC.customerPhone AS contractCustomerPhone,
-				RC.customerGender AS contractCustomerGender,
-				RC.customerAge AS contractCustomerAge,
+				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
+				COALESCE(RCW.checkinGender, RC.checkinGender) AS checkinGender,
+				COALESCE(RCW.checkinAge, RC.checkinAge) AS checkinAge,
+				COALESCE(RCW.customerName, RC.customerName) AS contractCustomerName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) AS contractCustomerPhone,
+				COALESCE(RCW.customerGender, RC.customerGender) AS contractCustomerGender,
+				COALESCE(RCW.customerAge, RC.customerAge) AS contractCustomerAge,
 				COALESCE(PL.pyl_goods_amount, 0) AS pyl_goods_amount,
 				FORMAT(COALESCE(PL.paymentAmount, 0), 0) AS paymentAmount,
 				COALESCE(PL.paymentAmount, 0) AS payment_amount,
@@ -169,6 +169,7 @@ exports.getContractList = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			LEFT JOIN (
 				SELECT 
@@ -293,15 +294,15 @@ exports.getContractDetail = async (req, res, next) => {
 				RC.monthlyRent * 10000 AS contractMonthlyRent,
 				RC.memo AS occupantMemo,
 				RC.memo2 AS occupantMemo2,
-				RC.emergencyContact AS emergencyContact,
-				RC.checkinName AS checkinName,
-				RC.checkinPhone AS checkinPhone,
-				RC.checkinGender AS checkinGender,
-				RC.checkinAge AS checkinAge,
-				RC.customerName AS contractCustomerName,
-				RC.customerPhone AS contractCustomerPhone,
-				RC.customerGender AS contractCustomerGender,
-				RC.customerAge AS contractCustomerAge,
+				COALESCE(RCW.emergencyContact, RC.emergencyContact) AS emergencyContact,
+				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
+				COALESCE(RCW.checkinGender, RC.checkinGender) AS checkinGender,
+				COALESCE(RCW.checkinAge, RC.checkinAge) AS checkinAge,
+				COALESCE(RCW.customerName, RC.customerName) AS contractCustomerName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) AS contractCustomerPhone,
+				COALESCE(RCW.customerGender, RC.customerGender) AS contractCustomerGender,
+				COALESCE(RCW.customerAge, RC.customerAge) AS contractCustomerAge,
 				R.agreementType AS agreementType,
 				R.agreementContent AS agreementContent,
 				G.contract AS gsw_contract,
@@ -313,6 +314,7 @@ exports.getContractDetail = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`;
@@ -438,17 +440,27 @@ exports.updateContract = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 정보 조회
+		// 계약 정보 조회 (roomContractWho 포함)
 		const contractInfo = await mariaDBSequelize.query(
 			`
 			SELECT 
 				RC.*,
+				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
+				COALESCE(RCW.checkinGender, RC.checkinGender) AS checkinGender,
+				COALESCE(RCW.checkinAge, RC.checkinAge) AS checkinAge,
+				COALESCE(RCW.customerName, RC.customerName) AS customerName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) AS customerPhone,
+				COALESCE(RCW.customerGender, RC.customerGender) AS customerGender,
+				COALESCE(RCW.customerAge, RC.customerAge) AS customerAge,
+				COALESCE(RCW.emergencyContact, RC.emergencyContact) AS emergencyContact,
 				C.birth AS customerBirth,
 				D.contractorEsntlId,
 				D.accountHolder AS depositAccountHolder
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
 			WHERE RC.esntlId = ?
 			LIMIT 1
@@ -515,59 +527,61 @@ exports.updateContract = async (req, res, next) => {
 				`입실자 메모2: ${contract.memo2 || '없음'} → ${occupantMemo2 || '없음'}`
 			);
 		}
+		// roomContractWho 테이블 업데이트 대상 (입실자/계약고객/비상연락망)
+		const whoUpdateData = {};
 		if (
 			emergencyContact !== undefined &&
 			emergencyContact !== contract.emergencyContact
 		) {
-			contractUpdateData.emergencyContact = emergencyContact;
+			whoUpdateData.emergencyContact = emergencyContact;
 			changes.push(
 				`비상연락망/관계: ${contract.emergencyContact || '없음'} → ${emergencyContact || '없음'}`
 			);
 		}
 		if (checkinName !== undefined && checkinName !== contract.checkinName) {
-			contractUpdateData.checkinName = checkinName;
+			whoUpdateData.checkinName = checkinName;
 			changes.push(
 				`체크인한 사람 이름: ${contract.checkinName || '없음'} → ${checkinName || '없음'}`
 			);
 		}
 		if (checkinPhone !== undefined && checkinPhone !== contract.checkinPhone) {
-			contractUpdateData.checkinPhone = checkinPhone;
+			whoUpdateData.checkinPhone = checkinPhone;
 			changes.push(
 				`체크인한 사람 연락처: ${contract.checkinPhone || '없음'} → ${checkinPhone || '없음'}`
 			);
 		}
 		if (checkinGender !== undefined && checkinGender !== contract.checkinGender) {
-			contractUpdateData.checkinGender = checkinGender;
+			whoUpdateData.checkinGender = checkinGender;
 			changes.push(
 				`체크인한 사람 성별: ${contract.checkinGender || '없음'} → ${checkinGender || '없음'}`
 			);
 		}
 		if (checkinAge !== undefined && checkinAge !== contract.checkinAge) {
-			contractUpdateData.checkinAge = checkinAge;
+			whoUpdateData.checkinAge = checkinAge;
 			changes.push(
 				`체크인한 사람 나이: ${contract.checkinAge || '없음'} → ${checkinAge || '없음'}`
 			);
 		}
 		if (contractCustomerName !== undefined && contractCustomerName !== contract.customerName) {
-			contractUpdateData.customerName = contractCustomerName;
+			whoUpdateData.customerName = contractCustomerName;
 			changes.push(
 				`고객 이름: ${contract.customerName || '없음'} → ${contractCustomerName || '없음'}`
 			);
 		}
 		if (contractCustomerPhone !== undefined && contractCustomerPhone !== contract.customerPhone) {
-			contractUpdateData.customerPhone = contractCustomerPhone;
+			whoUpdateData.customerPhone = contractCustomerPhone;
 			changes.push(
 				`고객 연락처: ${contract.customerPhone || '없음'} → ${contractCustomerPhone || '없음'}`
 			);
 		}
 		if (contractCustomerGender !== undefined && contractCustomerGender !== contract.customerGender) {
-			contractUpdateData.customerGender = contractCustomerGender;
+			whoUpdateData.customerGender = contractCustomerGender;
 			changes.push(
 				`고객 성별: ${contract.customerGender || '없음'} → ${contractCustomerGender || '없음'}`
 			);
 		}
 		if (contractCustomerAge !== undefined && contractCustomerAge !== contract.customerAge) {
-			contractUpdateData.customerAge = contractCustomerAge;
+			whoUpdateData.customerAge = contractCustomerAge;
 			changes.push(
 				`고객 나이: ${contract.customerAge || '없음'} → ${contractCustomerAge || '없음'}`
 			);
@@ -695,6 +709,26 @@ exports.updateContract = async (req, res, next) => {
 				{
 					replacements: values,
 					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+
+		// roomContractWho upsert (입실자/계약고객/비상연락망)
+		if (Object.keys(whoUpdateData).length > 0) {
+			const whoKeys = ['checkinName', 'checkinPhone', 'checkinGender', 'checkinAge', 'customerName', 'customerPhone', 'customerGender', 'customerAge', 'emergencyContact'];
+			const whoValues = [
+				contractEsntlId,
+				...(whoKeys.map((k) => (whoUpdateData[k] !== undefined ? whoUpdateData[k] : (contract[k] ?? null)))),
+			];
+			const placeholders = ['?', ...whoKeys.map(() => '?')].join(', ');
+			const updateClause = whoKeys.map((c) => `${c} = VALUES(${c})`).join(', ');
+			await mariaDBSequelize.query(
+				`INSERT INTO roomContractWho (contractEsntlId, ${whoKeys.join(', ')}, updatedAt) VALUES (${placeholders}, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
+				 ON DUPLICATE KEY UPDATE ${updateClause}, updatedAt = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)`,
+				{
+					replacements: whoValues,
+					type: mariaDBSequelize.QueryTypes.INSERT,
 					transaction,
 				}
 			);

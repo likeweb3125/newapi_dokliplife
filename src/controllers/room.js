@@ -414,12 +414,8 @@ exports.createRoom = async (req, res, next) => {
 			return dateValue;
 		};
 
-		// monthlyRent를 만단위로 나눠서 저장
-		let monthlyRentValue = null;
-		if (monthlyRent !== undefined && monthlyRent !== null && monthlyRent !== '') {
-			const rentNum = parseFloat(monthlyRent) || 0;
-			monthlyRentValue = rentNum > 0 ? (rentNum / 10000).toString() : null;
-		}
+		// monthlyRent(만원 단위) 받은 값 그대로 저장 (0.5, 1 등 가공 없음)
+		const monthlyRentToStore = (monthlyRent !== undefined && monthlyRent !== null && monthlyRent !== '') ? String(monthlyRent) : null;
 
 		await room.create(
 			{
@@ -429,7 +425,7 @@ exports.createRoom = async (req, res, next) => {
 				roomType: roomType || null,
 				roomCategory: roomCategory || null,
 				deposit: deposit !== undefined ? parseInt(deposit, 10) : null,
-				monthlyRent: monthlyRentValue,
+				monthlyRent: monthlyRentToStore,
 				startDate: validateDate(startDate, 'startDate'),
 				endDate: validateDate(endDate, 'endDate'),
 				rom_checkout_expected_date: validateDate(rom_checkout_expected_date, 'rom_checkout_expected_date'),
@@ -578,14 +574,12 @@ exports.updateRoom = async (req, res, next) => {
 			updateData.deposit = parseInt(deposit, 10);
 			changes.push(`보증금: ${roomInfo.deposit || 0} → ${deposit}`);
 		}
-		if (monthlyRent !== undefined && monthlyRent !== null && monthlyRent !== '') {
-			// monthlyRent를 만단위로 나눠서 저장
-			const rentNum = parseFloat(monthlyRent) || 0;
-			const monthlyRentValue = rentNum > 0 ? (rentNum / 10000).toString() : null;
-			
-			if (monthlyRentValue !== roomInfo.monthlyRent) {
-				updateData.monthlyRent = monthlyRentValue;
-				changes.push(`월세: ${roomInfo.monthlyRent || 0} → ${monthlyRentValue}`);
+		if (monthlyRent !== undefined) {
+			// monthlyRent(만원 단위) 받은 값 그대로 저장 (0.5, 1 등 가공 없음)
+			const valueToStore = (monthlyRent !== null && monthlyRent !== '') ? String(monthlyRent) : null;
+			if (valueToStore !== roomInfo.monthlyRent) {
+				updateData.monthlyRent = valueToStore;
+				changes.push(`월세: ${roomInfo.monthlyRent ?? '없음'} → ${valueToStore ?? '없음'}`);
 			}
 		}
 		if (status !== undefined && status !== roomInfo.status) {

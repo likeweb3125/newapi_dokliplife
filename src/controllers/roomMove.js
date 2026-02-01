@@ -282,6 +282,23 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
+		// roomContractWho 복사 (기존 계약 → 새 계약)
+		await mariaDBSequelize.query(
+			`
+			INSERT INTO roomContractWho (contractEsntlId, checkinName, checkinPhone, checkinGender, checkinAge, customerName, customerPhone, customerGender, customerAge, emergencyContact, createdAt, updatedAt)
+			SELECT ?, COALESCE(RCW.checkinName, RC.checkinName), COALESCE(RCW.checkinPhone, RC.checkinPhone), COALESCE(RCW.checkinGender, RC.checkinGender), COALESCE(RCW.checkinAge, RC.checkinAge), COALESCE(RCW.customerName, RC.customerName), COALESCE(RCW.customerPhone, RC.customerPhone), COALESCE(RCW.customerGender, RC.customerGender), COALESCE(RCW.customerAge, RC.customerAge), COALESCE(RCW.emergencyContact, RC.emergencyContact), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
+			FROM roomContract RC
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+			WHERE RC.esntlId = ?
+			LIMIT 1
+			`,
+			{
+				replacements: [newContractEsntlId, contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+
 		// 4. 새로운 roomStatus 레코드 생성 (이동할 방용, 새로운 계약서 연결)
 		// statusStartDate는 moveDate, statusEndDate는 새 계약서의 endDate로 설정
 		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);

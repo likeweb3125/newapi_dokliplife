@@ -1391,8 +1391,8 @@ exports.getReservationList = async (req, res, next) => {
 			whereConditions.push(`(
 				R.roomNumber LIKE ? OR
 				R.esntlId LIKE ? OR
-				RC.checkinName LIKE ? OR
-				RC.customerName LIKE ?
+				COALESCE(RCW.checkinName, RC.checkinName) LIKE ? OR
+				COALESCE(RCW.customerName, RC.customerName) LIKE ?
 			)`);
 			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
@@ -1424,10 +1424,10 @@ exports.getReservationList = async (req, res, next) => {
 				G.name as gosiwonName,
 				RC.esntlId as contractEsntlId,
 				RS.status as roomStatus,
-				RC.checkinName as reservationName,
-				RC.checkinPhone as reservationPhone,
-				RC.customerName as contractorName,
-				RC.customerPhone as contractorPhone,
+				COALESCE(RCW.checkinName, RC.checkinName) as reservationName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) as reservationPhone,
+				COALESCE(RCW.customerName, RC.customerName) as contractorName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) as contractorPhone,
 				DATE(RC.startDate) as checkInDate,
 				DATE(RC.endDate) as checkOutDate,
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
@@ -1455,6 +1455,7 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN (
 				SELECT D_inner.rom_eid, D_inner.rdp_eid, D_inner.rdp_completed_dtm
 				FROM il_room_deposit D_inner
@@ -1498,6 +1499,7 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN (
 				SELECT D_inner.rom_eid, D_inner.rdp_eid, D_inner.rdp_completed_dtm
 				FROM il_room_deposit D_inner
@@ -1687,8 +1689,8 @@ exports.getDepositList = async (req, res, next) => {
 			whereConditions.push(`(
 				R.roomNumber LIKE ? OR
 				R.esntlId LIKE ? OR
-				RC.checkinName LIKE ? OR
-				RC.customerName LIKE ?
+				COALESCE(RCW.checkinName, RC.checkinName) LIKE ? OR
+				COALESCE(RCW.customerName, RC.customerName) LIKE ?
 			)`);
 			replacements.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
 		}
@@ -1717,10 +1719,10 @@ exports.getDepositList = async (req, res, next) => {
 				R.customerEsntlId as currentOccupantID,
 				C.bank as customerBank,
 				C.bankAccount as customerBankAccount,
-				RC.checkinName,
-				RC.checkinPhone,
-				RC.customerName as contractorName,
-				RC.customerPhone as contractorPhone,
+				COALESCE(RCW.checkinName, RC.checkinName) AS checkinName,
+				COALESCE(RCW.checkinPhone, RC.checkinPhone) AS checkinPhone,
+				COALESCE(RCW.customerName, RC.customerName) as contractorName,
+				COALESCE(RCW.customerPhone, RC.customerPhone) as contractorPhone,
 				D.rdp_price as depositAmount,
 				RC.esntlId as contractEsntlId,
 				DATE(RC.startDate) as moveInDate,
@@ -1779,6 +1781,7 @@ exports.getDepositList = async (req, res, next) => {
 					GROUP BY roomEsntlId
 				) RC2 ON RC1.roomEsntlId = RC2.roomEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			${whereClause}
 			ORDER BY 
 				COALESCE(D.rdp_regist_dtm, '1970-01-01') DESC,

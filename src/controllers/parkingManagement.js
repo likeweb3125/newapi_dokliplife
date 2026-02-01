@@ -359,9 +359,9 @@ exports.getParkingNowList = async (req, res, next) => {
 				PS.contractEsntlId AS contractEsntlId,
 				RC.roomEsntlId AS roomEsntlId,
 				R.roomNumber AS roomNumber,
-				COALESCE(RC.customerName, C.name) AS customerName,
-				COALESCE(RC.customerGender, C.gender) AS customerGender,
-				COALESCE(RC.customerAge, 
+				COALESCE(RCW.customerName, RC.customerName, C.name) AS customerName,
+				COALESCE(RCW.customerGender, RC.customerGender, C.gender) AS customerGender,
+				COALESCE(RCW.customerAge, RC.customerAge, 
 					CASE 
 						WHEN C.birth IS NOT NULL AND C.birth != '' 
 						THEN ROUND((TO_DAYS(NOW()) - TO_DAYS(C.birth)) / 365)
@@ -376,6 +376,7 @@ exports.getParkingNowList = async (req, res, next) => {
 				COALESCE(PS.cost, 0) AS cost
 			FROM parkStatus PS
 			LEFT JOIN roomContract RC ON PS.contractEsntlId = RC.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN room R ON RC.roomEsntlId = R.esntlId
 			LEFT JOIN customer C ON PS.customerEsntlId = C.esntlId
 			WHERE PS.gosiwonEsntlId = ?
