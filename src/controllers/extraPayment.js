@@ -264,6 +264,26 @@ exports.roomExtraPayment = async (req, res, next) => {
 				});
 
 				if (parkingInfo) {
+					// extraCostName이 '주차비'일 때: autoUse/bikeUse가 한도(auto/bike)를 초과하면 경고(에러)
+					if (extraCostName === '주차비') {
+						const maxAuto = parkingInfo.auto ?? 0;
+						const maxBike = parkingInfo.bike ?? 0;
+						const currentAutoUse = parkingInfo.autoUse ?? 0;
+						const currentBikeUse = parkingInfo.bikeUse ?? 0;
+						if (optionName === '자동차' && currentAutoUse >= maxAuto) {
+							errorHandler.errorThrow(
+								400,
+								`자동차 주차 가능 대수(${maxAuto}대)를 초과했습니다. 현재 사용 중: ${currentAutoUse}대.`
+							);
+						}
+						if (optionName === '오토바이' && currentBikeUse >= maxBike) {
+							errorHandler.errorThrow(
+								400,
+								`오토바이 주차 가능 대수(${maxBike}대)를 초과했습니다. 현재 사용 중: ${currentBikeUse}대.`
+							);
+						}
+					}
+
 					// 사용 대수 증가
 					if (optionName === '자동차') {
 						await parking.update(
