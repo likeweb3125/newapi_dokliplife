@@ -48,15 +48,6 @@ const generateRoomMoveStatusId = async (transaction) => {
 	return result?.nextId || `${ROOMMOVE_PREFIX}${String(1).padStart(ROOMMOVE_PADDING, '0')}`;
 };
 
-// 계약서 ID 생성 함수
-const generateContractId = async (transaction) => {
-	const [result] = await mariaDBSequelize.query(
-		`SELECT CONCAT('RCTT', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 5) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId FROM roomContract WHERE esntlId LIKE 'RCTT%'`,
-		{ type: mariaDBSequelize.QueryTypes.SELECT, transaction }
-	);
-	return result?.nextId || 'RCTT0000000001';
-};
-
 // 방이동 처리
 exports.processRoomMove = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -243,8 +234,8 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
-		// 3. 새로운 계약서 생성
-		const newContractEsntlId = await generateContractId(transaction);
+		// 3. 새로운 계약서 생성 (IDS 테이블 roomContract RCTT)
+		const newContractEsntlId = await idsNext('roomContract', 'RCTT', transaction);
 		const contractDate = new Date();
 		const contractDateStr = `${contractDate.getFullYear()}-${String(contractDate.getMonth() + 1).padStart(2, '0')}-${String(contractDate.getDate()).padStart(2, '0')}`;
 		
@@ -387,6 +378,50 @@ exports.processRoomMove = async (req, res, next) => {
 				transaction,
 			}
 		);
+
+		// room 테이블 상태값 (docs/room_move_logic.md, 스케줄러 제외)
+		const isMoveToday = moveDateStr === todayStr;
+		if (isMoveToday) {
+			// 이동일이 오늘: 기존방 CONTRACT → EMPTY, 이동방 → CONTRACT
+			await room.update(
+				{ status: 'EMPTY' },
+				{ where: { esntlId: originalRoomEsntlId }, transaction }
+			);
+			await room.update(
+				{ status: 'CONTRACT' },
+				{ where: { esntlId: targetRoomEsntlId }, transaction }
+			);
+		} else {
+			// 이동일이 오늘이 아님: 기존방 CONTRACT → LEAVE, 이동방 → RESERVE
+			await room.update(
+				{ status: 'LEAVE' },
+				{ where: { esntlId: originalRoomEsntlId }, transaction }
+			);
+			await room.update(
+				{ status: 'RESERVE' },
+				{ where: { esntlId: targetRoomEsntlId }, transaction }
+			);
+		}
+
+		// 이동일이 오늘일 때만: extraPayment, parkStatus의 contractEsntlId를 기존 → 신규 계약서 id로 변경 (docs/room_move_logic.md, 스케줄러 제외)
+		if (isMoveToday) {
+			await mariaDBSequelize.query(
+				`UPDATE extraPayment SET contractEsntlId = ? WHERE contractEsntlId = ?`,
+				{
+					replacements: [newContractEsntlId, contractEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+			await mariaDBSequelize.query(
+				`UPDATE parkStatus SET contractEsntlId = ? WHERE contractEsntlId = ? AND deleteYN = 'N'`,
+				{
+					replacements: [newContractEsntlId, contractEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
 
 		// 3. roomMoveStatus에 저장
 		const roomMoveStatusId = await generateRoomMoveStatusId(transaction);

@@ -1646,7 +1646,7 @@ exports.getFreeRoomList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
 		}
 
-		// roomStatus 테이블에서 ON_SALE, BEFORE_SALE 상태인 방들을 조회하고 room 테이블과 join
+		// room 기준만 사용, roomStatus 조건 제거. room.status IN ('OPEN', 'EMPTY', 'LEAVE'), deleteYN = 'N'
 		const query = `
 			SELECT 
 				R.esntlId,
@@ -1677,27 +1677,11 @@ exports.getFreeRoomList = async (req, res, next) => {
 				R.orderNo,
 				R.agreementType,
 				R.agreementContent,
-				R.availableGender,
-				RS.esntlId AS roomStatusId,
-				RS.gosiwonEsntlId AS roomStatusGosiwonEsntlId,
-				RS.status AS roomStatusStatus,
-				RS.customerEsntlId AS roomStatusCustomerEsntlId,
-				RS.customerName,
-				RS.reservationEsntlId,
-				RS.reservationName,
-				RS.contractorEsntlId,
-				RS.contractorName,
-				RS.statusStartDate,
-				RS.statusEndDate,
-				RS.etcStartDate,
-				RS.etcEndDate,
-				RS.createdAt AS roomStatusCreatedAt,
-				RS.updatedAt AS roomStatusUpdatedAt
-			FROM roomStatus RS
-			INNER JOIN room R ON RS.roomEsntlId = R.esntlId
+				R.availableGender
+			FROM room R
 			WHERE R.gosiwonEsntlId = :goID
-				AND RS.status IN ('ON_SALE', 'BEFORE_SALE')
 				AND R.deleteYN = 'N'
+				AND R.status IN ('OPEN', 'EMPTY', 'LEAVE')
 			ORDER BY R.orderNo ASC
 		`;
 
@@ -1706,8 +1690,9 @@ exports.getFreeRoomList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// monthlyRent를 만단위로 변환하여 리턴
-		const formattedRoomList = roomList.map((room) => {
+		// 최종 조건: room.deleteYN = 'N'만 통과 (N이 아니면 아웃)
+		const filteredRoomList = roomList.filter((room) => room.deleteYN === 'N');
+		const formattedRoomList = filteredRoomList.map((room) => {
 			if (room.monthlyRent) {
 				const rentValue = parseFloat(room.monthlyRent) || 0;
 				room.monthlyRent = (rentValue * 10000).toString();
