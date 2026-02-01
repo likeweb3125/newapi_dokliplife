@@ -13,6 +13,17 @@ const mariaDBSequelize = new Sequelize(
 	mariaDBConfig
 );
 
+// 연결 직후·풀에서 획득할 때마다 세션 타임존을 한국 시간으로 고정 (NOW(), CURRENT_TIMESTAMP가 KST로 동작)
+const setSessionTimezone = async (connection) => {
+	if (connection && typeof connection.query === 'function') {
+		const q = connection.query("SET time_zone = 'Asia/Seoul'");
+		if (q && typeof q.then === 'function') await q;
+		else await new Promise((resolve, reject) => { connection.query("SET time_zone = 'Asia/Seoul'", (err) => (err ? reject(err) : resolve())); });
+	}
+};
+mariaDBSequelize.addHook('afterConnect', setSessionTimezone);
+mariaDBSequelize.addHook('afterPoolAcquire', setSessionTimezone);
+
 db.mariaDBSequelize = mariaDBSequelize;
 
 // DB 연결
