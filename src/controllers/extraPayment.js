@@ -12,6 +12,7 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const aligoSMS = require('../module/aligo/sms');
 
 const EXTR_PREFIX = 'EXTR';
 const EXTR_PADDING = 10;
@@ -61,6 +62,35 @@ const compareDates = (date1, date2) => {
 	const d1 = new Date(date1);
 	const d2 = new Date(date2);
 	return d1.getTime() - d2.getTime();
+};
+
+// 추가결제 링크 문자 발송 (receiver 번호로, messageSmsHistory 저장)
+const sendExtraPaymentLinkSMS = async (receiverPhone, extEid, writerAdminId, gosiwonEsntlId, customerEsntlId) => {
+	if (!receiverPhone || !String(receiverPhone).trim()) return;
+	try {
+		const link = `https://doklipuser.likeweb.co.kr/v2?page=extraPay&ext_eid=${extEid}`;
+		const title = '[독립생활]추가결제 안내';
+		const message = `다음 링크에서 결제해주세요\n${link}`;
+		await aligoSMS.send({ receiver: receiverPhone.trim(), title, message });
+
+		const historyEsntlId = await idsNext('messageSmsHistory');
+		const firstReceiver = String(receiverPhone).trim().split(',')[0]?.trim() || String(receiverPhone).trim();
+		const userRows = await mariaDBSequelize.query(
+			`SELECT C.esntlId FROM customer C WHERE C.phone = :receiverPhone LIMIT 1`,
+			{ replacements: { receiverPhone: firstReceiver }, type: mariaDBSequelize.QueryTypes.SELECT }
+		);
+		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0 ? userRows[0].esntlId : customerEsntlId || null;
+		await mariaDBSequelize.query(
+			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy, createdAt, updatedAt)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+			{
+				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiver, writerAdminId || null],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+			}
+		);
+	} catch (err) {
+		console.error('추가결제 링크 문자 발송 실패:', err);
+	}
 };
 
 // uniqueId 생성 함수 (pDate와 esntlId를 기반으로 생성)
@@ -308,6 +338,19 @@ exports.roomExtraPayment = async (req, res, next) => {
 		);
 
 		await transaction.commit();
+
+		// 추가결제 링크 SMS 발송 (수신자: body.receiverPhone 또는 계약 고객 연락처)
+		const receiverPhoneToUse = receiverPhone || (contract.customerEsntlId ? (await customer.findByPk(contract.customerEsntlId, { attributes: ['phone'] }))?.phone : null);
+		if (receiverPhoneToUse && createdPayments.length > 0) {
+			const firstExtEid = createdPayments[0].esntlId;
+			await sendExtraPaymentLinkSMS(
+				receiverPhoneToUse,
+				firstExtEid,
+				writerAdminId,
+				contract.gosiwonEsntlId,
+				contract.customerEsntlId || null
+			);
+		}
 
 		errorHandler.successThrow(res, '추가 결제 요청이 완료되었습니다.', {
 			contractEsntlId: contractEsntlId,
