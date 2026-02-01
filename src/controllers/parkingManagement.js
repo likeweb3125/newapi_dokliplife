@@ -322,7 +322,7 @@ exports.getParkingList = async (req, res, next) => {
 				AND (EP.useStartDate <=> PS.useStartDate)
 			WHERE PS.contractEsntlId = ?
 				AND PS.deleteYN = 'N'
-				AND (PS.status = 'IN_USE' OR PS.status = 'RESERVED')
+				AND (PS.status IN ('IN_USE', 'RESERVED', 'PENDING'))
 				AND (PS.parkType = '자동차' OR PS.parkType = '오토바이')
 			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;

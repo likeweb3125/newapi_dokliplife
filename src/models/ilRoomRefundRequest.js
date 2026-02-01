@@ -104,7 +104,7 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.DATE,
 				allowNull: false,
 				field: 'rrr_regist_dtm',
-				defaultValue: DataTypes.NOW,
+				defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
 				comment: '등록일시',
 			},
 			rrr_registrant_id: {

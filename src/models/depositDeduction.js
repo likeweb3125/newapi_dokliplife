@@ -32,7 +32,7 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.DATE,
 				allowNull: false,
 				field: 'createdAt',
-				defaultValue: DataTypes.NOW,
+				defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
 				comment: '생성일',
 			},
 		},

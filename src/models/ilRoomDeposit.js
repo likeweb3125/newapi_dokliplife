@@ -69,7 +69,7 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.DATE,
 				allowNull: false,
 				field: 'rdp_regist_dtm',
-				defaultValue: DataTypes.NOW,
+				defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
 				comment: '등록일시',
 			},
 			registrantId: {
@@ -82,7 +82,7 @@ module.exports = (sequelize, DataTypes) => {
 				type: DataTypes.DATE,
 				allowNull: false,
 				field: 'rdp_update_dtm',
-				defaultValue: DataTypes.NOW,
+				defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
 				comment: '수정일시',
 			},
 			updaterId: {
