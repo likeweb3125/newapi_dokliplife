@@ -221,7 +221,7 @@ router.get('/', parkingManagementController.getParkingList);
  *                             description: 차량 번호
  *                           status:
  *                             type: string
- *                             description: 주차 상태 (IN_USE, RESERVED)
+ *                             description: 주차 상태 (CONTRACT, RESERVED)
  *                           useStartDate:
  *                             type: string
  *                             format: date

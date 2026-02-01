@@ -223,7 +223,7 @@ exports.createParkStatus = async (req, res, next) => {
 		const historyId = await generateHistoryId(transaction);
 		const statusText = {
 			AVAILABLE: '사용가능',
-			IN_USE: '사용중',
+			CONTRACT: '사용중',
 			RESERVED: '예약됨',
 			EXPIRED: '만료됨',
 		}[status] || status;
@@ -351,7 +351,7 @@ exports.updateParkStatus = async (req, res, next) => {
 			updateData.status = status;
 			const statusText = {
 				AVAILABLE: '사용가능',
-				IN_USE: '사용중',
+				CONTRACT: '사용중',
 				RESERVED: '예약됨',
 				EXPIRED: '만료됨',
 			};
@@ -476,7 +476,7 @@ exports.deleteParkStatus = async (req, res, next) => {
 		const historyId = await generateHistoryId(transaction);
 		const statusText = {
 			AVAILABLE: '사용가능',
-			IN_USE: '사용중',
+			CONTRACT: '사용중',
 			RESERVED: '예약됨',
 			EXPIRED: '만료됨',
 		}[existingParkStatus.status] || existingParkStatus.status;

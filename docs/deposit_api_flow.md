@@ -163,7 +163,7 @@ Deposit API 그룹은 보증금(예약금) 관리 기능을 제공합니다. 예
 | esntlId        | 방 상태 고유 아이디 (PK)                 |
 | roomEsntlId    | 방 고유 아이디 (FK)                      |
 | contractEsntlId | 계약 고유 아이디 (FK)                   |
-| status         | 방 상태 (ON_SALE, CAN_CHECKIN, IN_USE 등) |
+| status         | 방 상태 (ON_SALE, CAN_CHECKIN, CONTRACT 등) |
 | subStatus      | 하위 상태 (END 등)                       |
 | statusStartDate | 상태 시작일                            |
 | updatedAt      | 최종 업데이트 시간                       |

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `roomStatus` (
   `esntlId` VARCHAR(50) NOT NULL COMMENT '방 상태 고유아이디',
   `roomEsntlId` VARCHAR(50) NOT NULL COMMENT '방 고유아이디',
   `gosiwonEsntlId` VARCHAR(50) NOT NULL COMMENT '고시원 고유 아이디',
-  `status` VARCHAR(50) NOT NULL COMMENT '방 상태 (BEFORE_SALES: 판매신청전, ON_SALE: 판매중, PENDING: 입금대기중, RESERVED: 예약중, IN_USE: 이용중, OVERDUE: 체납상태, CHECKOUT_REQUESTED: 퇴실요청, CHECKOUT_CONFIRMED: 퇴실확정, ROOM_MOVE: 방이동)',
+  `status` VARCHAR(50) NOT NULL COMMENT '방 상태 (BEFORE_SALES: 판매신청전, ON_SALE: 판매중, PENDING: 입금대기중, RESERVED: 예약중, CONTRACT: 이용중, OVERDUE: 체납상태, CHECKOUT_REQUESTED: 퇴실요청, CHECKOUT_CONFIRMED: 퇴실확정, ROOM_MOVE: 방이동)',
   `subStatus` VARCHAR(50) NULL COMMENT '서브 방상태',
   `statusMemo` TEXT NULL COMMENT '상태 메모',
   `customerEsntlId` VARCHAR(50) NULL COMMENT '입실자 고유아이디',

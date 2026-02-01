@@ -62,7 +62,7 @@ const STATUS_MAP = {
 	'ON_SALE': { color: '#27A644', label: '판매중' },
 	'PENDING': { color: '#FFB800', label: '입금대기중' },
 	'RESERVED': { color: '#35BB88', label: '예약중' },
-	'IN_USE': { color: '#FF8A00', label: '이용중' },
+	'CONTRACT': { color: '#FF8A00', label: '이용중' },
 	'OVERDUE': { color: '#D25454', label: '체납상태' },
 	'CHECKOUT_REQUESTED': { color: '#9B9B9B', label: '퇴실요청' },
 	'CHECKOUT_CONFIRMED': { color: '#9B9B9B', label: '퇴실확정' },
@@ -114,7 +114,7 @@ exports.mngChartMain = async (req, res, next) => {
 				COALESCE(
 					RS.status,
 					CASE 
-						WHEN R.status = 'CONTRACT' THEN 'IN_USE'
+						WHEN R.status = 'CONTRACT' THEN 'CONTRACT'
 						WHEN R.status = 'RESERVE' THEN 'RESERVED'
 						WHEN R.status = 'VBANK' THEN 'PENDING'
 						WHEN R.status = 'EMPTY' OR R.status = '' OR R.status IS NULL THEN 'BEFORE_SALES'
@@ -134,17 +134,17 @@ exports.mngChartMain = async (req, res, next) => {
 				INNER JOIN (
 					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
 					FROM roomStatus
-					WHERE status IN ('IN_USE', 'RESERVED', 'PENDING', 'ON_SALE')
+					WHERE status IN ('CONTRACT', 'RESERVED', 'PENDING', 'ON_SALE')
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId 
 					AND RS1.updatedAt = RS2.maxUpdatedAt
-					AND RS1.status IN ('IN_USE', 'RESERVED', 'PENDING', 'ON_SALE')
+					AND RS1.status IN ('CONTRACT', 'RESERVED', 'PENDING', 'ON_SALE')
 				WHERE RS1.esntlId = (
 					SELECT esntlId 
 					FROM roomStatus RS3 
 					WHERE RS3.roomEsntlId = RS1.roomEsntlId 
 						AND RS3.updatedAt = RS2.maxUpdatedAt
-						AND RS3.status IN ('IN_USE', 'RESERVED', 'PENDING', 'ON_SALE')
+						AND RS3.status IN ('CONTRACT', 'RESERVED', 'PENDING', 'ON_SALE')
 					ORDER BY RS3.esntlId DESC
 					LIMIT 1
 				)
@@ -346,7 +346,7 @@ exports.mngChartMain = async (req, res, next) => {
 			// 계약 상태에 따른 className 결정
 			const contractStatus = contract.contractStatus;
 			let className = 'timeline-item leave';
-			if (contractStatus === 'ACTIVE' || contractStatus === 'IN_USE') {
+			if (contractStatus === 'ACTIVE' || contractStatus === 'CONTRACT') {
 				className = 'timeline-item in-progress';
 			}
 
@@ -723,9 +723,9 @@ exports.createTestData = async (req, res, next) => {
 
 			// 3. 방 상태 데이터 생성 (랜덤 상태 할당)
 			const statusId = await idsNext('roomStatus', undefined, transaction);
-			// 고객이 있으면 IN_USE 또는 RESERVED, 없으면 ON_SALE
+			// 고객이 있으면 CONTRACT 또는 RESERVED, 없으면 ON_SALE
 			const statusOptions = roomCustomers.length > 0 
-				? ['IN_USE', 'RESERVED', 'ON_SALE'] 
+				? ['CONTRACT', 'RESERVED', 'ON_SALE'] 
 				: ['ON_SALE'];
 			const status = statusOptions[getRandomInt(0, statusOptions.length - 1)];
 			
@@ -738,7 +738,7 @@ exports.createTestData = async (req, res, next) => {
 			
 			// 상태별 날짜 범위 설정 (2025년 8월부터 현재까지 랜덤)
 			let statusStartDate, statusEndDate;
-			if (status === 'IN_USE') {
+			if (status === 'CONTRACT') {
 				// 이용중: 랜덤 시작일부터 1개월 후까지
 				const randomStart = getRandomDateString(startDate, endDate);
 				const startDateObj = new Date(randomStart);
@@ -775,8 +775,8 @@ exports.createTestData = async (req, res, next) => {
 
 			createdData.roomStatuses.push({ esntlId: statusId, roomId, status });
 
-			// 4. 계약 데이터 생성 (IN_USE, RESERVED 상태인 경우만)
-			if (status === 'IN_USE' || status === 'RESERVED') {
+			// 4. 계약 데이터 생성 (CONTRACT, RESERVED 상태인 경우만)
+			if (status === 'CONTRACT' || status === 'RESERVED') {
 				const contractId = await generateContractId(transaction);
 				
 				// 계약별 날짜 범위 설정 (2025년 8월부터 현재까지 랜덤)
@@ -825,7 +825,7 @@ exports.createTestData = async (req, res, next) => {
 
 				createdData.contracts.push({ esntlId: contractId, roomId, customerId: selectedCustomer.esntlId });
 
-				// 4-1. 계약 관련 roomStatus 이력 생성 (PENDING, RESERVED, IN_USE 등)
+				// 4-1. 계약 관련 roomStatus 이력 생성 (PENDING, RESERVED, CONTRACT 등)
 				// 입금대기중 상태 (계약 시작일 3일 전)
 				const depositPendingDateObj = new Date(contractStartDate);
 				depositPendingDateObj.setDate(depositPendingDateObj.getDate() - 3);
@@ -888,7 +888,7 @@ exports.createTestData = async (req, res, next) => {
 					`INSERT INTO roomStatus (
 						esntlId, roomEsntlId, gosiwonEsntlId, status, customerEsntlId, customerName,
 						contractEsntlId, statusStartDate, statusEndDate, createdAt, updatedAt
-					) VALUES (?, ?, ?, 'IN_USE', ?, ?, ?, ?, ?, NOW(), NOW())`,
+					) VALUES (?, ?, ?, 'CONTRACT', ?, ?, ?, ?, ?, NOW(), NOW())`,
 					{
 						replacements: [
 							inUseStatusId,
@@ -904,7 +904,7 @@ exports.createTestData = async (req, res, next) => {
 						transaction,
 					}
 				);
-				createdData.roomStatuses.push({ esntlId: inUseStatusId, roomId, status: 'IN_USE' });
+				createdData.roomStatuses.push({ esntlId: inUseStatusId, roomId, status: 'CONTRACT' });
 
 				// 판매중 상태 (계약 시작 전 - 랜덤하게 일부 방에만)
 				if (getRandomInt(0, 2) === 0) { // 33% 확률

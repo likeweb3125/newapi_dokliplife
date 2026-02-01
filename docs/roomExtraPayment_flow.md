@@ -79,7 +79,7 @@
 | gosiwonEsntlId | 고시원 ID                              |
 | contractEsntlId | 계약 ID                                |
 | customerEsntlId | 고객 ID                                |
-| status        | `IN_USE`                                |
+| status        | `CONTRACT`                                |
 | useStartDate  | 이용 시작일 (useStartDate 또는 pDate)   |
 | useEndDate    | 계약 종료일 (contract.endDate)          |
 | memo          | optionInfo (차량번호 등)                |
@@ -142,7 +142,7 @@
     |                  +-- 있으면
     |                  |     · 자동차 → autoUse +1
     |                  |     · 오토바이 → bikeUse +1
-    |                  |     · parkStatus INSERT (IN_USE, useStartDate, useEndDate, memo=optionInfo)
+    |                  |     · parkStatus INSERT (CONTRACT, useStartDate, useEndDate, memo=optionInfo)
     |                  |
     |         NO  --> skip
     |

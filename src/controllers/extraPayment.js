@@ -300,7 +300,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 							gosiwonEsntlId: contract.gosiwonEsntlId,
 							contractEsntlId: contractEsntlId,
 							customerEsntlId: contract.customerEsntlId || null,
-							status: 'PENDING', // 추가결제 등록 시 대기 상태, 결제 완료 후 IN_USE 등으로 변경
+							status: 'PENDING', // 추가결제 등록 시 대기 상태, 결제 완료 후 CONTRACT 등으로 변경
 							useStartDate: useStartDate || pDate,
 							useEndDate: contract.endDate || null,
 							parkType: parkingOptionName, // 자동차 / 오토바이 (기타 비용은 자동차로 처리)

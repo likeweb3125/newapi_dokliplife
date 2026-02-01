@@ -233,7 +233,7 @@ exports.createParking = async (req, res, next) => {
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				contractEsntlId: contractEsntlId,
 				customerEsntlId: contract.customerEsntlId || null,
-				status: 'IN_USE',
+				status: 'CONTRACT',
 				useStartDate: useStartDate || pDate,
 				useEndDate: useEndDate || contract.endDate || null,
 				parkType: optionName,
@@ -322,7 +322,7 @@ exports.getParkingList = async (req, res, next) => {
 				AND (EP.useStartDate <=> PS.useStartDate)
 			WHERE PS.contractEsntlId = ?
 				AND PS.deleteYN = 'N'
-				AND (PS.status IN ('IN_USE', 'RESERVED', 'PENDING'))
+				AND (PS.status IN ('CONTRACT', 'RESERVED', 'PENDING'))
 				AND (PS.parkType = '자동차' OR PS.parkType = '오토바이')
 			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;
@@ -380,7 +380,7 @@ exports.getParkingNowList = async (req, res, next) => {
 			LEFT JOIN room R ON RC.roomEsntlId = R.esntlId
 			LEFT JOIN customer C ON PS.customerEsntlId = C.esntlId
 			WHERE PS.gosiwonEsntlId = ?
-				AND PS.status IN ('IN_USE', 'RESERVED')
+				AND PS.status IN ('CONTRACT', 'RESERVED')
 				AND PS.deleteYN = 'N'
 			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;

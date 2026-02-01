@@ -97,7 +97,7 @@
 | 컬럼           | 용도                                                                      |
 |----------------|---------------------------------------------------------------------------|
 | contractEsntlId | 계약 고유 아이디 (FK)                                                      |
-| status         | 방 상태 (PENDING, RESERVED, IN_USE, OVERDUE, CHECKOUT_CONFIRMED, UNPAID) |
+| status         | 방 상태 (PENDING, RESERVED, CONTRACT, OVERDUE, CHECKOUT_CONFIRMED, UNPAID) |
 
 **조인 조건:**
 - `RC.esntlId = RS.contractEsntlId` (LEFT JOIN)
@@ -149,7 +149,7 @@ GROUP BY contractEsntlId
 | page        | integer           | 아니오 | 1     | 페이지 번호                                                  |
 | limit       | integer           | 아니오 | 50    | 페이지당 항목 수                                              |
 | status      | string            | 아니오 | -     | 계약 상태 필터 (roomContract.status)                          |
-| roomStatus  | string            | 아니오 | -     | 방 상태 필터 (PENDING, RESERVED, IN_USE, OVERDUE, CHECKOUT_CONFIRMED, UNPAID) |
+| roomStatus  | string            | 아니오 | -     | 방 상태 필터 (PENDING, RESERVED, CONTRACT, OVERDUE, CHECKOUT_CONFIRMED, UNPAID) |
 | startDate   | string (YYYY-MM-DD) | 아니오 | -     | 계약일 시작일                                                 |
 | endDate     | string (YYYY-MM-DD) | 아니오 | -     | 계약일 종료일                                                 |
 | searchString | string           | 아니오 | -     | 검색어 (고시원 ID, 고시원명, 고객명, 고객 전화번호)            |
@@ -283,7 +283,7 @@ roomContract (RC) ──┬── INNER JOIN ──► gosiwon (G)
 **요청**
 
 ```
-GET /v1/roomContract/list?page=1&limit=50&roomStatus=IN_USE&startDate=2024-01-01&endDate=2024-12-31&order=DESC
+GET /v1/roomContract/list?page=1&limit=50&roomStatus=CONTRACT&startDate=2024-01-01&endDate=2024-12-31&order=DESC
 Authorization: Bearer {token}
 ```
 
@@ -370,7 +370,7 @@ Authorization: Bearer {token}
 - **방 상태**: `roomStatus` 파라미터로 `roomStatus.status` 필터링
   - PENDING: 입금대기중
   - RESERVED: 예약중
-  - IN_USE: 이용중
+  - CONTRACT: 이용중
   - OVERDUE: 체납상태
   - CHECKOUT_CONFIRMED: 퇴실확정
   - UNPAID: 보증금 미납

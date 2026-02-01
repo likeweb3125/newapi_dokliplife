@@ -878,7 +878,7 @@ exports.getDepositHistory = async (req, res, next) => {
 			offset: offset,
 		});
 
-		// roomStatus에서 status가 IN_USE인 contractEsntlId 조회
+		// roomStatus에서 status가 CONTRACT인 contractEsntlId 조회
 		const roomEsntlIds = rows.map((row) => row.roomEsntlId).filter((id) => id);
 		let roomStatusMap = {};
 		if (roomEsntlIds.length > 0) {
@@ -886,7 +886,7 @@ exports.getDepositHistory = async (req, res, next) => {
 				SELECT roomEsntlId, contractEsntlId
 				FROM roomStatus
 				WHERE roomEsntlId IN (:roomEsntlIds)
-					AND status = 'IN_USE'
+					AND status = 'CONTRACT'
 			`;
 			const roomStatusRows = await mariaDBSequelize.query(roomStatusQuery, {
 				replacements: { roomEsntlIds: roomEsntlIds },
@@ -927,7 +927,7 @@ exports.getDepositHistory = async (req, res, next) => {
 			if (rowData.refundDate) {
 				rowData.refundDate = formatToSeoulTime(rowData.refundDate);
 			}
-			// roomStatus에서 status가 IN_USE인 contractEsntlId로 교체 (없으면 null)
+			// roomStatus에서 status가 CONTRACT인 contractEsntlId로 교체 (없으면 null)
 			if (rowData.roomEsntlId && roomStatusMap[rowData.roomEsntlId]) {
 				rowData.contractEsntlId = roomStatusMap[rowData.roomEsntlId];
 			} else {

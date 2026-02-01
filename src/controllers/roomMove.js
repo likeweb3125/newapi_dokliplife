@@ -150,7 +150,7 @@ exports.processRoomMove = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId 
 				AND RS.roomEsntlId = ?
-				AND RS.status = 'IN_USE'
+				AND RS.status = 'CONTRACT'
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`,
@@ -164,7 +164,7 @@ exports.processRoomMove = async (req, res, next) => {
 		if (!contractInfo || !contractInfo.roomStatusEsntlId) {
 			errorHandler.errorThrow(
 				404,
-				'계약 정보 또는 IN_USE 상태의 방 상태를 찾을 수 없습니다.'
+				'계약 정보 또는 CONTRACT 상태의 방 상태를 찾을 수 없습니다.'
 			);
 		}
 
@@ -207,8 +207,7 @@ exports.processRoomMove = async (req, res, next) => {
 			`
 			UPDATE roomContract 
 			SET endDate = ?,
-				status = 'ENDED',
-				updatedAt = NOW()
+				status = 'ENDED'
 			WHERE esntlId = ?
 		`,
 			{
@@ -239,24 +238,20 @@ exports.processRoomMove = async (req, res, next) => {
 		const contractDate = new Date();
 		const contractDateStr = `${contractDate.getFullYear()}-${String(contractDate.getMonth() + 1).padStart(2, '0')}-${String(contractDate.getDate()).padStart(2, '0')}`;
 		
-		// 기존 계약서의 모든 필드를 복사하여 새 계약서 생성 (roomEsntlId와 날짜만 변경)
+		// 기존 계약서 필드 복사하여 새 계약서 생성 (who 컬럼은 roomContractWho에서 별도 복사, roomContract에는 customerName 등·contractorEsntlId 없음)
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO roomContract (
 				esntlId, roomEsntlId, gosiwonEsntlId, customerEsntlId,
 				startDate, endDate, contractDate, month, status,
-				customerName, customerPhone, customerGender, customerAge,
-				checkinName, checkinPhone, checkinGender, checkinAge,
-				monthlyRent, memo, memo2, emergencyContact,
-				checkInTime, contractorEsntlId
+				monthlyRent, memo, memo2,
+				checkInTime
 			)
 			SELECT 
 				?, ?, gosiwonEsntlId, customerEsntlId,
 				?, endDate, ?, month, 'ACTIVE',
-				customerName, customerPhone, customerGender, customerAge,
-				checkinName, checkinPhone, checkinGender, checkinAge,
-				monthlyRent, memo, memo2, emergencyContact,
-				checkInTime, contractorEsntlId
+				monthlyRent, memo, memo2,
+				checkInTime
 			FROM roomContract
 			WHERE esntlId = ?
 		`,
@@ -315,7 +310,7 @@ exports.processRoomMove = async (req, res, next) => {
 				statusMemo,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'IN_USE', 'ROOM_MOVE_IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+			) VALUES (?, ?, ?, 'CONTRACT', 'ROOM_MOVE_IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 		`,
 			{
 				replacements: [
@@ -701,8 +696,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 				`
 				UPDATE roomContract 
 				SET endDate = ?,
-					status = 'ACTIVE',
-					updatedAt = NOW()
+					status = 'ACTIVE'
 				WHERE esntlId = ?
 			`,
 				{
@@ -713,7 +707,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 			);
 		}
 
-		// 2. 원래 방의 roomStatus 복구 (ROOM_MOVE_OUT -> IN_USE, statusEndDate 복구)
+		// 2. 원래 방의 roomStatus 복구 (ROOM_MOVE_OUT -> CONTRACT, statusEndDate 복구)
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomStatus 
@@ -723,7 +717,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 				updatedAt = NOW()
 			WHERE contractEsntlId = ?
 				AND roomEsntlId = ?
-				AND status = 'IN_USE'
+				AND status = 'CONTRACT'
 				AND subStatus = 'ROOM_MOVE_OUT'
 		`,
 			{
@@ -738,13 +732,19 @@ exports.deleteRoomMove = async (req, res, next) => {
 			}
 		);
 
+		// 2-1. 이동 전 방(원래 방) room 테이블 상태값 CONTRACT로 복구
+		await room.update(
+			{ status: 'CONTRACT' },
+			{ where: { esntlId: existingRoomMove.originalRoomEsntlId }, transaction }
+		);
+
 		// 3. 새로운 방의 roomStatus 삭제 (ROOM_MOVE_IN 상태)
 		await mariaDBSequelize.query(
 			`
 			DELETE FROM roomStatus
 			WHERE contractEsntlId = ?
 				AND roomEsntlId = ?
-				AND status = 'IN_USE'
+				AND status = 'CONTRACT'
 				AND subStatus = 'ROOM_MOVE_IN'
 		`,
 			{
@@ -768,6 +768,12 @@ exports.deleteRoomMove = async (req, res, next) => {
 				type: mariaDBSequelize.QueryTypes.DELETE,
 				transaction,
 			}
+		);
+
+		// 4-1. 이동하려고 했던 방(타겟 방) room 테이블 상태값 EMPTY로 변경
+		await room.update(
+			{ status: 'EMPTY' },
+			{ where: { esntlId: existingRoomMove.targetRoomEsntlId }, transaction }
 		);
 
 		// 3. 타겟 방의 ON_SALE 상태 복구 (END -> 원래 상태로)
