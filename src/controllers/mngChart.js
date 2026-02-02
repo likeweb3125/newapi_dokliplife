@@ -83,6 +83,16 @@ exports.mngChartMain = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
 		}
 
+		// 고시원 이름 조회 (응답에 gosiwonName 포함)
+		const [gosiwonRow] = await mariaDBSequelize.query(
+			`SELECT name FROM gosiwon WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [gosiwonEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+		const gosiwonName = gosiwonRow?.name ?? null;
+
 		// 페이징 처리: 오늘 기준으로 2개월 간격 (로컬 날짜 사용, toISOString은 UTC라 KST에서 하루 밀림 방지)
 		const pageNum = parseInt(page) || 1;
 		const today = new Date();
@@ -593,6 +603,7 @@ exports.mngChartMain = async (req, res, next) => {
 		// 8. 응답 데이터 구성
 		const responseData = {
 			gosiwonEsntlId: gosiwonEsntlId,
+			gosiwonName: gosiwonName,
 			groups: groups,
 			items: items,
 			dependency: dependency,
