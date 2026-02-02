@@ -4,6 +4,9 @@ const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
+
+const CLEAN_DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
 
 const verifyAdminToken = (req) => {
 	const authHeader = req.get('Authorization');
@@ -1434,6 +1437,164 @@ exports.updateGosiwonConfig = async (req, res, next) => {
 		errorHandler.successThrow(res, '운영환경설정 저장 성공');
 	} catch (err) {
 		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 청소 요일 저장 (새로 등록만, 삭제/수정 없음)
+exports.postGosiwonClean = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { gosiwonId, cleaningDays, applicationStartDate, applicationEndDate } = req.body;
+
+		if (!gosiwonId) {
+			errorHandler.errorThrow(400, 'gosiwonId를 입력해주세요.');
+		}
+
+		const gosiwonEsntlId = gosiwonId;
+
+		// cleaningDays: ["월","수","금"] 또는 "월,수,금" 또는 "월 / 수 / 금"
+		let daysArr = [];
+		if (Array.isArray(cleaningDays)) {
+			daysArr = cleaningDays.filter((d) => typeof d === 'string' && CLEAN_DAY_NAMES.includes(d.trim()));
+		} else if (typeof cleaningDays === 'string') {
+			daysArr = cleaningDays
+				.split(/[\s,/\u002f]+/)
+				.map((d) => d.trim())
+				.filter((d) => CLEAN_DAY_NAMES.includes(d));
+		}
+		if (daysArr.length === 0) {
+			errorHandler.errorThrow(400, '청소 요일(cleaningDays)을 하나 이상 입력해주세요. (예: 월, 수, 금)');
+		}
+
+		// 저장 형식: "월 / 수 / 금"
+		const cleaningDaysStr = [...new Set(daysArr)].sort(
+			(a, b) => CLEAN_DAY_NAMES.indexOf(a) - CLEAN_DAY_NAMES.indexOf(b)
+		).join(' / ');
+
+		const gosiwonInfo = await gosiwon.findOne({
+			where: { esntlId: gosiwonEsntlId },
+			transaction,
+		});
+		if (!gosiwonInfo) {
+			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
+		}
+
+		const cleanEsntlId = await idsNext('gosiwonClean', 'GCLN', transaction);
+
+		await mariaDBSequelize.query(
+			`INSERT INTO gosiwonClean (esntlId, gosiwonEsntlId, cleaning_days, application_start_date, application_end_date, writer_admin_id, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+			{
+				replacements: [
+					cleanEsntlId,
+					gosiwonEsntlId,
+					cleaningDaysStr,
+					applicationStartDate || null,
+					applicationEndDate || null,
+					writerAdminId || null,
+				],
+				transaction,
+				type: mariaDBSequelize.QueryTypes.INSERT,
+			}
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '청소 요일 등록 성공', {
+			esntlId: cleanEsntlId,
+			gosiwonEsntlId,
+			cleaningDays: cleaningDaysStr,
+			applicationStartDate: applicationStartDate || null,
+			applicationEndDate: applicationEndDate || null,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 청소 요일 조회 (현재 적용 설정 + 이력 목록)
+exports.getGosiwonClean = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { gosiwonId } = req.query;
+
+		if (!gosiwonId) {
+			errorHandler.errorThrow(400, 'gosiwonId를 입력해주세요.');
+		}
+
+		const gosiwonEsntlId = gosiwonId;
+
+		const gosiwonInfo = await gosiwon.findOne({
+			where: { esntlId: gosiwonEsntlId },
+		});
+		if (!gosiwonInfo) {
+			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
+		}
+
+		// 현재 적용 설정: 오늘 날짜가 적용기간 안에 있거나 적용기간이 없는 것 중 최신 1건
+		const [currentRow] = await mariaDBSequelize.query(
+			`SELECT esntlId, gosiwonEsntlId, cleaning_days AS cleaningDays,
+				application_start_date AS applicationStartDate, application_end_date AS applicationEndDate,
+				writer_admin_id AS writerAdminId, created_at AS createdAt
+			 FROM gosiwonClean
+			 WHERE gosiwonEsntlId = ?
+			 ORDER BY
+			   (application_start_date IS NULL AND application_end_date IS NULL) DESC,
+			   (CURDATE() BETWEEN COALESCE(application_start_date, '1000-01-01') AND COALESCE(application_end_date, '9999-12-31')) DESC,
+			   created_at DESC
+			 LIMIT 1`,
+			{
+				replacements: [gosiwonEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+
+		// 이력 목록 (적용기간, 구분(청소요일), 담당자 표시용)
+		const list = await mariaDBSequelize.query(
+			`SELECT esntlId, cleaning_days AS cleaningDays,
+				application_start_date AS applicationStartDate, application_end_date AS applicationEndDate,
+				writer_admin_id AS writerAdminId, created_at AS createdAt
+			 FROM gosiwonClean
+			 WHERE gosiwonEsntlId = ?
+			 ORDER BY created_at DESC`,
+			{
+				replacements: [gosiwonEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+
+		const current = currentRow
+			? {
+					...currentRow,
+					cleaningDaysArray: currentRow.cleaningDays ? currentRow.cleaningDays.split(' / ').filter(Boolean) : [],
+				}
+			: null;
+
+		const listFormatted = (list || []).map((row) => ({
+			esntlId: row.esntlId,
+			cleaningDays: row.cleaningDays,
+			applicationStartDate: row.applicationStartDate,
+			applicationEndDate: row.applicationEndDate,
+			applicationPeriod:
+				row.applicationStartDate && row.applicationEndDate
+					? `${row.applicationStartDate} ~ ${row.applicationEndDate}`
+					: '설정 안 함',
+			writerAdminId: row.writerAdminId,
+			createdAt: row.createdAt,
+		}));
+
+		errorHandler.successThrow(res, '청소 요일 조회 성공', {
+			gosiwonEsntlId,
+			current,
+			list: listFormatted,
+		});
+	} catch (err) {
 		next(err);
 	}
 };

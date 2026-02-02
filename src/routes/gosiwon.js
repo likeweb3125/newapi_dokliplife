@@ -1433,6 +1433,197 @@ router.put('/config', gosiwonController.updateGosiwonConfig);
 
 /**
  * @swagger
+ * /v1/gosiwon/clean:
+ *   get:
+ *     summary: 청소 요일 조회
+ *     description: 고시원 ID로 현재 설정된 청소 요일 및 적용기간, 이력 목록을 조회합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: gosiwonId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유아이디
+ *         example: GOSI0000000199
+ *     responses:
+ *       200:
+ *         description: 청소 요일 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 청소 요일 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     gosiwonEsntlId:
+ *                       type: string
+ *                       example: GOSI0000000199
+ *                     current:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         esntlId:
+ *                           type: string
+ *                         cleaningDays:
+ *                           type: string
+ *                           example: "월 / 수 / 금"
+ *                         cleaningDaysArray:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                           example:
+ *                             - "월"
+ *                             - "수"
+ *                             - "금"
+ *                         applicationStartDate:
+ *                           type: string
+ *                           format: date
+ *                           nullable: true
+ *                         applicationEndDate:
+ *                           type: string
+ *                           format: date
+ *                           nullable: true
+ *                         writerAdminId:
+ *                           type: string
+ *                           nullable: true
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                     list:
+ *                       type: array
+ *                       description: 청소 요일 설정 이력
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                           cleaningDays:
+ *                             type: string
+ *                             example: "월 / 수 / 금"
+ *                           applicationStartDate:
+ *                             type: string
+ *                             nullable: true
+ *                           applicationEndDate:
+ *                             type: string
+ *                             nullable: true
+ *                           applicationPeriod:
+ *                             type: string
+ *                             example: "2025-10-31 ~ 2025-11-30 (또는 설정 안 함)"
+ *                           writerAdminId:
+ *                             type: string
+ *                             nullable: true
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/clean', gosiwonController.getGosiwonClean);
+
+/**
+ * @swagger
+ * /v1/gosiwon/clean:
+ *   post:
+ *     summary: 청소 요일 등록
+ *     description: 고시원 ID와 청소 요일(지정 요일), 선택적 적용기간을 받아 새로 등록합니다. 삭제/수정 없이 이력만 추가됩니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - gosiwonId
+ *             properties:
+ *               gosiwonId:
+ *                 type: string
+ *                 description: 고시원 고유아이디 (청소 요일을 등록할 고시원). 청소설정 레코드의 esntlId는 서버에서 IDS(next)로 자동 발급됩니다.
+ *                 example: GOSI0000000199
+ *               cleaningDays:
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                       enum: [월, 화, 수, 목, 금, 토, 일]
+ *                     example: ["월", "수", "금"]
+ *                   - type: string
+ *                     description: 쉼표 또는 슬래시 구분 (예 월,수,금 또는 월 / 수 / 금)
+ *                     example: "월,수,금"
+ *               applicationStartDate:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *                 description: 적용기간 시작일 (YYYY-MM-DD). 설정 시 해당 기간에만 적용
+ *                 example: "2025-10-31"
+ *               applicationEndDate:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *                 description: 적용기간 종료일 (YYYY-MM-DD)
+ *                 example: "2025-11-30"
+ *     responses:
+ *       200:
+ *         description: 청소 요일 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 청소 요일 등록 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     esntlId:
+ *                       type: string
+ *                       description: 청소설정 고유아이디 (서버에서 IDS next로 발급, GCLN 접두사)
+ *                     gosiwonEsntlId:
+ *                       type: string
+ *                     cleaningDays:
+ *                       type: string
+ *                       example: "월 / 수 / 금"
+ *                     applicationStartDate:
+ *                       type: string
+ *                       nullable: true
+ *                     applicationEndDate:
+ *                       type: string
+ *                       nullable: true
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/clean', gosiwonController.postGosiwonClean);
+
+/**
+ * @swagger
  * /v1/gosiwon/list:
  *   get:
  *     summary: 고시원 리스트 조회 (관리자용)
