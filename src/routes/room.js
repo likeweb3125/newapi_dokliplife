@@ -351,6 +351,84 @@ router.get('/info', roomController.getRoomInfo);
 
 /**
  * @swagger
+ * /v1/room/reserve-info:
+ *   get:
+ *     summary: 결제요청용 정보 (reserveInfo)
+ *     description: 방 ID로 room 기본정보(monthlyRent, option, description)와 해당 방의 고시원 카테고리 목록(카테고리 id, name, base_price, 옵션 배열 option_name/option_amount)을 조회합니다.
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: roomId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디
+ *         example: ROOM0000022725
+ *     responses:
+ *       200:
+ *         description: 결제요청용 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 결제요청용 정보 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     monthlyRent:
+ *                       type: string
+ *                       description: room.monthlyRent
+ *                     option:
+ *                       type: string
+ *                       description: room.option
+ *                     description:
+ *                       type: string
+ *                       description: room.description
+ *                     categories:
+ *                       type: array
+ *                       description: 고시원 카테고리 배열 (roomCategory + roomCategoryOption)
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             description: 카테고리 고유아이디 (roomCategory.esntlId)
+ *                           name:
+ *                             type: string
+ *                             description: roomCategory.name
+ *                           base_price:
+ *                             type: integer
+ *                             description: roomCategory.base_price (원)
+ *                           options:
+ *                             type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 option_name:
+ *                                   type: string
+ *                                 option_amount:
+ *                                   type: number
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         description: 방 정보를 찾을 수 없습니다
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/reserve-info', roomController.getReserveInfo);
+
+/**
+ * @swagger
  * /v1/room/create:
  *   post:
  *     summary: 방 정보 등록

@@ -458,12 +458,13 @@ exports.mngChartMain = async (req, res, next) => {
 				content: '방이동(입)',
 				title: '방이동',
 			});
+			// 차트 화살표: OUT → IN. (라이브러리는 id_item_1 → id_item_2 로 그림. 1=OUT, 2=IN)
 			dependency.push({
 				id: dependencyId++,
 				id_item_1: outItemId,
 				id_item_2: inItemId,
 				title: '방이동',
-				direction: 0,
+				direction: 1,
 				color: '#4A67DD',
 				line: 2,
 				type: 2,

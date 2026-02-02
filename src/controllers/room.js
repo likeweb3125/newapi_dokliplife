@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { room, memo, history, mariaDBSequelize } = require('../models');
+const { room, memo, history, roomCategory, roomCategoryOption, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
@@ -330,6 +330,63 @@ exports.getRoomInfo = async (req, res, next) => {
 		}
 
 		errorHandler.successThrow(res, '방 정보 조회 성공', roomInfo);
+	} catch (err) {
+		next(err);
+	}
+};
+
+// 결제요청용 정보 (reserveInfo) - 방 ID로 room 기본정보 + 고시원 카테고리/옵션 배열
+exports.getReserveInfo = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { roomId } = req.query;
+
+		if (!roomId) {
+			errorHandler.errorThrow(400, 'roomId를 입력해주세요.');
+		}
+
+		const roomRow = await room.findOne({
+			where: { esntlId: roomId },
+			attributes: ['monthlyRent', 'option', 'description', 'gosiwonEsntlId'],
+		});
+
+		if (!roomRow) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+
+		const categories = await roomCategory.findAll({
+			where: { gosiwonEsntlId: roomRow.gosiwonEsntlId },
+			order: [['created_at', 'ASC']],
+			include: [
+				{
+					model: roomCategoryOption,
+					as: 'options',
+					required: false,
+					attributes: ['option_name', 'option_amount'],
+					order: [['sort_order', 'ASC']],
+				},
+			],
+		});
+
+		const categoriesData = categories.map((cat) => ({
+			id: cat.esntlId,
+			name: cat.name,
+			base_price: cat.base_price,
+			options: (cat.options || []).map((opt) => ({
+				option_name: opt.option_name,
+				option_amount: opt.option_amount,
+			})),
+		}));
+
+		const data = {
+			monthlyRent: roomRow.monthlyRent,
+			option: roomRow.option,
+			description: roomRow.description,
+			categories: categoriesData,
+		};
+
+		errorHandler.successThrow(res, '결제요청용 정보 조회 성공', data);
 	} catch (err) {
 		next(err);
 	}
