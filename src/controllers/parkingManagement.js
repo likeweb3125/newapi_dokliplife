@@ -108,6 +108,42 @@ const getCurrentDateTime = () => {
 	};
 };
 
+// parkStatus 기준(CONTRACT/RESERVED, deleteYN='N')으로 gosiwonParking.autoUse, bikeUse 동기화
+const syncGosiwonParkingUse = async (gosiwonEsntlId, transaction) => {
+	const countRows = await mariaDBSequelize.query(
+		`
+		SELECT parkType, COUNT(*) AS cnt
+		FROM parkStatus
+		WHERE gosiwonEsntlId = ?
+			AND status IN ('CONTRACT', 'RESERVED')
+			AND deleteYN = 'N'
+			AND (parkType = '자동차' OR parkType = '오토바이')
+		GROUP BY parkType
+		`,
+		{
+			replacements: [gosiwonEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		}
+	);
+	let autoUse = 0;
+	let bikeUse = 0;
+	(countRows || []).forEach((row) => {
+		if (row.parkType === '자동차') autoUse = parseInt(row.cnt, 10) || 0;
+		if (row.parkType === '오토바이') bikeUse = parseInt(row.cnt, 10) || 0;
+	});
+	const parkingRow = await parking.findOne({
+		where: { gosiwonEsntlId },
+		transaction,
+	});
+	if (parkingRow) {
+		await parking.update(
+			{ autoUse, bikeUse },
+			{ where: { esntlId: parkingRow.esntlId }, transaction }
+		);
+	}
+};
+
 // 주차 등록 (Create)
 exports.createParking = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -195,33 +231,6 @@ exports.createParking = async (req, res, next) => {
 			{ transaction }
 		);
 
-		// gosiwonParking 조회 및 사용 대수 증가
-		const parkingInfo = await parking.findOne({
-			where: { gosiwonEsntlId: contract.gosiwonEsntlId },
-			transaction,
-		});
-
-		if (parkingInfo) {
-			// 사용 대수 증가
-			if (optionName === '자동차') {
-				await parking.update(
-					{ autoUse: (parkingInfo.autoUse || 0) + 1 },
-					{
-						where: { esntlId: parkingInfo.esntlId },
-						transaction,
-					}
-				);
-			} else if (optionName === '오토바이') {
-				await parking.update(
-					{ bikeUse: (parkingInfo.bikeUse || 0) + 1 },
-					{
-						where: { esntlId: parkingInfo.esntlId },
-						transaction,
-					}
-				);
-			}
-		}
-
 		// parkStatus 생성 (IDS 테이블 parkStatus PKST)
 		const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 		const parkNumber = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
@@ -244,6 +253,9 @@ exports.createParking = async (req, res, next) => {
 			},
 			{ transaction }
 		);
+
+		// parkStatus INSERT 후 gosiwonParking.autoUse, bikeUse 동기화 (CONTRACT/RESERVED, deleteYN='N' 기준)
+		await syncGosiwonParkingUse(contract.gosiwonEsntlId, transaction);
 
 		// History 기록 생성
 		const historyId = await generateHistoryId(transaction);
@@ -552,33 +564,14 @@ exports.deleteParking = async (req, res, next) => {
 			errorHandler.errorThrow(404, '주차 정보를 찾을 수 없습니다.');
 		}
 
-		// gosiwonParking 사용 대수 감소 (parkStatus.parkType = 자동차/오토바이)
-		const parkingInfo = await parking.findOne({
-			where: { gosiwonEsntlId: parkStatusInfo.gosiwonEsntlId },
-			transaction,
-		});
-
-		if (parkingInfo && parkStatusInfo.parkType) {
-			if (parkStatusInfo.parkType === '자동차') {
-				const newAutoUse = Math.max(0, (parkingInfo.autoUse || 0) - 1);
-				await parking.update(
-					{ autoUse: newAutoUse },
-					{ where: { esntlId: parkingInfo.esntlId }, transaction }
-				);
-			} else if (parkStatusInfo.parkType === '오토바이') {
-				const newBikeUse = Math.max(0, (parkingInfo.bikeUse || 0) - 1);
-				await parking.update(
-					{ bikeUse: newBikeUse },
-					{ where: { esntlId: parkingInfo.esntlId }, transaction }
-				);
-			}
-		}
-
 		// parkStatus 소프트 삭제
 		await parkStatus.update(
 			{ deleteYN: 'Y', deletedBy: writerAdminId, deletedAt: mariaDBSequelize.literal('NOW()') },
 			{ where: { esntlId: parkingId }, transaction }
 		);
+
+		// parkStatus DELETE 후 gosiwonParking.autoUse, bikeUse 동기화 (CONTRACT/RESERVED, deleteYN='N' 기준)
+		await syncGosiwonParkingUse(parkStatusInfo.gosiwonEsntlId, transaction);
 
 		// extraPayment는 삭제하지 않고 유지 (결제 내역 보존)
 
