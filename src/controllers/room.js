@@ -335,7 +335,7 @@ exports.getRoomInfo = async (req, res, next) => {
 	}
 };
 
-// 결제요청용 정보 (reserveInfo) - 방 ID로 room 기본정보 + 고시원 카테고리/옵션 배열
+// 결제요청용 정보 (reserveInfo) - 방 ID로 room 기본정보 + 해당 방이 속한 카테고리(room.roomCategory) 정보만
 exports.getReserveInfo = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
@@ -348,36 +348,39 @@ exports.getReserveInfo = async (req, res, next) => {
 
 		const roomRow = await room.findOne({
 			where: { esntlId: roomId },
-			attributes: ['monthlyRent', 'option', 'description', 'gosiwonEsntlId'],
+			attributes: ['monthlyRent', 'option', 'description', 'gosiwonEsntlId', 'roomCategory'],
 		});
 
 		if (!roomRow) {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
 		}
 
-		const categories = await roomCategory.findAll({
-			where: { gosiwonEsntlId: roomRow.gosiwonEsntlId },
-			order: [['created_at', 'ASC']],
-			include: [
-				{
-					model: roomCategoryOption,
-					as: 'options',
-					required: false,
-					attributes: ['option_name', 'option_amount'],
-					order: [['sort_order', 'ASC']],
-				},
-			],
-		});
-
-		const categoriesData = categories.map((cat) => ({
-			id: cat.esntlId,
-			name: cat.name,
-			base_price: cat.base_price,
-			options: (cat.options || []).map((opt) => ({
-				option_name: opt.option_name,
-				option_amount: opt.option_amount,
-			})),
-		}));
+		let categoriesData = [];
+		if (roomRow.roomCategory) {
+			const categoryRow = await roomCategory.findOne({
+				where: { esntlId: roomRow.roomCategory },
+				include: [
+					{
+						model: roomCategoryOption,
+						as: 'options',
+						required: false,
+						attributes: ['option_name', 'option_amount'],
+						order: [['sort_order', 'ASC']],
+					},
+				],
+			});
+			if (categoryRow) {
+				categoriesData = [{
+					id: categoryRow.esntlId,
+					name: categoryRow.name,
+					base_price: categoryRow.base_price,
+					options: (categoryRow.options || []).map((opt) => ({
+						option_name: opt.option_name,
+						option_amount: opt.option_amount,
+					})),
+				}];
+			}
+		}
 
 		const data = {
 			monthlyRent: roomRow.monthlyRent,
