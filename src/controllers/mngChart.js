@@ -83,7 +83,7 @@ exports.mngChartMain = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
 		}
 
-		// 페이징 처리: 오늘 기준으로 1개월 간격
+		// 페이징 처리: 오늘 기준으로 2개월 간격 (로컬 날짜 사용, toISOString은 UTC라 KST에서 하루 밀림 방지)
 		const pageNum = parseInt(page) || 1;
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
@@ -95,9 +95,10 @@ exports.mngChartMain = async (req, res, next) => {
 		const startDate = new Date(today);
 		startDate.setMonth(startDate.getMonth() - pageNum);
 		
-		// 날짜 범위 문자열 생성 (YYYY-MM-DD 형식)
-		const endDateStr = endDate.toISOString().slice(0, 10);
-		const startDateStr = startDate.toISOString().slice(0, 10);
+		const pad2 = (n) => String(n).padStart(2, '0');
+		const toYmd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+		const endDateStr = toYmd(endDate);
+		const startDateStr = toYmd(startDate);
 
 		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, 없으면 room.status 매핑
 		const groupsQuery = `
@@ -111,6 +112,7 @@ exports.mngChartMain = async (req, res, next) => {
 				R.gosiwonEsntlId,
 				R.orderNo AS value,
 				R.status AS roomStatus,
+				RS.subStatus AS roomSubStatus,
 				COALESCE(
 					RS.status,
 					CASE 
@@ -160,8 +162,12 @@ exports.mngChartMain = async (req, res, next) => {
 		});
 
 		// Groups 데이터 변환 - id는 room.esntlId 사용
+		// subStatus가 ROOM_MOVE_OUT/ROOM_MOVE_IN이면 '방이동'(ROOM_MOVE)으로 표시
 		const groups = rooms.map((room) => {
-			const statusKey = room.status || 'BEFORE_SALES';
+			const baseStatus = room.status || 'BEFORE_SALES';
+			const statusKey = (room.roomSubStatus === 'ROOM_MOVE_OUT' || room.roomSubStatus === 'ROOM_MOVE_IN')
+				? 'ROOM_MOVE'
+				: baseStatus;
 			const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP['BEFORE_SALES'];
 			
 			return {
@@ -238,24 +244,13 @@ exports.mngChartMain = async (req, res, next) => {
 			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE RC.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
-				AND (
-					(RC.startDate >= ? AND RC.startDate < ?)
-					OR (RC.endDate >= ? AND RC.endDate < ?)
-					OR (RC.startDate < ? AND RC.endDate >= ?)
-				)
+				AND RC.startDate <= ?
+				AND RC.endDate >= ?
 			ORDER BY RC.startDate ASC
 		`;
 
 		const contracts = await mariaDBSequelize.query(contractItemsQuery, {
-			replacements: [
-				gosiwonEsntlId,
-				startDateStr,
-				endDateStr,
-				startDateStr,
-				endDateStr,
-				startDateStr,
-				endDateStr
-			],
+			replacements: [gosiwonEsntlId, endDateStr, startDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -296,9 +291,31 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
+		// 3-1. 방이동 목록 조회 (날짜 구간과 겹치는 moveDate)
+		const roomMovesQuery = `
+			SELECT 
+				RMS.esntlId,
+				RMS.originalRoomEsntlId,
+				RMS.targetRoomEsntlId,
+				RMS.moveDate,
+				RMS.memo,
+				RMS.status AS moveStatus
+			FROM roomMoveStatus RMS
+			WHERE RMS.gosiwonEsntlId = ?
+				AND RMS.deleteYN = 'N'
+				AND DATE(RMS.moveDate) >= ?
+				AND DATE(RMS.moveDate) <= ?
+			ORDER BY RMS.moveDate ASC
+		`;
+		const roomMoves = await mariaDBSequelize.query(roomMovesQuery, {
+			replacements: [gosiwonEsntlId, startDateStr, endDateStr],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
 		// 4. Items 데이터 변환
 		const items = [];
 		let itemIdCounter = 0;
+		const dependency = [];
 
 		// 계약 Items 추가
 		contracts.forEach((contract) => {
@@ -404,6 +421,52 @@ exports.mngChartMain = async (req, res, next) => {
 				content: content,
 				reason: status.statusMemo || '',
 				description: status.statusMemo || '판매 및 룸투어, 입실이 불가합니다.',
+			});
+		});
+
+		// 4-1. 방이동 Items 및 dependency (ROOM_MOVE_OUT → id_item_1, ROOM_MOVE_IN → id_item_2)
+		let dependencyId = 1;
+		roomMoves.forEach((move) => {
+			if (roomIdToGroupIndex[move.originalRoomEsntlId] === undefined || roomIdToGroupIndex[move.targetRoomEsntlId] === undefined) return;
+			const moveDateStr = move.moveDate
+				? (typeof move.moveDate === 'string'
+					? move.moveDate.split(' ')[0].split('T')[0]
+					: move.moveDate.toISOString?.().slice(0, 10) || String(move.moveDate).slice(0, 10))
+				: null;
+			if (!moveDateStr) return;
+			const moveStart = formatDateTime(moveDateStr);
+			const moveEnd = formatDateTime(moveDateStr + ' 23:59:59');
+			const outItemId = itemIdCounter++;
+			const inItemId = itemIdCounter++;
+			items.push({
+				id: outItemId,
+				group: move.originalRoomEsntlId,
+				itemType: 'room_move_out',
+				className: 'room-move-out',
+				start: moveStart,
+				end: moveEnd,
+				content: '방이동(출)',
+				title: '방이동',
+			});
+			items.push({
+				id: inItemId,
+				group: move.targetRoomEsntlId,
+				itemType: 'room_move_in',
+				className: 'room-move-in',
+				start: moveStart,
+				end: moveEnd,
+				content: '방이동(입)',
+				title: '방이동',
+			});
+			dependency.push({
+				id: dependencyId++,
+				id_item_1: outItemId,
+				id_item_2: inItemId,
+				title: '방이동',
+				direction: 0,
+				color: '#4A67DD',
+				line: 2,
+				type: 2,
 			});
 		});
 
@@ -531,6 +594,7 @@ exports.mngChartMain = async (req, res, next) => {
 			gosiwonEsntlId: gosiwonEsntlId,
 			groups: groups,
 			items: items,
+			dependency: dependency,
 			roomStatuses: roomStatusesArray,
 			page: pageNum,
 			totalPages: totalPages,
