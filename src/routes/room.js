@@ -351,7 +351,7 @@ router.get('/info', roomController.getRoomInfo);
 
 /**
  * @swagger
- * /v1/room/reserve-info:
+ * /v1/room/reserveInfo:
  *   get:
  *     summary: 결제요청용 정보 (reserveInfo)
  *     description: 방 ID로 room 기본정보(monthlyRent, option, description)와 해당 방의 고시원 카테고리 목록(카테고리 id, name, base_price, 옵션 배열 option_name/option_amount)을 조회합니다.
@@ -425,7 +425,7 @@ router.get('/info', roomController.getRoomInfo);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.get('/reserve-info', roomController.getReserveInfo);
+router.get('/reserveInfo', roomController.getReserveInfo);
 
 /**
  * @swagger
