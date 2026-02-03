@@ -27,7 +27,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *         schema:
  *           type: string
  *         description: 고시원 고유 아이디
- *         example: GOSI0000000001
+ *         example: GOSI0000000199
  *       - in: query
  *         name: page
  *         required: false
@@ -56,7 +56,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                     gosiwonEsntlId:
  *                       type: string
  *                       description: 현재 검색 중인 고시원 고유 아이디
- *                       example: GOSI0000000001
+ *                       example: GOSI0000000199
  *                     groups:
  *                       type: array
  *                       description: 방 목록 (vis-timeline groups)
@@ -271,7 +271,7 @@ router.get('/main', isAuthMiddleware.isAuthAdmin, mngChartController.mngChartMai
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000001
+ *                 example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 테스트 데이터 생성 성공

@@ -39,11 +39,11 @@ const roomMoveController = require('../controllers/roomMove');
  *               originalRoomEsntlId:
  *                 type: string
  *                 description: 원래 방 고유아이디
- *                 example: ROOM0000000001
+ *                 example: ROOM0000019357
  *               targetRoomEsntlId:
  *                 type: string
  *                 description: 이동할 방 고유아이디
- *                 example: ROOM0000000002
+ *                 example: ROOM0000019357
  *               reason:
  *                 type: string
  *                 enum: [OWNER, CUSTOMER]

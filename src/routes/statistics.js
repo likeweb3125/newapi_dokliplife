@@ -203,13 +203,13 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                             example: RCTT0000000001
  *                           gosiwonEsntlId:
  *                             type: string
- *                             example: GOSI0000000001
+ *                             example: GOSI0000000199
  *                           gosiwonName:
  *                             type: string
  *                             example: 고시원명
  *                           roomEsntlId:
  *                             type: string
- *                             example: ROOM0000000001
+ *                             example: ROOM0000019357
  *                           roomName:
  *                             type: string
  *                             example: '101'

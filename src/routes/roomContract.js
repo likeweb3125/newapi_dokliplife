@@ -658,11 +658,11 @@ router.put('/detail', roomContractController.updateContract);
  *                     gosiwonEsntlId:
  *                       type: string
  *                       description: 고시원 고유 아이디
- *                       example: GOSI0000000001
+ *                       example: GOSI0000000199
  *                     roomEsntlId:
  *                       type: string
  *                       description: 방 고유 아이디
- *                       example: ROOM0000000001
+ *                       example: ROOM0000019357
  *                     extraData:
  *                       type: array
  *                       description: 추가 결제 내역 목록

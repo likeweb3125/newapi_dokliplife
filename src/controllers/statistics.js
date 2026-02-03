@@ -732,7 +732,7 @@ exports.getRealTimeList = async (req, res, next) => {
 			if (ele.roomDeposit === null && ele.gosiwonDeposit === null) {
 				deposit = 0;
 			} else if (ele.roomDeposit === null && ele.gosiwonDeposit !== null) {
-				deposit = ele.gosiwonDeposit * 10000;
+				deposit = ele.gosiwonDeposit;
 			} else {
 				deposit = ele.roomDeposit;
 			}

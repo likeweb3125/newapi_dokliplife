@@ -179,11 +179,11 @@ router.post('/process', refundController.processRefundAndCheckout);
  *               gswId:
  *                 type: string
  *                 description: 고시원 고유아이디
- *                 example: 'GOSI0000000001'
+ *                 example: 'GOSI0000000199'
  *               romId:
  *                 type: string
  *                 description: 방 고유 아이디
- *                 example: 'ROOM0000000001'
+ *                 example: 'ROOM0000019357'
  *               mbrId:
  *                 type: string
  *                 description: 회원 고유 아이디
@@ -272,7 +272,7 @@ router.post('/refundInsert', refundController.refundInsert);
  *         schema:
  *           type: string
  *         description: '고시원 고유아이디 (GOSI로 시작하는 경우 필터링, 선택)'
- *         example: 'GOSI0000000001'
+ *         example: 'GOSI0000000199'
  *       - in: query
  *         name: year
  *         required: false

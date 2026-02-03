@@ -392,8 +392,8 @@ exports.mngChartMain = async (req, res, next) => {
 				contractPerson: contractor,
 				periodType: contract.month ? `${contract.month}개월` : '1개월',
 				contractType: contractType,
-				entryFee: entryFee > 0 ? `${Math.floor(entryFee / 10000)} 만원` : '0 원',
-				paymentAmount: paymentAmount > 0 ? `${Math.floor(paymentAmount / 10000)} 만원` : '0 원',
+				entryFee: entryFee > 0 ? `${entryFee}` : '0',
+				paymentAmount: paymentAmount > 0 ? `${paymentAmount}` : '0',
 				accountInfo: accountInfo,
 				deposit: deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원',
 				additionalPaymentOption: '-', // 추후 추가 결제 옵션 조회로 채워야 함
@@ -581,7 +581,7 @@ exports.mngChartMain = async (req, res, next) => {
 				contractAdditionalPayments[payment.contractEsntlId] = [];
 			}
 			const amount = parseInt(payment.paymentAmount) || 0;
-			const amountText = amount > 0 ? `${Math.floor(amount / 10000)}만원` : '';
+			const amountText = amount > 0 ? `${amount}` : '';
 			contractAdditionalPayments[payment.contractEsntlId].push(
 				`${payment.extraCostName} ${amountText}`
 			);

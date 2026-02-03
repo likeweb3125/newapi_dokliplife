@@ -32,7 +32,7 @@ const calculateController = require('../controllers/calculate');
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000001
+ *                 example: GOSI0000000199
  *               baseDate:
  *                 type: string
  *                 format: date
@@ -78,7 +78,7 @@ const calculateController = require('../controllers/calculate');
  *                       gsw_eid:
  *                         type: string
  *                         description: 고시원 고유 아이디
- *                         example: GOSI0000000001
+ *                         example: GOSI0000000199
  *                       dsc_selling_cnt:
  *                         type: integer
  *                         description: 판매 건수
@@ -246,7 +246,7 @@ router.post('/daily/list', calculateController.selectListToCalculateDaily);
  *                       gsw_eid:
  *                         type: string
  *                         description: 고시원 고유 아이디
- *                         example: GOSI0000000001
+ *                         example: GOSI0000000199
  *                       dsc_selling_cnt:
  *                         type: integer
  *                         description: 판매 건수
@@ -411,7 +411,7 @@ router.post('/daily/admin/list', calculateController.selectCalculateAdminByDate)
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000001
+ *                 example: GOSI0000000199
  *               baseDate:
  *                 type: string
  *                 format: date
@@ -571,7 +571,7 @@ router.post('/daily/detail', calculateController.selectListCalculateCompleteByTy
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000001
+ *                 example: GOSI0000000199
  *               baseDate:
  *                 type: string
  *                 format: date
@@ -626,11 +626,11 @@ router.post('/daily/detail', calculateController.selectListCalculateCompleteByTy
  *                       gosiwonEsntlId:
  *                         type: string
  *                         description: 고시원 고유 아이디
- *                         example: GOSI0000000001
+ *                         example: GOSI0000000199
  *                       roomEsntlId:
  *                         type: string
  *                         description: 방 고유 아이디
- *                         example: ROOM0000000001
+ *                         example: ROOM0000019357
  *                       roomName:
  *                         type: string
  *                         description: 방 이름
@@ -734,7 +734,7 @@ router.post('/daily/detail', calculateController.selectListCalculateCompleteByTy
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000001
+ *                 example: GOSI0000000199
  *               baseDate:
  *                 type: string
  *                 format: date

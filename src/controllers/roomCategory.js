@@ -2,6 +2,7 @@ const { roomCategory, roomCategoryOption, history, mariaDBSequelize } = require(
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 const verifyAdminToken = (req) => {
 	const authHeader = req.get('Authorization');
@@ -25,32 +26,6 @@ const verifyAdminToken = (req) => {
 		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
 	}
 	return decodedToken;
-};
-
-const CATEGORY_PREFIX = 'CATE';
-const CATEGORY_PADDING = 10;
-
-const generateCategoryId = async (transaction) => {
-	const latest = await roomCategory.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${CATEGORY_PREFIX}${String(1).padStart(CATEGORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(CATEGORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${CATEGORY_PREFIX}${String(nextNumber).padStart(
-		CATEGORY_PADDING,
-		'0'
-	)}`;
 };
 
 const OPTION_PREFIX = 'COPT';
@@ -167,15 +142,16 @@ exports.createCategory = async (req, res, next) => {
 			errorHandler.errorThrow(400, '필수 값을 모두 입력해주세요.');
 		}
 
-		const categoryId = await generateCategoryId(transaction);
-		const parsedBasePrice = parseInt(basePrice, 10);
+		// IDS 테이블 기준 카테고리 ID 생성 (tableName: roomCategory, prefix: ROOM)
+		const categoryId = await idsNext('roomCategory', 'ROOM', transaction);
+		const basePriceValue = basePrice !== undefined && basePrice !== null ? String(basePrice) : '0';
 
 		await roomCategory.create(
 			{
 				esntlId: categoryId,
 				gosiwonEsntlId: goID,
 				name: categoryName,
-				base_price: Number.isNaN(parsedBasePrice) ? 0 : parsedBasePrice,
+				base_price: basePriceValue,
 				memo: memo || null,
 			},
 			{ transaction }
@@ -203,7 +179,7 @@ exports.createCategory = async (req, res, next) => {
 		// History 기록 생성
 		try {
 			const historyId = await generateHistoryId(transaction);
-			const historyContent = `방 카테고리 생성: ${categoryName}, 기본가격 ${parsedBasePrice}원${memo ? `, 메모: ${memo}` : ''}${options && options.length > 0 ? `, 옵션 ${options.length}개` : ''}`;
+			const historyContent = `방 카테고리 생성: ${categoryName}, 기본가격 ${basePriceValue}원${memo ? `, 메모: ${memo}` : ''}${options && options.length > 0 ? `, 옵션 ${options.length}개` : ''}`;
 
 			await history.create(
 				{
@@ -252,15 +228,15 @@ exports.updateCategory = async (req, res, next) => {
 			errorHandler.errorThrow(404, '카테고리를 찾을 수 없습니다.');
 		}
 
-		const parsedBasePrice =
-			basePrice !== undefined ? parseInt(basePrice, 10) : category.base_price;
+		const basePriceValue =
+			basePrice !== undefined && basePrice !== null
+				? String(basePrice)
+				: category.base_price;
 
 		await roomCategory.update(
 			{
 				name: categoryName || category.name,
-				base_price: Number.isNaN(parsedBasePrice)
-					? category.base_price
-					: parsedBasePrice,
+				base_price: basePriceValue,
 				memo: memo !== undefined ? memo : category.memo,
 			},
 			{
@@ -324,8 +300,8 @@ exports.updateCategory = async (req, res, next) => {
 			if (categoryName && categoryName !== category.name) {
 				changes.push(`이름: ${category.name} → ${categoryName}`);
 			}
-			if (basePrice !== undefined && parsedBasePrice !== category.base_price) {
-				changes.push(`기본가격: ${category.base_price}원 → ${parsedBasePrice}원`);
+			if (basePrice !== undefined && basePriceValue !== category.base_price) {
+				changes.push(`기본가격: ${category.base_price}원 → ${basePriceValue}원`);
 			}
 			if (memo !== undefined && memo !== category.memo) {
 				changes.push(`메모 변경`);

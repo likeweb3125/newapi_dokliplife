@@ -40,11 +40,11 @@ const paymentController = require('../controllers/payment');
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: "고시원 고유아이디"
- *                 example: GSW0000000001
+ *                 example: GOSI0000000199
  *               roomEsntlId:
  *                 type: string
  *                 description: "방 고유아이디"
- *                 example: ROOM0000000001
+ *                 example: ROOM0000019357
  *               customerEsntlId:
  *                 type: string
  *                 description: "고객 고유아이디"

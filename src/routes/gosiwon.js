@@ -20,7 +20,7 @@ const parkingController = require('../controllers/parking');
  *         schema:
  *           type: string
  *         description: 고시원 고유아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 고시원 정보 조회 성공 (조인된 모든 테이블 데이터 포함)
@@ -323,7 +323,7 @@ router.get('/info', gosiwonController.getGosiwonInfo);
  *                   properties:
  *                     esntlId:
  *                       type: string
- *                       example: GOSI0000002131
+ *                       example: GOSI0000000199
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -354,7 +354,7 @@ router.post('/info', gosiwonController.createGosiwon);
  *               esntlId:
  *                 type: string
  *                 description: 고시원 고유아이디
- *                 example: GOSI0000002130
+ *                 example: GOSI0000000199
  *               name:
  *                 type: string
  *                 description: 고시원 이름
@@ -614,7 +614,7 @@ router.put('/info', gosiwonController.updateGosiwon);
  *         schema:
  *           type: string
  *         description: 고시원 고유아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 고시원 정보 삭제 성공 (관련 테이블 데이터도 함께 삭제됨)
@@ -746,7 +746,7 @@ router.get('/names', gosiwonController.getGosiwonNames);
  *                       esntlId:
  *                         type: string
  *                         description: 고시원 고유 아이디
- *                         example: GOSI0000002130
+ *                         example: GOSI0000000199
  *                       name:
  *                         type: string
  *                         description: 고시원명
@@ -840,7 +840,7 @@ router.put('/favorite', gosiwonController.toggleFavorite);
  *         schema:
  *           type: string
  *         description: 고시원 고유아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 주차장 정보 조회 성공
@@ -863,7 +863,7 @@ router.put('/favorite', gosiwonController.toggleFavorite);
  *                       example: PARK0000000001
  *                     gosiwonEsntlId:
  *                       type: string
- *                       example: GOSI0000002130
+ *                       example: GOSI0000000199
  *                     structure:
  *                       type: string
  *                       example: 필로티 구조
@@ -972,7 +972,7 @@ router.get('/parking/info', parkingController.getParkingInfo);
  *                             example: PARK0000000001
  *                           gosiwonEsntlId:
  *                             type: string
- *                             example: GOSI0000002130
+ *                             example: GOSI0000000199
  *                           gosiwonName:
  *                             type: string
  *                             example: 성수 고시원
@@ -1027,7 +1027,7 @@ router.get('/parking/list', parkingController.getParkingList);
  *               esntlId:
  *                 type: string
  *                 description: 고시원 고유아이디
- *                 example: GOSI0000002130
+ *                 example: GOSI0000000199
  *               structure:
  *                 type: string
  *                 description: 주차장 구조
@@ -1282,7 +1282,7 @@ router.get('/dashboardCnt', gosiwonController.getDashboardCnt);
  *         schema:
  *           type: string
  *         description: 고시원 고유아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 운영환경설정 조회 성공
@@ -1302,7 +1302,7 @@ router.get('/dashboardCnt', gosiwonController.getDashboardCnt);
  *                   properties:
  *                     esntlId:
  *                       type: string
- *                       example: GOSI0000002130
+ *                       example: GOSI0000000199
  *                     ableCheckDays:
  *                       type: integer
  *                       nullable: true
@@ -1370,7 +1370,7 @@ router.get('/config', gosiwonController.getGosiwonConfig);
  *               esntlId:
  *                 type: string
  *                 description: 고시원 고유아이디
- *                 example: GOSI0000002130
+ *                 example: GOSI0000000199
  *               ableCheckDays:
  *                 type: integer
  *                 nullable: true

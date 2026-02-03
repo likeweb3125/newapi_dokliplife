@@ -114,7 +114,7 @@ const depositController = require('../controllers/deposit');
  *                           roomEsntlId:
  *                             type: string
  *                             description: 방 고유 아이디
- *                             example: ROOM0000000001
+ *                             example: ROOM0000019357
  *                           roomNumber:
  *                             type: string
  *                             description: 방 이름(방번호)
@@ -165,11 +165,11 @@ const depositController = require('../controllers/deposit');
  *                                 roomEsntlId:
  *                                   type: string
  *                                   description: 방 고유 아이디
- *                                   example: ROOM0000000001
+ *                                   example: ROOM0000019357
  *                                 gosiwonEsntlId:
  *                                   type: string
  *                                   description: 고시원 고유 아이디
- *                                   example: GOSI0000000001
+ *                                   example: GOSI0000000199
  *                                 content:
  *                                   type: object
  *                                   description: 내용 정보
@@ -251,11 +251,11 @@ router.get('/reservationList', depositController.getReservationList);
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유 아이디 (roomEsntlId로 고시원 정보 자동 조회)
- *                 example: ROOM0000025359
+ *                 example: ROOM0000019357
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디 (선택, 입력하지 않으면 roomEsntlId로 자동 조회)
- *                 example: GOSI0000002416
+ *                 example: GOSI0000000199
  *               depositDate:
  *                 type: string
  *                 format: date-time
@@ -350,7 +350,7 @@ router.get(
  *         schema:
  *           type: string
  *         description: 방 고유 아이디
- *         example: ROOM0000028345
+ *         example: ROOM0000019357
  *     responses:
  *       200:
  *         description: 방의 예약금 내역 조회 성공
@@ -376,11 +376,11 @@ router.get(
  *                           roomEsntlId:
  *                             type: string
  *                             description: 방 고유 아이디
- *                             example: ROOM0000028345
+ *                             example: ROOM0000019357
  *                           gosiwonEsntlId:
  *                             type: string
  *                             description: 고시원 고유 아이디
- *                             example: GOSI0000000001
+ *                             example: GOSI0000000199
  *                           content:
  *                             type: object
  *                             description: 내용 정보
@@ -576,7 +576,7 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                             type: string
  *                             nullable: true
  *                             description: 고시원 고유 아이디 (room.gosiwonEsntlId)
- *                             example: GOSI0000000001
+ *                             example: GOSI0000000199
  *                           gosiwonName:
  *                             type: string
  *                             nullable: true
@@ -585,7 +585,7 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                           roomEsntlId:
  *                             type: string
  *                             description: 방 고유 아이디
- *                             example: ROOM0000000001
+ *                             example: ROOM0000019357
  *                           roomNumber:
  *                             type: string
  *                             description: 방 이름(방번호)
@@ -1015,11 +1015,11 @@ router.get('/depositInfo', depositController.getDepositInfo);
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유 아이디
- *                 example: ROOM0000025359
+ *                 example: ROOM0000019357
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000001
+ *                 example: GOSI0000000199
  *               customerEsntlId:
  *                 type: string
  *                 description: 예약자/입실자 고유 아이디 (DEPOSIT 타입일 때만 유효)
@@ -1194,7 +1194,7 @@ router.get('/history', depositController.getDepositHistory);
  *                       esntlId:
  *                         type: string
  *                         description: 고시원 고유 아이디
- *                         example: GOSI0000000001
+ *                         example: GOSI0000000199
  *                       name:
  *                         type: string
  *                         description: 고시원 이름
@@ -1226,7 +1226,7 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *         schema:
  *           type: string
  *         description: 방 고유 아이디
- *         example: ROOM0000000001
+ *         example: ROOM0000019357
  *       - in: query
  *         name: type
  *         required: false

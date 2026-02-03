@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `parkStatus` (
   `useEndDate` DATE NULL COMMENT '사용 종료일',
   `parkType` VARCHAR(50) NULL COMMENT '주차 유형 (자동차, 오토바이)',
   `parkNumber` VARCHAR(500) NULL COMMENT '번호판 (기존 memo에서 마이그레이션)',
-  `cost` INT(11) NULL DEFAULT 0 COMMENT '주차비',
+  `cost` VARCHAR(50) NULL DEFAULT '0' COMMENT '주차비',
   `memo` VARCHAR(500) NULL COMMENT '메모 (차량번호, 차종 등)',
   `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부',
   `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID',

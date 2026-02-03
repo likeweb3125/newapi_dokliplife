@@ -34,7 +34,7 @@ const roomCategoryController = require('../controllers/roomCategory');
  *         schema:
  *           type: string
  *         description: 고시원 고유 아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *       - in: query
  *         name: roomName
  *         required: false
@@ -250,7 +250,7 @@ router.get('/dashboardCnt', roomController.getDashboardCnt);
  *         schema:
  *           type: string
  *         description: 방 고유 아이디
- *         example: ROOM0000022725
+ *         example: ROOM0000019357
  *     responses:
  *       200:
  *         description: 방 정보 조회 성공
@@ -365,7 +365,7 @@ router.get('/info', roomController.getRoomInfo);
  *         schema:
  *           type: string
  *         description: 방 고유 아이디
- *         example: ROOM0000022725
+ *         example: ROOM0000019357
  *     responses:
  *       200:
  *         description: 결제요청용 정보 조회 성공
@@ -452,7 +452,7 @@ router.get('/reserveInfo', roomController.getReserveInfo);
  *               goID:
  *                 type: string
  *                 description: 고시원 고유 아이디
- *                 example: GOSI0000002130
+ *                 example: GOSI0000000199
  *               roomNumber:
  *                 type: string
  *                 description: 방번호(이름)
@@ -576,7 +576,7 @@ router.get('/reserveInfo', roomController.getReserveInfo);
  *                   properties:
  *                     esntlID:
  *                       type: string
- *                       example: ROOM0000022725
+ *                       example: ROOM0000019357
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -607,7 +607,7 @@ router.post('/create', roomController.createRoom);
  *               esntlID:
  *                 type: string
  *                 description: 수정할 방 고유 아이디
- *                 example: ROOM0000022725
+ *                 example: ROOM0000019357
  *               roomNumber:
  *                 type: string
  *                 description: 방번호(이름)
@@ -719,7 +719,7 @@ router.put('/update', roomController.updateRoom);
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유 아이디
- *                 example: ROOM0000022725
+ *                 example: ROOM0000019357
  *               agreementType:
  *                 type: string
  *                 enum: [GENERAL, GOSIWON, ROOM]
@@ -749,7 +749,7 @@ router.put('/update', roomController.updateRoom);
  *                     esntlId:
  *                       type: string
  *                       description: 방 고유 아이디
- *                       example: ROOM0000022725
+ *                       example: ROOM0000019357
  *                     agreementType:
  *                       type: string
  *                       description: 특약 타입
@@ -791,7 +791,7 @@ router.put('/agreement', roomController.updateRoomAgreement);
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유 아이디
- *                 example: ROOM0000022725
+ *                 example: ROOM0000019357
  *               rom_dp_at:
  *                 type: string
  *                 enum: [N, Y]
@@ -817,7 +817,7 @@ router.put('/agreement', roomController.updateRoomAgreement);
  *                     esntlId:
  *                       type: string
  *                       description: 방 고유 아이디
- *                       example: ROOM0000022725
+ *                       example: ROOM0000019357
  *                     rom_dp_at:
  *                       type: string
  *                       description: DP 방 여부
@@ -854,7 +854,7 @@ router.put('/dp-at', roomController.updateRoomDpAt);
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유 아이디
- *                 example: ROOM0000022725
+ *                 example: ROOM0000019357
  *               isReserve:
  *                 type: string
  *                 enum: [Y, N]
@@ -880,7 +880,7 @@ router.put('/dp-at', roomController.updateRoomDpAt);
  *                     roomEsntlId:
  *                       type: string
  *                       description: 방 고유 아이디
- *                       example: ROOM0000022725
+ *                       example: ROOM0000019357
  *                     isReserve:
  *                       type: boolean
  *                       description: 예약만 취소 여부
@@ -916,7 +916,7 @@ router.post('/reserveCancel', roomController.reserveCancel);
  *         schema:
  *           type: string
  *         description: 삭제할 방 고유 아이디
- *         example: ROOM0000022725
+ *         example: ROOM0000019357
  *     responses:
  *       200:
  *         description: 방 정보 삭제 성공
@@ -947,7 +947,7 @@ router.delete('/delete', roomController.deleteRoom);
  *         schema:
  *           type: string
  *         description: 고시원 고유 아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 카테고리 목록 조회 성공
@@ -982,7 +982,7 @@ router.get('/category/list', roomCategoryController.getCategoryList);
  *             properties:
  *               goID:
  *                 type: string
- *                 example: GOSI0000002130
+ *                 example: GOSI0000000199
  *               categoryName:
  *                 type: string
  *                 example: 트리니티룸
@@ -1144,7 +1144,7 @@ router.delete('/category/delete', roomCategoryController.deleteCategory);
  *               roomEsntlId:
  *                 type: string
  *                 description: 방 고유아이디
- *                 example: ROOM0000000001
+ *                 example: ROOM0000019357
  *               deposit:
  *                 type: integer
  *                 description: 보증금 금액
@@ -1275,7 +1275,7 @@ router.post('/reserve', roomController.roomReserve);
  *                     roomId:
  *                       type: string
  *                       description: 방 고유아이디
- *                       example: ROOM0000000001
+ *                       example: ROOM0000019357
  *                     statusStartDate:
  *                       type: string
  *                       format: date-time
@@ -1363,7 +1363,7 @@ router.post('/roomSell/start', roomController.startRoomSell);
  *         schema:
  *           type: string
  *         description: 고시원 고유 아이디
- *         example: GOSI0000002130
+ *         example: GOSI0000000199
  *     responses:
  *       200:
  *         description: 빈 방 목록 조회 성공

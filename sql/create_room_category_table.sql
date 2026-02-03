@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `roomCategory` (
   `esntlId` VARCHAR(50) NOT NULL COMMENT '카테고리 고유아이디',
   `gosiwonEsntlId` VARCHAR(50) NOT NULL COMMENT '고시원 고유아이디',
   `name` VARCHAR(50) NOT NULL COMMENT '카테고리명',
-  `base_price` INT(11) NOT NULL COMMENT '정가 (단위: 원)',
+  `base_price` VARCHAR(50) NOT NULL COMMENT '정가 (단위: 원)',
   `memo` TEXT NULL COMMENT '메모',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
   PRIMARY KEY (`esntlId`),

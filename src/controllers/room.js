@@ -1420,7 +1420,7 @@ exports.roomReserve = async (req, res, next) => {
 			SELECT 
 				g.name AS gsw_name,
 				r.roomNumber AS rom_name,
-				FORMAT(r.monthlyRent * 10000, 0) AS monthlyRent,
+				r.monthlyRent AS monthlyRent,
 				CONCAT(REPLACE(CURDATE(), '-', '.'), ' ', '23:59') AS contractExpDateTime,
 				IF(c.phone = ?, 'EXTENSION', 'NEW') AS req_type,
 				IF((c.name LIKE '%kakao%' OR c.name IS NULL), '입실자', c.name) AS cus_name,
@@ -1753,13 +1753,8 @@ exports.getFreeRoomList = async (req, res, next) => {
 
 		// 최종 조건: room.deleteYN = 'N'만 통과 (N이 아니면 아웃)
 		const filteredRoomList = roomList.filter((room) => room.deleteYN === 'N');
-		const formattedRoomList = filteredRoomList.map((room) => {
-			if (room.monthlyRent) {
-				const rentValue = parseFloat(room.monthlyRent) || 0;
-				room.monthlyRent = (rentValue * 10000).toString();
-			}
-			return room;
-		});
+		// monthlyRent는 DB에서 받은 값 그대로 반환
+		const formattedRoomList = filteredRoomList;
 
 		errorHandler.successThrow(res, '빈 방 목록 조회 성공', formattedRoomList);
 	} catch (err) {
