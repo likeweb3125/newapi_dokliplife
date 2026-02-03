@@ -684,6 +684,11 @@ router.post('/create', roomController.createRoom);
  *                 enum: [DEFAULT, MALE, FEMALE]
  *                 description: 이용 가능 성별 (DEFAULT는 제한없음, MALE는 남성, FEMALE는 여성)
  *                 example: DEFAULT
+ *               useCategoryRentFee:
+ *                 type: string
+ *                 enum: [Y, N]
+ *                 description: 카테고리 월비용 사용 여부 (Y=사용, N=미사용)
+ *                 example: Y
  *     responses:
  *       200:
  *         description: 방 정보 수정 성공
