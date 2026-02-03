@@ -25,12 +25,12 @@ module.exports = (sequelize, DataTypes) => {
 				allowNull: true,
 				comment: '방 카테고리',
 			},
-			useCRFYN: {
+			useRoomRentFee: {
 				type: DataTypes.CHAR(1),
 				allowNull: true,
-				defaultValue: 'N',
-				field: 'useCRFYN',
-				comment: '카테고리 월비용 사용 YN',
+				defaultValue: null,
+				field: 'useRoomRentFee',
+				comment: '방 월비용 사용 YN',
 			},
 			deposit: {
 				type: DataTypes.INTEGER(11),

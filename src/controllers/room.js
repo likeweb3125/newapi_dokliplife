@@ -282,7 +282,7 @@ exports.getRoomInfo = async (req, res, next) => {
 				r.gosiwonEsntlId,
 				r.roomType,
 				r.roomCategory,
-				r.useCRFYN,
+				r.useRoomRentFee,
 				r.deposit AS rom_deposit,
 				r.monthlyRent,
 				r.startDate,
@@ -584,7 +584,7 @@ exports.updateRoom = async (req, res, next) => {
 			agreementType,
 			agreementContent,
 			availableGender,
-			useCategoryRentFee,
+			useRoomRentFee,
 		} = req.body;
 
 		if (!esntlID) {
@@ -619,10 +619,10 @@ exports.updateRoom = async (req, res, next) => {
 		}
 
 		// 카테고리 월비용 사용 YN 유효성 검사
-		if (useCategoryRentFee !== undefined) {
-			const normalized = String(useCategoryRentFee).toUpperCase().substring(0, 1);
+		if (useRoomRentFee !== undefined) {
+			const normalized = String(useRoomRentFee).toUpperCase().substring(0, 1);
 			if (normalized !== 'Y' && normalized !== 'N') {
-				errorHandler.errorThrow(400, 'useCategoryRentFee는 Y 또는 N이어야 합니다.');
+				errorHandler.errorThrow(400, 'useRoomRentFee는 Y 또는 N이어야 합니다.');
 			}
 		}
 
@@ -641,11 +641,11 @@ exports.updateRoom = async (req, res, next) => {
 			updateData.roomCategory = roomCategory;
 			changes.push(`카테고리: ${roomInfo.roomCategory || '없음'} → ${roomCategory}`);
 		}
-		if (useCategoryRentFee !== undefined) {
-			const useCRFYNValue = String(useCategoryRentFee).toUpperCase().substring(0, 1);
-			if (useCRFYNValue !== (roomInfo.useCRFYN || 'N')) {
-				updateData.useCRFYN = useCRFYNValue;
-				changes.push(`카테고리 월비용 사용: ${roomInfo.useCRFYN || 'N'} → ${useCRFYNValue}`);
+		if (useRoomRentFee !== undefined) {
+			const useRoomRentFeeValue = String(useRoomRentFee).toUpperCase().substring(0, 1);
+			if (useRoomRentFeeValue !== (roomInfo.useRoomRentFee ?? 'N')) {
+				updateData.useRoomRentFee = useRoomRentFeeValue;
+				changes.push(`방 월비용 사용: ${roomInfo.useRoomRentFee ?? 'N'} → ${useRoomRentFeeValue}`);
 			}
 		}
 		if (deposit !== undefined && parseInt(deposit, 10) !== roomInfo.deposit) {
