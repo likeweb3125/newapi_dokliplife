@@ -1,6 +1,7 @@
 const { mariaDBSequelize, room, customer, history, deposit, extraPayment } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
@@ -267,7 +268,7 @@ exports.getContractDetail = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 정보 조회 (roomContract 기준)
+		// 계약 정보 조회 (roomContract 기준). 고객 계좌는 il_customer_refund에서 조회
 		const contractQuery = `
 			SELECT 
 				RC.esntlId AS contractNumber,
@@ -284,8 +285,9 @@ exports.getContractDetail = async (req, res, next) => {
 				C.phone AS customerPhone,
 				RC.customerEsntlId AS customerEsntlId,
 				C.id AS customerId,
-				C.bank AS customerBank,
-				C.bankAccount AS customerBankAccount,
+				ICR.cre_bank_name AS customerBank,
+				ICR.cre_account_number AS customerBankAccount,
+				ICR.cre_account_holder AS customerAccountHolder,
 				RC.month,
 				RC.startDate,
 				RC.endDate,
@@ -315,6 +317,8 @@ exports.getContractDetail = async (req, res, next) => {
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+			LEFT JOIN il_customer_refund ICR ON ICR.cus_eid = C.esntlId AND ICR.cre_delete_dtm IS NULL
+				AND ICR.cre_regist_dtm = (SELECT MAX(cre_regist_dtm) FROM il_customer_refund i2 WHERE i2.cus_eid = C.esntlId AND i2.cre_delete_dtm IS NULL)
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`;
@@ -587,7 +591,7 @@ exports.updateContract = async (req, res, next) => {
 			);
 		}
 
-		// customer 테이블 업데이트 (입주자)
+		// customer 테이블 업데이트 (입주자) - 이름, 연락처, 성별, 생년월일만. 계좌는 il_customer_refund 사용
 		const customerUpdateData = {};
 		const {
 			customerName,
@@ -596,6 +600,7 @@ exports.updateContract = async (req, res, next) => {
 			customerBirth,
 			customerBank,
 			customerBankAccount,
+			customerAccountHolder,
 		} = req.body;
 
 		const customerInfo = await customer.findByPk(contract.customerEsntlId, {
@@ -625,18 +630,55 @@ exports.updateContract = async (req, res, next) => {
 			customerUpdateData.birth = customerBirth;
 			changes.push(`입주자 생년월일: ${customerInfo.birth || '없음'} → ${customerBirth}`);
 		}
-		if (customerBank !== undefined && customerBank !== customerInfo.bank) {
-			customerUpdateData.bank = customerBank;
-			changes.push(`입주자 은행: ${customerInfo.bank || '없음'} → ${customerBank}`);
-		}
+
+		// 고객 계좌: il_customer_refund 테이블에 저장 (cre_bank_name, cre_account_number, cre_account_holder)
 		if (
-			customerBankAccount !== undefined &&
-			customerBankAccount !== customerInfo.bankAccount
+			customerBank !== undefined ||
+			customerBankAccount !== undefined ||
+			customerAccountHolder !== undefined
 		) {
-			customerUpdateData.bankAccount = customerBankAccount;
-			changes.push(
-				`입주자 계좌: ${customerInfo.bankAccount || '없음'} → ${customerBankAccount}`
+			const [existingRefund] = await mariaDBSequelize.query(
+				`SELECT cre_eid, cre_bank_name, cre_account_number, cre_account_holder
+				 FROM il_customer_refund
+				 WHERE cus_eid = ? AND cre_delete_dtm IS NULL
+				 ORDER BY cre_regist_dtm DESC LIMIT 1`,
+				{
+					replacements: [contract.customerEsntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
 			);
+
+			const newBank = customerBank !== undefined ? customerBank : (existingRefund?.cre_bank_name ?? null);
+			const newAccountNumber = customerBankAccount !== undefined ? customerBankAccount : (existingRefund?.cre_account_number ?? null);
+			const newAccountHolder = customerAccountHolder !== undefined ? customerAccountHolder : (existingRefund?.cre_account_holder ?? null);
+
+			if (existingRefund && existingRefund.cre_eid) {
+				await mariaDBSequelize.query(
+					`UPDATE il_customer_refund
+					 SET cre_bank_name = ?, cre_account_number = ?, cre_account_holder = ?,
+					     cre_update_dtm = NOW(), cre_updater_id = ?
+					 WHERE cre_eid = ?`,
+					{
+						replacements: [newBank, newAccountNumber, newAccountHolder, writerAdminId, existingRefund.cre_eid],
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+						transaction,
+					}
+				);
+				changes.push(`입주자 계좌(은행/계좌번호/예금주): il_customer_refund 업데이트`);
+			} else {
+				const creEid = await idsNext('il_customer_refund', 'CRE', transaction);
+				await mariaDBSequelize.query(
+					`INSERT INTO il_customer_refund (cre_eid, cus_eid, cre_bank_name, cre_account_number, cre_account_holder, cre_registrant_id, cre_updater_id, cre_regist_dtm, cre_update_dtm)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+					{
+						replacements: [creEid, contract.customerEsntlId, newBank, newAccountNumber, newAccountHolder, writerAdminId, writerAdminId],
+						type: mariaDBSequelize.QueryTypes.INSERT,
+						transaction,
+					}
+				);
+				changes.push(`입주자 계좌(은행/계좌번호/예금주): il_customer_refund 신규 등록`);
+			}
 		}
 
 		// customer 테이블 업데이트 (계약자)

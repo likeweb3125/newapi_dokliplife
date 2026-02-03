@@ -511,8 +511,12 @@ router.get('/detail', roomContractController.getContractDetail);
  *                 example: '신한은행'
  *               customerBankAccount:
  *                 type: string
- *                 description: 입주자 계좌번호
+ *                 description: 입주자 계좌번호 (il_customer_refund.cre_account_number)
  *                 example: '123-456-789'
+ *               customerAccountHolder:
+ *                 type: string
+ *                 description: 입주자 예금주명 (il_customer_refund.cre_account_holder)
+ *                 example: '홍길동'
  *               contractorName:
  *                 type: string
  *                 description: 계약자명
