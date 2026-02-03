@@ -374,6 +374,7 @@ exports.getReserveInfo = async (req, res, next) => {
 					id: categoryRow.esntlId,
 					name: categoryRow.name,
 					base_price: categoryRow.base_price,
+					memo: categoryRow.memo ?? null,
 					options: (categoryRow.options || []).map((opt) => ({
 						option_name: opt.option_name,
 						option_amount: opt.option_amount,

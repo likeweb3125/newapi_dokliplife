@@ -407,6 +407,10 @@ router.get('/info', roomController.getRoomInfo);
  *                           base_price:
  *                             type: integer
  *                             description: roomCategory.base_price (원)
+ *                           memo:
+ *                             type: string
+ *                             nullable: true
+ *                             description: roomCategory.memo
  *                           options:
  *                             type: array
  *                             items:
