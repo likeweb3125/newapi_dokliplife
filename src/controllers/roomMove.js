@@ -1,4 +1,4 @@
-const { mariaDBSequelize, room } = require('../models');
+const { mariaDBSequelize, room, history } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { roomAfterUse } = require('./refund');
@@ -6,6 +6,32 @@ const { next: idsNext } = require('../utils/idsNext');
 
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
+const HISTORY_PREFIX = 'HISTORY';
+const HISTORY_PADDING = 10;
+
+// 히스토리 ID 생성 함수
+const generateHistoryId = async (transaction) => {
+	const latest = await history.findOne({
+		attributes: ['esntlId'],
+		order: [['esntlId', 'DESC']],
+		transaction,
+		lock: transaction ? transaction.LOCK.UPDATE : undefined,
+	});
+
+	if (!latest || !latest.esntlId) {
+		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
+	}
+
+	const numberPart = parseInt(
+		latest.esntlId.replace(HISTORY_PREFIX, ''),
+		10
+	);
+	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
+	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
+		HISTORY_PADDING,
+		'0'
+	)}`;
+};
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -177,10 +203,10 @@ exports.processRoomMove = async (req, res, next) => {
 			contractEsntlId: contractEsntlId,
 		});
 
-		// 이동할 방 정보 확인
+		// 이동할 방 정보 확인 (roomNumber: memo2·history용)
 		const [targetRoom] = await mariaDBSequelize.query(
 			`
-			SELECT esntlId, gosiwonEsntlId
+			SELECT esntlId, gosiwonEsntlId, roomNumber
 			FROM room
 			WHERE esntlId = ?
 			LIMIT 1
@@ -195,6 +221,24 @@ exports.processRoomMove = async (req, res, next) => {
 		if (!targetRoom) {
 			errorHandler.errorThrow(404, '이동할 방 정보를 찾을 수 없습니다.');
 		}
+
+		// 나가는 방 정보 (roomNumber: memo2·history용)
+		const [originalRoom] = await mariaDBSequelize.query(
+			`
+			SELECT esntlId, roomNumber
+			FROM room
+			WHERE esntlId = ?
+			LIMIT 1
+		`,
+			{
+				replacements: [originalRoomEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		const targetRoomNumber = targetRoom.roomNumber || targetRoomEsntlId;
+		const originalRoomNumber = (originalRoom && originalRoom.roomNumber) ? originalRoom.roomNumber : originalRoomEsntlId;
 
 		if (targetRoom.gosiwonEsntlId !== contractInfo.gosiwonEsntlId) {
 			errorHandler.errorThrow(400, '이동할 방이 같은 고시원에 속해있지 않습니다.');
@@ -230,15 +274,18 @@ exports.processRoomMove = async (req, res, next) => {
 			같은지: moveDateStr === originalContractEndDate,
 		});
 
-		// 1. 기존 계약서 중지 (endDate는 원래 만료일 유지, status만 'ENDED'로 변경)
+		// 1. 기존 계약서 중지: endDate를 이동날짜로 변경, memo2에 타겟방 기록, status 'ENDED'
+		const originalMemo2Append = `방이동: → ${targetRoomNumber}로`;
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomContract 
-			SET status = 'ENDED'
+			SET status = 'ENDED',
+				endDate = ?,
+				memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?))
 			WHERE esntlId = ?
 		`,
 			{
-				replacements: [contractEsntlId],
+				replacements: [moveDateStr, originalMemo2Append, contractEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
 			}
@@ -309,6 +356,21 @@ exports.processRoomMove = async (req, res, next) => {
 			{ replacements: [newContractEsntlId], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
 		);
 		console.log('[roomMove] roomContract INSERT 직후 DB 조회:', insertedContract || '없음');
+
+		// 새 계약서 memo2에 원래 방에서 이 타겟방으로 왔다는 기록
+		const newContractMemo2Append = `방이동: ← ${originalRoomNumber}에서`;
+		await mariaDBSequelize.query(
+			`
+			UPDATE roomContract
+			SET memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?))
+			WHERE esntlId = ?
+		`,
+			{
+				replacements: [newContractMemo2Append, newContractEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
 
 		// roomContractWho 복사 (기존 계약 → 새 계약)
 		await mariaDBSequelize.query(
@@ -536,6 +598,52 @@ exports.processRoomMove = async (req, res, next) => {
 				transaction,
 			}
 		);
+
+		// 3-2. history 테이블에 방마다 히스토리 기록 (나가는 방: 이 방에서 타겟방으로, 타겟방: 어떤 방에서 이 방으로)
+		try {
+			const historyContentOriginal = `이 방에서 ${targetRoomNumber}로 방이동`;
+			const historyContentTarget = `${originalRoomNumber}에서 이 방으로 방이동`;
+
+			// ID를 나눠서 생성 (한 번에 두 개 부르면 같은 ID가 나와 두 번째 create에서 PK 중복 발생)
+			const historyIdOut = await generateHistoryId(transaction);
+			await history.create(
+				{
+					esntlId: historyIdOut,
+					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+					roomEsntlId: originalRoomEsntlId,
+					contractEsntlId: contractEsntlId,
+					content: historyContentOriginal,
+					category: 'CONTRACT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+
+			const historyIdIn = await generateHistoryId(transaction);
+			await history.create(
+				{
+					esntlId: historyIdIn,
+					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+					roomEsntlId: targetRoomEsntlId,
+					contractEsntlId: newContractEsntlId,
+					content: historyContentTarget,
+					category: 'CONTRACT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+		} catch (historyErr) {
+			console.error('방이동 history 생성 실패:', historyErr);
+			// history 생성 실패해도 방이동 처리 자체는 완료
+		}
 
 		// 4. roomAfterUse 함수 호출 (기존 방 id로 새 roomStatus INSERT. 설정에 따라 ON_SALE/CAN_CHECKIN/BEFORE_SALES 등 생성)
 		// 클라이언트가 설정을 보내면 그대로 사용, 없으면 check_basic_sell: true로 고시원 설정(il_gosiwon_config) 기준 생성
