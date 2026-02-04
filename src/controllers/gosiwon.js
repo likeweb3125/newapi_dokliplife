@@ -1599,6 +1599,121 @@ exports.getGosiwonClean = async (req, res, next) => {
 	}
 };
 
+// 청소 요일 수정
+exports.putGosiwonClean = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { esntlId, cleaningDays, applicationStartDate, applicationEndDate } = req.body;
+
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+
+		const [existing] = await mariaDBSequelize.query(
+			`SELECT esntlId, gosiwonEsntlId, cleaning_days, application_start_date, application_end_date
+			 FROM gosiwonClean WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [esntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (!existing) {
+			errorHandler.errorThrow(404, '청소 설정을 찾을 수 없습니다.');
+		}
+
+		let cleaningDaysStr = existing.cleaning_days;
+		if (cleaningDays !== undefined) {
+			let daysArr = [];
+			if (Array.isArray(cleaningDays)) {
+				daysArr = cleaningDays.filter((d) => typeof d === 'string' && CLEAN_DAY_NAMES.includes(d.trim()));
+			} else if (typeof cleaningDays === 'string') {
+				daysArr = cleaningDays
+					.split(/[\s,/\u002f]+/)
+					.map((d) => d.trim())
+					.filter((d) => CLEAN_DAY_NAMES.includes(d));
+			}
+			if (daysArr.length === 0) {
+				errorHandler.errorThrow(400, '청소 요일(cleaningDays)을 하나 이상 입력해주세요. (예: 월, 수, 금)');
+			}
+			cleaningDaysStr = [...new Set(daysArr)]
+				.sort((a, b) => CLEAN_DAY_NAMES.indexOf(a) - CLEAN_DAY_NAMES.indexOf(b))
+				.join(' / ');
+		}
+
+		const applicationStartDateVal = applicationStartDate !== undefined ? (applicationStartDate || null) : existing.application_start_date;
+		const applicationEndDateVal = applicationEndDate !== undefined ? (applicationEndDate || null) : existing.application_end_date;
+
+		await mariaDBSequelize.query(
+			`UPDATE gosiwonClean
+			 SET cleaning_days = ?, application_start_date = ?, application_end_date = ?, writer_admin_id = ?
+			 WHERE esntlId = ?`,
+			{
+				replacements: [cleaningDaysStr, applicationStartDateVal, applicationEndDateVal, writerAdminId || null, esntlId],
+				transaction,
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+			}
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '청소 요일 수정 성공', {
+			esntlId,
+			cleaningDays: cleaningDaysStr,
+			applicationStartDate: applicationStartDateVal,
+			applicationEndDate: applicationEndDateVal,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 청소 요일 삭제
+exports.deleteGosiwonClean = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		verifyAdminToken(req);
+
+		const esntlId = req.query.esntlId || req.body?.esntlId;
+
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+
+		const [existing] = await mariaDBSequelize.query(
+			`SELECT esntlId FROM gosiwonClean WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [esntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (!existing) {
+			errorHandler.errorThrow(404, '청소 설정을 찾을 수 없습니다.');
+		}
+
+		await mariaDBSequelize.query(
+			`DELETE FROM gosiwonClean WHERE esntlId = ?`,
+			{
+				replacements: [esntlId],
+				transaction,
+				type: mariaDBSequelize.QueryTypes.DELETE,
+			}
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '청소 요일 삭제 성공');
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
 // 고시원 리스트 조회 (관리자용)
 exports.selectListToAdminNew = async (req, res, next) => {
 	try {

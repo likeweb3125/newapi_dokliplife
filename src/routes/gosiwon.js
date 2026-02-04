@@ -1624,6 +1624,92 @@ router.post('/clean', gosiwonController.postGosiwonClean);
 
 /**
  * @swagger
+ * /v1/gosiwon/clean:
+ *   put:
+ *     summary: 청소 요일 수정
+ *     description: 기존 청소 설정(esntlId)의 요일·적용기간을 수정합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - esntlId
+ *             properties:
+ *               esntlId:
+ *                 type: string
+ *                 description: 수정할 청소설정 고유아이디 (GCLN 접두사)
+ *                 example: GCLN0000000001
+ *               cleaningDays:
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                       enum: [월, 화, 수, 목, 금, 토, 일]
+ *                     example: ["월", "수", "금"]
+ *                   - type: string
+ *                     description: 쉼표 또는 슬래시 구분 (예 월,수,금 또는 월 / 수 / 금)
+ *               applicationStartDate:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *                 description: 적용기간 시작일 (YYYY-MM-DD)
+ *               applicationEndDate:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *                 description: 적용기간 종료일 (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: 청소 요일 수정 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/clean', gosiwonController.putGosiwonClean);
+
+/**
+ * @swagger
+ * /v1/gosiwon/clean:
+ *   delete:
+ *     summary: 청소 요일 삭제
+ *     description: 청소 설정(esntlId) 한 건을 삭제합니다.
+ *     tags: [Gosiwon]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 삭제할 청소설정 고유아이디 (GCLN 접두사)
+ *         example: GCLN0000000001
+ *     responses:
+ *       200:
+ *         description: 청소 요일 삭제 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.delete('/clean', gosiwonController.deleteGosiwonClean);
+
+/**
+ * @swagger
  * /v1/gosiwon/list:
  *   get:
  *     summary: 고시원 리스트 조회 (관리자용)
