@@ -173,11 +173,14 @@ exports.mngChartMain = async (req, res, next) => {
 
 		// Groups 데이터 변환 - id는 room.esntlId 사용
 		// subStatus가 ROOM_MOVE_OUT/ROOM_MOVE_IN이면 '방이동'(ROOM_MOVE)으로 표시
+		// roomEsntlId -> roomStatus.status(원본) 매핑 (items의 itemStatus용)
+		const roomIdToStatusRaw = {};
 		const groups = rooms.map((room) => {
 			const baseStatus = room.status || 'BEFORE_SALES';
 			const statusKey = (room.roomSubStatus === 'ROOM_MOVE_OUT' || room.roomSubStatus === 'ROOM_MOVE_IN')
 				? 'ROOM_MOVE'
 				: baseStatus;
+			roomIdToStatusRaw[room.id] = statusKey;
 			const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP['BEFORE_SALES'];
 			
 			return {
@@ -381,6 +384,7 @@ exports.mngChartMain = async (req, res, next) => {
 				id: itemIdCounter++,
 				group: contract.roomEsntlId,
 				itemType: 'contract',
+				itemStatus: roomIdToStatusRaw[contract.roomEsntlId] ?? null,
 				start: formatDateTime(startDate),
 				end: formatDateTime(endDate + ' 23:59:59'),
 				period: period,
@@ -425,6 +429,7 @@ exports.mngChartMain = async (req, res, next) => {
 				id: itemIdCounter++,
 				group: status.roomEsntlId,
 				itemType: 'disabled',
+				itemStatus: roomIdToStatusRaw[status.roomEsntlId] ?? null,
 				className: 'disabled',
 				start: formattedStart,
 				end: formattedEnd,
@@ -452,6 +457,7 @@ exports.mngChartMain = async (req, res, next) => {
 				id: outItemId,
 				group: move.originalRoomEsntlId,
 				itemType: 'room_move_out',
+				itemStatus: roomIdToStatusRaw[move.originalRoomEsntlId] ?? null,
 				className: 'room-move-out',
 				start: moveStart,
 				end: moveEnd,
@@ -462,6 +468,7 @@ exports.mngChartMain = async (req, res, next) => {
 				id: inItemId,
 				group: move.targetRoomEsntlId,
 				itemType: 'room_move_in',
+				itemStatus: roomIdToStatusRaw[move.targetRoomEsntlId] ?? null,
 				className: 'room-move-in',
 				start: moveStart,
 				end: moveEnd,
@@ -546,6 +553,7 @@ exports.mngChartMain = async (req, res, next) => {
 				id: `room-${status.roomEsntlId}-statuses-${statusItemIdCounter++}`,
 				group: status.roomEsntlId,
 				itemType: 'system',
+				itemStatus: status.status ?? null,
 				content: [contentText],
 				colors: [statusInfo.color],
 				start: formatDateTime(statusDate),
