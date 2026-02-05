@@ -132,10 +132,10 @@ exports.processRoomMove = async (req, res, next) => {
 		}
 
 		// adjustmentAmount와 adjustmentType 유효성 검증
-		const finalAdjustmentAmount = adjustmentAmount || 0;
-		if (finalAdjustmentAmount < 0) {
-			errorHandler.errorThrow(400, 'adjustmentAmount는 0 이상의 값만 허용됩니다.');
-		}
+		// const finalAdjustmentAmount = adjustmentAmount || 0;
+		// if (finalAdjustmentAmount < 0) {
+		// 	errorHandler.errorThrow(400, 'adjustmentAmount는 0 이상의 값만 허용됩니다.');
+		// }
 		
 		// adjustmentType 유효성 검증
 		if (adjustmentType) {
@@ -669,6 +669,43 @@ exports.processRoomMove = async (req, res, next) => {
 			},
 			transaction
 		);
+
+		// roomAfterUse가 상태를 생성하지 않은 경우: 나간 방에 BEFORE_SALES 무기한(9999년) INSERT
+		if (createdRoomStatusIds.length === 0) {
+			const beforeSalesStatusId = await idsNext('roomStatus', undefined, transaction);
+			createdRoomStatusIds.push(beforeSalesStatusId);
+			const beforeSalesStartDate = moveDateStr; // 이동일 기준
+			const beforeSalesEndDate = '9999-12-31 23:59:59';
+			await mariaDBSequelize.query(
+				`
+				INSERT INTO roomStatus (
+					esntlId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					status,
+					statusStartDate,
+					statusEndDate,
+					etcStartDate,
+					etcEndDate,
+					createdAt,
+					updatedAt
+				) VALUES (?, ?, ?, 'BEFORE_SALES', ?, ?, ?, ?, NOW(), NOW())
+				`,
+				{
+					replacements: [
+						beforeSalesStatusId,
+						originalRoomEsntlId,
+						contractInfo.gosiwonEsntlId,
+						beforeSalesStartDate,
+						beforeSalesEndDate,
+						beforeSalesStartDate,
+						beforeSalesEndDate,
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
+					transaction,
+				}
+			);
+		}
 
 		// roomAfterUse로 생성된 상태 ID들을 roomMoveStatus의 memo에 업데이트
 		// createdRoomStatusIds가 있거나 targetRoomOnSaleStatuses가 있으면 업데이트
