@@ -132,10 +132,7 @@ exports.processRoomMove = async (req, res, next) => {
 		}
 
 		// adjustmentAmount와 adjustmentType 유효성 검증
-		// const finalAdjustmentAmount = adjustmentAmount || 0;
-		// if (finalAdjustmentAmount < 0) {
-		// 	errorHandler.errorThrow(400, 'adjustmentAmount는 0 이상의 값만 허용됩니다.');
-		// }
+		const finalAdjustmentAmount = adjustmentAmount || 0;
 		
 		// adjustmentType 유효성 검증
 		if (adjustmentType) {
