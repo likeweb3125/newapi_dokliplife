@@ -439,8 +439,7 @@ exports.mngChartMain = async (req, res, next) => {
 			});
 		});
 
-		// 4-1. 방이동 Items 및 dependency (ROOM_MOVE_OUT → id_item_1, ROOM_MOVE_IN → id_item_2)
-		let dependencyId = 1;
+		// 4-1. 방이동 Items 추가 (dependency는 items 기준으로 나중에 생성)
 		roomMoves.forEach((move) => {
 			if (roomIdToGroupIndex[move.originalRoomEsntlId] === undefined || roomIdToGroupIndex[move.targetRoomEsntlId] === undefined) return;
 			const moveDateStr = move.moveDate
@@ -451,10 +450,8 @@ exports.mngChartMain = async (req, res, next) => {
 			if (!moveDateStr) return;
 			const moveStart = formatDateTime(moveDateStr);
 			const moveEnd = formatDateTime(moveDateStr + ' 23:59:59');
-			const outItemId = itemIdCounter++;
-			const inItemId = itemIdCounter++;
 			items.push({
-				id: outItemId,
+				id: itemIdCounter++,
 				group: move.originalRoomEsntlId,
 				itemType: 'room_move_out',
 				itemStatus: roomIdToStatusRaw[move.originalRoomEsntlId] ?? null,
@@ -465,7 +462,7 @@ exports.mngChartMain = async (req, res, next) => {
 				title: '방이동',
 			});
 			items.push({
-				id: inItemId,
+				id: itemIdCounter++,
 				group: move.targetRoomEsntlId,
 				itemType: 'room_move_in',
 				itemStatus: roomIdToStatusRaw[move.targetRoomEsntlId] ?? null,
@@ -475,17 +472,42 @@ exports.mngChartMain = async (req, res, next) => {
 				content: '방이동(입)',
 				title: '방이동',
 			});
-			// 차트 화살표: OUT → IN. (라이브러리는 id_item_1 → id_item_2 로 그림. 1=OUT, 2=IN)
-			dependency.push({
-				id: dependencyId++,
-				id_item_1: outItemId,
-				id_item_2: inItemId,
-				title: '방이동',
-				direction: 1,
-				color: '#4A67DD',
-				line: 2,
-				type: 2,
-			});
+		});
+
+		// 4-2. dependency: items 배열에서 room_move_out / room_move_in 쌍을 찾아 id_item_1(OUT) → id_item_2(IN) 설정
+		let dependencyId = 1;
+		roomMoves.forEach((move) => {
+			const moveDateStr = move.moveDate
+				? (typeof move.moveDate === 'string'
+					? move.moveDate.split(' ')[0].split('T')[0]
+					: move.moveDate.toISOString?.().slice(0, 10) || String(move.moveDate).slice(0, 10))
+				: null;
+			if (!moveDateStr) return;
+			const moveStart = formatDateTime(moveDateStr);
+			const outItem = items.find(
+				(it) =>
+					it.itemType === 'room_move_out' &&
+					it.group === move.originalRoomEsntlId &&
+					it.start === moveStart
+			);
+			const inItem = items.find(
+				(it) =>
+					it.itemType === 'room_move_in' &&
+					it.group === move.targetRoomEsntlId &&
+					it.start === moveStart
+			);
+			if (outItem != null && inItem != null) {
+				dependency.push({
+					id: dependencyId++,
+					id_item_1: outItem.id,
+					id_item_2: inItem.id,
+					title: '방이동',
+					direction: 1,
+					color: '#4A67DD',
+					line: 2,
+					type: 2,
+				});
+			}
 		});
 
 		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - 날짜 범위 필터 적용
