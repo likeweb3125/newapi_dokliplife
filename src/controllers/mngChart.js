@@ -56,17 +56,24 @@ const getContractType = (contractDate, startDate) => {
 	return diffDays === 0 ? '신규' : '연장';
 };
 
-// 방 상태 매핑 (프론트엔드와 동일한 구조)
+// 방 상태 매핑 (roomStatus.status 값 기준, Untitled-2 목록)
 const STATUS_MAP = {
 	'BEFORE_SALES': { color: '#9B9B9B', label: '판매신청전' },
 	'ON_SALE': { color: '#27A644', label: '판매중' },
 	'PENDING': { color: '#FFB800', label: '입금대기중' },
+	'VBANK_PENDING': { color: '#FFB800', label: '입금대기중' },
+	'RESERVE_PENDING': { color: '#FFB800', label: '예약금 입금대기중' },
+	'RESERVE_PENGIND': { color: '#FFB800', label: '예약금 입금대기중' },
 	'RESERVED': { color: '#35BB88', label: '예약중' },
 	'CONTRACT': { color: '#FF8A00', label: '이용중' },
 	'OVERDUE': { color: '#D25454', label: '체납상태' },
 	'CHECKOUT_REQUESTED': { color: '#9B9B9B', label: '퇴실요청' },
 	'CHECKOUT_CONFIRMED': { color: '#9B9B9B', label: '퇴실확정' },
+	'CHECKOUT_ONSALE': { color: '#9B9B9B', label: '퇴실확정(방 판매중)' },
+	'END_DEPOSIT': { color: '#9B9B9B', label: '퇴실완료(보증금 반환 완료)' },
+	'END': { color: '#9B9B9B', label: '퇴실완료(보증금 반환 필요)' },
 	'ROOM_MOVE': { color: '#4A67DD', label: '방이동' },
+	'ETC': { color: '#9B9B9B', label: '기타' },
 	'disabled': { color: '#9B9B9B', label: '비활성' },
 	'in-progress': { color: '#FF8A00', label: '이용중' },
 	'leave': { color: '#9B9B9B', label: '퇴실' },
@@ -110,7 +117,7 @@ exports.mngChartMain = async (req, res, next) => {
 		const endDateStr = toYmd(endDate);
 		const startDateStr = toYmd(startDate);
 
-		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, 없으면 room.status 매핑
+		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, roomCategory·checkInName·contractEsntlId 포함
 		const groupsQuery = `
 			SELECT DISTINCT
 				R.esntlId AS id,
@@ -122,6 +129,9 @@ exports.mngChartMain = async (req, res, next) => {
 				R.gosiwonEsntlId,
 				R.orderNo AS value,
 				R.status AS roomStatus,
+				R.roomCategory AS roomCategoryEsntlId,
+				R.useRoomRentFee,
+				RS.contractEsntlId,
 				RS.subStatus AS roomSubStatus,
 				COALESCE(
 					RS.status,
@@ -134,11 +144,20 @@ exports.mngChartMain = async (req, res, next) => {
 					END
 				) AS status,
 				COALESCE(RS.customerName, '') AS currentGuest,
+				COALESCE(C.name, RCW.checkinName, RS.customerName, '') AS checkInName,
+				RS.customerEsntlId AS _dbg_rsCustomerEsntlId,
+				RS.contractEsntlId AS _dbg_rsContractEsntlId,
+				C.name AS _dbg_customerName,
+				RCW.checkinName AS _dbg_rcwCheckinName,
+				RS.customerName AS _dbg_rsCustomerName,
 				COALESCE(CONCAT(
 					DATE_FORMAT(RS.statusStartDate, '%y-%m-%d'),
 					'~',
 					DATE_FORMAT(RS.statusEndDate, '%y-%m-%d')
-				), '') AS stayPeriod
+				), '') AS stayPeriod,
+				RCAT.name AS roomCategoryName,
+				RCAT.base_price AS roomCategoryBasePrice,
+				RCAT.memo AS roomCategoryMemo
 			FROM room R
 			LEFT JOIN (
 				SELECT RS1.*
@@ -161,6 +180,9 @@ exports.mngChartMain = async (req, res, next) => {
 					LIMIT 1
 				)
 			) RS ON R.esntlId = RS.roomEsntlId
+			LEFT JOIN customer C ON RS.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RS.contractEsntlId = RCW.contractEsntlId
+			LEFT JOIN roomCategory RCAT ON R.roomCategory = RCAT.esntlId
 			WHERE R.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 			ORDER BY R.orderNo ASC, R.roomNumber ASC
@@ -170,6 +192,56 @@ exports.mngChartMain = async (req, res, next) => {
 			replacements: [gosiwonEsntlId],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
+
+		// checkInName 디버그: 이용중/예약중인데 checkInName 비어 있으면 로그 (원인 추적용)
+		rooms.forEach((r) => {
+			const status = r.status || '';
+			const checkInName = r.checkInName || '';
+			const isContractOrReserved = status === 'CONTRACT' || status === 'RESERVED';
+			if (isContractOrReserved && !checkInName) {
+				console.log('[mngChart/groups checkInName 빈값]', {
+					roomEsntlId: r.id,
+					roomNumber: r.roomNumber,
+					status,
+					'RS.customerEsntlId': r._dbg_rsCustomerEsntlId ?? '(null)',
+					'RS.contractEsntlId': r._dbg_rsContractEsntlId ?? '(null)',
+					'customer.name (C)': r._dbg_customerName ?? '(null)',
+					'RCW.checkinName': r._dbg_rcwCheckinName ?? '(null)',
+					'RS.customerName': r._dbg_rsCustomerName ?? '(null)',
+				});
+			}
+		});
+
+		// 방별 계약 ID로 parkStatus 조회 (주차 정보)
+		const contractIds = [...new Set(rooms.map((r) => r.contractEsntlId).filter(Boolean))];
+		let parkStatusByContract = {};
+		if (contractIds.length > 0) {
+			const parkRows = await mariaDBSequelize.query(
+				`
+				SELECT esntlId, contractEsntlId, status, useStartDate, useEndDate, parkType, parkNumber, cost, memo
+				FROM parkStatus
+				WHERE contractEsntlId IN (?) AND deleteYN = 'N'
+				ORDER BY contractEsntlId, useStartDate
+				`,
+				{
+					replacements: [contractIds],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				}
+			);
+			parkRows.forEach((row) => {
+				if (!parkStatusByContract[row.contractEsntlId]) parkStatusByContract[row.contractEsntlId] = [];
+				parkStatusByContract[row.contractEsntlId].push({
+					esntlId: row.esntlId,
+					status: row.status,
+					useStartDate: row.useStartDate,
+					useEndDate: row.useEndDate,
+					parkType: row.parkType,
+					parkNumber: row.parkNumber,
+					cost: row.cost != null ? parseInt(row.cost) : 0,
+					memo: row.memo,
+				});
+			});
+		}
 
 		// Groups 데이터 변환 - id는 room.esntlId 사용
 		// subStatus가 ROOM_MOVE_OUT/ROOM_MOVE_IN이면 '방이동'(ROOM_MOVE)으로 표시
@@ -185,7 +257,16 @@ exports.mngChartMain = async (req, res, next) => {
 				: baseStatus;
 			roomIdToStatusRaw[room.id] = statusKey;
 			const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP['BEFORE_SALES'];
-			
+			const roomCategory = room.roomCategoryEsntlId
+				? {
+					esntlId: room.roomCategoryEsntlId,
+					name: room.roomCategoryName || '',
+					base_price: room.roomCategoryBasePrice != null ? parseInt(room.roomCategoryBasePrice) : 0,
+					memo: room.roomCategoryMemo || '',
+				}
+				: null;
+			const parkStatus = parkStatusByContract[room.contractEsntlId] || [];
+
 			return {
 				id: room.id, // room.esntlId
 				roomEsntlId: room.id, // room.esntlId
@@ -196,8 +277,12 @@ exports.mngChartMain = async (req, res, next) => {
 				window: room.window || '',
 				monthlyRent: parseInt(room.monthlyRent) || 0,
 				currentGuest: room.currentGuest || '',
+				checkInName: room.checkInName || room.currentGuest || '',
 				stayPeriod: room.stayPeriod || '',
 				value: room.value || 0,
+				roomCategory,
+				useRoomRentFee: room.useRoomRentFee ?? null,
+				parkStatus,
 				color: {
 					sidebar: statusInfo.color,
 					statusBorder: statusInfo.color,
