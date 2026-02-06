@@ -108,14 +108,14 @@ const getCurrentDateTime = () => {
 	};
 };
 
-// parkStatus 기준(CONTRACT/RESERVED, deleteYN='N')으로 gosiwonParking.autoUse, bikeUse 동기화
+// parkStatus 기준(CONTRACT: 사용중만, deleteYN='N')으로 gosiwonParking.autoUse, bikeUse 동기화
 const syncGosiwonParkingUse = async (gosiwonEsntlId, transaction) => {
 	const countRows = await mariaDBSequelize.query(
 		`
 		SELECT parkType, COUNT(*) AS cnt
 		FROM parkStatus
 		WHERE gosiwonEsntlId = ?
-			AND status IN ('CONTRACT', 'RESERVED')
+			AND status = 'CONTRACT'
 			AND deleteYN = 'N'
 			AND (parkType = '자동차' OR parkType = '오토바이')
 		GROUP BY parkType
@@ -334,7 +334,7 @@ exports.getParkingList = async (req, res, next) => {
 				AND (EP.useStartDate <=> PS.useStartDate)
 			WHERE PS.contractEsntlId = ?
 				AND PS.deleteYN = 'N'
-				AND (PS.status IN ('CONTRACT', 'RESERVED', 'PENDING'))
+				AND (PS.status IN ('PENDING', 'CONTRACT', 'ENDED'))
 				AND (PS.parkType = '자동차' OR PS.parkType = '오토바이')
 			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;
@@ -392,7 +392,7 @@ exports.getParkingNowList = async (req, res, next) => {
 			LEFT JOIN room R ON RC.roomEsntlId = R.esntlId
 			LEFT JOIN customer C ON PS.customerEsntlId = C.esntlId
 			WHERE PS.gosiwonEsntlId = ?
-				AND PS.status IN ('CONTRACT', 'RESERVED')
+				AND PS.status = 'CONTRACT'
 				AND PS.deleteYN = 'N'
 			ORDER BY PS.useStartDate DESC, PS.createdAt DESC
 		`;

@@ -36,13 +36,20 @@ const formatDateTime = (dateString) => {
 	return date.toISOString().slice(0, 19).replace('T', ' ');
 };
 
-// 날짜에서 시간 제거 (YYYY-MM-DD 형식으로 변환)
+// 날짜에서 시간 제거 (YYYY-MM-DD 형식 문자열로 반환, slice 등 사용 가능)
 const formatDateOnly = (dateString) => {
 	if (!dateString) return null;
 	if (typeof dateString === 'string' && dateString.includes(' ')) {
 		return dateString.split(' ')[0];
 	}
-	return dateString;
+	if (typeof dateString === 'string') {
+		return dateString;
+	}
+	// Date 객체 등: YYYY-MM-DD 문자열로 변환
+	const d = new Date(dateString);
+	if (isNaN(d.getTime())) return null;
+	const pad2 = (n) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
 // 계약 타입 판단 함수
@@ -297,20 +304,29 @@ exports.mngChartMain = async (req, res, next) => {
 			roomIdToGroupIndex[group.id] = index; // group.id는 esntlId
 		});
 
-		// 2. Items 데이터 조회 (계약 정보) - 날짜 범위 필터 적용
-		const contractItemsQuery = `
+		// 2. Items 데이터 조회 (roomStatus 테이블 기준) - CONTRACT·CHECKOUT_* 기간이 날짜 범위와 겹치는 행, roomContract JOIN으로 contractStart/contractEnd·게스트 정보
+		const roomStatusItemsQuery = `
 			SELECT 
-				RC.esntlId AS id,
-				RC.roomEsntlId,
-				RC.gosiwonEsntlId,
-				RC.startDate,
-				RC.endDate,
+				RS.esntlId AS id,
+				RS.roomEsntlId,
+				RS.gosiwonEsntlId,
+				RS.status,
+				RS.subStatus,
+				RS.statusMemo,
+				RS.statusStartDate,
+				RS.statusEndDate,
+				RS.etcStartDate,
+				RS.etcEndDate,
+				RS.contractEsntlId,
+				R.roomNumber,
+				RC.esntlId AS contractEsntlIdVal,
+				RC.startDate AS contractStartDate,
+				RC.endDate AS contractEndDate,
 				RC.checkInTime,
 				RC.contractDate,
 				RC.month,
 				RC.status AS contractStatus,
 				RC.monthlyRent,
-				R.roomNumber,
 				R.monthlyRent AS roomMonthlyRent,
 				R.deposit AS roomDeposit,
 				C.name AS customerName,
@@ -329,9 +345,10 @@ exports.mngChartMain = async (req, res, next) => {
 				RCW.customerAge AS contractorAge,
 				PL.paymentAmount,
 				PL.pyl_goods_amount
-			FROM roomContract RC
-			JOIN room R ON RC.roomEsntlId = R.esntlId
-			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			FROM roomStatus RS
+			JOIN room R ON RS.roomEsntlId = R.esntlId
+			LEFT JOIN roomContract RC ON RS.contractEsntlId = RC.esntlId
+			LEFT JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN (
 				SELECT 
@@ -343,45 +360,29 @@ exports.mngChartMain = async (req, res, next) => {
 					AND isExtra = 0
 				GROUP BY contractEsntlId
 			) PL ON RC.esntlId = PL.contractEsntlId
-			WHERE RC.gosiwonEsntlId = ?
-				AND R.deleteYN = 'N'
-				AND RC.startDate <= ?
-				AND RC.endDate >= ?
-			ORDER BY RC.startDate ASC
-		`;
-
-		const contracts = await mariaDBSequelize.query(contractItemsQuery, {
-			replacements: [gosiwonEsntlId, endDateStr, startDateStr],
-			type: mariaDBSequelize.QueryTypes.SELECT,
-		});
-
-		// 3. 비활성 상태 Items 조회 (roomStatus에서 퇴실, 점검중 등) - 날짜 범위 필터 적용
-		const disabledItemsQuery = `
-			SELECT 
-				RS.esntlId AS id,
-				RS.roomEsntlId,
-				RS.status,
-				RS.statusMemo,
-				RS.etcStartDate,
-				RS.etcEndDate,
-				R.roomNumber
-			FROM roomStatus RS
-			JOIN room R ON RS.roomEsntlId = R.esntlId
 			WHERE RS.gosiwonEsntlId = ?
-				AND RS.status IN ('CHECKOUT_CONFIRMED', 'CHECKOUT_REQUESTED')
 				AND R.deleteYN = 'N'
-				AND (RS.etcStartDate IS NOT NULL OR RS.statusEndDate IS NOT NULL)
 				AND (
-					(COALESCE(RS.etcStartDate, RS.statusEndDate) >= ? AND COALESCE(RS.etcStartDate, RS.statusEndDate) < ?)
-					OR (COALESCE(RS.etcEndDate, RS.statusEndDate) >= ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) < ?)
-					OR (COALESCE(RS.etcStartDate, RS.statusEndDate) < ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) >= ?)
+					(RS.status = 'CONTRACT'
+						AND RS.statusStartDate <= ?
+						AND (RS.statusEndDate >= ? OR RS.statusEndDate IS NULL))
+					OR
+					(RS.status IN ('CHECKOUT_CONFIRMED', 'CHECKOUT_REQUESTED')
+						AND (RS.etcStartDate IS NOT NULL OR RS.statusEndDate IS NOT NULL)
+						AND (
+							(COALESCE(RS.etcStartDate, RS.statusEndDate) >= ? AND COALESCE(RS.etcStartDate, RS.statusEndDate) < ?)
+							OR (COALESCE(RS.etcEndDate, RS.statusEndDate) >= ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) < ?)
+							OR (COALESCE(RS.etcStartDate, RS.statusEndDate) < ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) >= ?)
+						))
 				)
-			ORDER BY COALESCE(RS.etcStartDate, RS.statusEndDate) ASC
+			ORDER BY COALESCE(RS.statusStartDate, RS.etcStartDate, RS.statusEndDate) ASC
 		`;
 
-		const disabledStatuses = await mariaDBSequelize.query(disabledItemsQuery, {
+		const roomStatusItems = await mariaDBSequelize.query(roomStatusItemsQuery, {
 			replacements: [
 				gosiwonEsntlId,
+				endDateStr,
+				startDateStr,
 				startDateStr,
 				endDateStr,
 				startDateStr,
@@ -392,7 +393,7 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 3-1. 방이동 목록 조회 (날짜 구간과 겹치는 moveDate)
+		// 3. 방이동 목록 조회 (날짜 구간과 겹치는 moveDate)
 		const roomMovesQuery = `
 			SELECT 
 				RMS.esntlId,
@@ -413,193 +414,162 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 4. Items 데이터 변환
+		// 4. Items 데이터 변환 (roomStatus 기준: start/end=roomStatus, contractStart/contractEnd=roomContract)
 		const items = [];
 		let itemIdCounter = 0;
-		const dependency = [];
 
-		// 계약 Items 추가
-		contracts.forEach((contract) => {
-			const groupIndex = roomIdToGroupIndex[contract.roomEsntlId];
+		// roomStatus 기준 Items 추가 (CONTRACT → contract, CHECKOUT_* → disabled)
+		roomStatusItems.forEach((row) => {
+			const groupIndex = roomIdToGroupIndex[row.roomEsntlId];
 			if (groupIndex === undefined) return;
 
-			const startDate = formatDateOnly(contract.startDate);
-			const endDate = formatDateOnly(contract.endDate);
-			if (!startDate || !endDate) return;
-
-			const contractType = getContractType(contract.contractDate, contract.startDate);
-			const paymentAmount = parseInt(contract.paymentAmount) || 0;
-			const entryFee = contract.pyl_goods_amount || 0;
-
-			// 입실자 정보 구성
-			const guestName = contract.checkinName || contract.customerName || '';
-			const guestAge = contract.checkinAge || contract.customerAge || '';
-			const guestGender = contract.checkinGender || contract.customerGender || '';
-			const guestPhone = contract.checkinPhone || contract.customerPhone || '';
-			const guest = `${guestName} / ${guestAge} / ${guestGender}(${guestPhone})`;
-
-			// 계약자 정보 구성
-			const contractorName = contract.contractorName || contract.customerName || '';
-			const contractorAge = contract.contractorAge || contract.customerAge || '';
-			const contractorGender = contract.contractorGender || contract.customerGender || '';
-			const contractorPhone = contract.contractorPhone || contract.customerPhone || '';
-			const contractor = `${contractorName} / ${contractorAge} / ${contractorGender}(${contractorPhone})`;
-
-			// 계좌정보
-			const accountInfo = contract.customerBank && contract.customerBankAccount
-				? `${contract.customerBank} ${contract.customerBankAccount} ${contractorName}`
-				: '-';
-
-			// 보증금
-			const deposit = contract.roomDeposit || 0;
-
-			// 추가 결제 옵션 조회 (주차비 등)
-			// 이 부분은 별도 쿼리로 가져와야 함 (추후 최적화 가능)
-
-			// 기간 표시 형식 (MM-dd ~ MM-dd)
-			const period = startDate && endDate
-				? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}`
-				: '';
-
-			// 계약 상태에 따른 className 결정
-			const contractStatus = contract.contractStatus;
-			let className = 'timeline-item leave';
-			if (contractStatus === 'ACTIVE' || contractStatus === 'CONTRACT') {
-				className = 'timeline-item in-progress';
+			// start/end: roomStatus 값 (CONTRACT는 statusStartDate/statusEndDate, CHECKOUT_*는 etcStartDate/statusEndDate, etcEndDate)
+			let statusStartRaw = null;
+			let statusEndRaw = null;
+			if (row.status === 'CONTRACT') {
+				statusStartRaw = row.statusStartDate;
+				statusEndRaw = row.statusEndDate;
+			} else {
+				statusStartRaw = row.etcStartDate || row.statusEndDate;
+				statusEndRaw = row.etcEndDate;
 			}
-
-			items.push({
-				id: itemIdCounter++,
-				group: contract.roomEsntlId,
-				itemType: 'contract',
-				itemStatus: roomIdToStatusRaw[contract.roomEsntlId] ?? null,
-				start: formatDateTime(startDate),
-				end: formatDateTime(endDate + ' 23:59:59'),
-				period: period,
-				currentGuest: guestName,
-				guestPhone: guestPhone,
-				className: className,
-				contractNumber: contract.id,
-				guest: guest,
-				contractPerson: contractor,
-				periodType: contract.month ? `${contract.month}개월` : '1개월',
-				contractType: contractType,
-				entryFee: entryFee > 0 ? `${entryFee}` : '0',
-				paymentAmount: paymentAmount > 0 ? `${paymentAmount}` : '0',
-				accountInfo: accountInfo,
-				deposit: deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원',
-				additionalPaymentOption: '-', // 추후 추가 결제 옵션 조회로 채워야 함
-			});
-		});
-
-		// 비활성 상태 Items 추가
-		disabledStatuses.forEach((status) => {
-			const groupIndex = roomIdToGroupIndex[status.roomEsntlId];
-			if (groupIndex === undefined) return;
-
-			const startDate = status.etcStartDate || status.statusEndDate;
-			const endDate = status.etcEndDate;
+			const startDate = formatDateOnly(statusStartRaw);
 			if (!startDate) return;
 
-			let content = '퇴실';
-			if (status.statusMemo) {
-				content = status.statusMemo;
-			} else if (status.status === 'CHECKOUT_CONFIRMED') {
-				content = '퇴실';
-			} else if (status.status === 'CHECKOUT_REQUESTED') {
-				content = '점검중';
-			}
-
+			const endDate = formatDateOnly(statusEndRaw);
 			const formattedStart = formatDateTime(startDate);
 			const formattedEnd = endDate ? formatDateTime(endDate + ' 23:59:59') : formatDateTime(startDate + ' 23:59:59');
 
-			items.push({
-				id: itemIdCounter++,
-				group: status.roomEsntlId,
-				itemType: 'disabled',
-				itemStatus: roomIdToStatusRaw[status.roomEsntlId] ?? null,
-				className: 'disabled',
-				start: formattedStart,
-				end: formattedEnd,
-				content: content,
-				reason: status.statusMemo || '',
-				description: status.statusMemo || '판매 및 룸투어, 입실이 불가합니다.',
-			});
+			// contractStart/contractEnd: roomContract의 startDate, endDate (있을 때만)
+			const contractStart = row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null;
+			const contractEnd = row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null;
+
+			if (row.status === 'CONTRACT') {
+				const contractType = getContractType(row.contractDate, row.contractStartDate);
+				const paymentAmount = parseInt(row.paymentAmount) || 0;
+				const entryFee = row.pyl_goods_amount || 0;
+
+				const guestName = row.checkinName || row.customerName || '';
+				const guestAge = row.checkinAge || row.customerAge || '';
+				const guestGender = row.checkinGender || row.customerGender || '';
+				const guestPhone = row.checkinPhone || row.customerPhone || '';
+				const guest = `${guestName} / ${guestAge} / ${guestGender}(${guestPhone})`;
+
+				const contractorName = row.contractorName || row.customerName || '';
+				const contractorAge = row.contractorAge || row.customerAge || '';
+				const contractorGender = row.contractorGender || row.customerGender || '';
+				const contractorPhone = row.contractorPhone || row.customerPhone || '';
+				const contractor = `${contractorName} / ${contractorAge} / ${contractorGender}(${contractorPhone})`;
+
+				const accountInfo = row.customerBank && row.customerBankAccount
+					? `${row.customerBank} ${row.customerBankAccount} ${contractorName}`
+					: '-';
+
+				const deposit = row.roomDeposit || 0;
+				const period = startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string'
+					? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}`
+					: '';
+
+				const contractStatus = row.contractStatus;
+				let className = 'timeline-item leave';
+				if (contractStatus === 'ACTIVE' || contractStatus === 'CONTRACT') {
+					className = 'timeline-item in-progress';
+				}
+
+				const contractItem = {
+					id: itemIdCounter++,
+					group: row.roomEsntlId,
+					itemType: 'contract',
+					itemStatus: roomIdToStatusRaw[row.roomEsntlId] ?? null,
+					start: formattedStart,
+					end: formattedEnd,
+					contractStart,
+					contractEnd,
+					period,
+					currentGuest: guestName,
+					guestPhone,
+					className,
+					contractNumber: row.contractEsntlIdVal || row.contractEsntlId,
+					guest,
+					contractPerson: contractor,
+					periodType: row.month ? `${row.month}개월` : '1개월',
+					contractType: contractType,
+					entryFee: entryFee > 0 ? `${entryFee}` : '0',
+					paymentAmount: paymentAmount > 0 ? `${paymentAmount}` : '0',
+					accountInfo,
+					deposit: deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원',
+					additionalPaymentOption: '-',
+				};
+				// roomStatus.subStatus가 ROOM_MOVE_IN/OUT이면 나중에 moveID·moveFrom·moveTo 매칭용으로 표시
+				if (row.subStatus === 'ROOM_MOVE_OUT' || row.subStatus === 'ROOM_MOVE_IN') {
+					contractItem._moveSubStatus = row.subStatus;
+				}
+				items.push(contractItem);
+			} else {
+				// CHECKOUT_CONFIRMED, CHECKOUT_REQUESTED → disabled
+				let content = '퇴실';
+				if (row.statusMemo) {
+					content = row.statusMemo;
+				} else if (row.status === 'CHECKOUT_CONFIRMED') {
+					content = '퇴실';
+				} else if (row.status === 'CHECKOUT_REQUESTED') {
+					content = '점검중';
+				}
+
+				items.push({
+					id: itemIdCounter++,
+					group: row.roomEsntlId,
+					itemType: 'disabled',
+					itemStatus: roomIdToStatusRaw[row.roomEsntlId] ?? null,
+					className: 'disabled',
+					start: formattedStart,
+					end: formattedEnd,
+					contractStart,
+					contractEnd,
+					content,
+					reason: row.statusMemo || '',
+					description: row.statusMemo || '판매 및 룸투어, 입실이 불가합니다.',
+				});
+			}
 		});
 
-		// 4-1. 방이동 Items 추가 (dependency는 items 기준으로 나중에 생성)
+		// 4-1. roomStatus.subStatus ROOM_MOVE_IN/OUT인 CONTRACT items에 moveID·moveFrom·moveTo·moveRole 설정 (별도 room_move 아이템 없이, 이동은 하나의 유니크 moveID로 연결)
+		let moveIDCounter = 1;
 		roomMoves.forEach((move) => {
-			if (roomIdToGroupIndex[move.originalRoomEsntlId] === undefined || roomIdToGroupIndex[move.targetRoomEsntlId] === undefined) return;
-			const moveDateStr = move.moveDate
-				? (typeof move.moveDate === 'string'
-					? move.moveDate.split(' ')[0].split('T')[0]
-					: move.moveDate.toISOString?.().slice(0, 10) || String(move.moveDate).slice(0, 10))
-				: null;
+			const moveDateStr = formatDateOnly(move.moveDate);
 			if (!moveDateStr) return;
-			const moveStart = formatDateTime(moveDateStr);
-			const moveEnd = formatDateTime(moveDateStr + ' 23:59:59');
-			const originalRoomNumber = roomIdToRoomNumber[move.originalRoomEsntlId] ?? move.originalRoomEsntlId;
-			const targetRoomNumber = roomIdToRoomNumber[move.targetRoomEsntlId] ?? move.targetRoomEsntlId;
-			const moveOutContent = `방이동(출 ${originalRoomNumber}->${targetRoomNumber})`;
-			const moveInContent = `방이동(입 ${originalRoomNumber}->${targetRoomNumber})`;
-			items.push({
-				id: itemIdCounter++,
-				group: move.originalRoomEsntlId,
-				itemType: 'room_move_out',
-				itemStatus: roomIdToStatusRaw[move.originalRoomEsntlId] ?? null,
-				className: 'room-move-out',
-				start: moveStart,
-				end: moveEnd,
-				content: moveOutContent,
-				title: '방이동',
-			});
-			items.push({
-				id: itemIdCounter++,
-				group: move.targetRoomEsntlId,
-				itemType: 'room_move_in',
-				itemStatus: roomIdToStatusRaw[move.targetRoomEsntlId] ?? null,
-				className: 'room-move-in',
-				start: moveStart,
-				end: moveEnd,
-				content: moveInContent,
-				title: '방이동',
-			});
-		});
 
-		// 4-2. dependency: items 배열에서 room_move_out / room_move_in 쌍을 찾아 id_item_1(OUT) → id_item_2(IN) 설정
-		let dependencyId = 1;
-		roomMoves.forEach((move) => {
-			const moveDateStr = move.moveDate
-				? (typeof move.moveDate === 'string'
-					? move.moveDate.split(' ')[0].split('T')[0]
-					: move.moveDate.toISOString?.().slice(0, 10) || String(move.moveDate).slice(0, 10))
-				: null;
-			if (!moveDateStr) return;
-			const moveStart = formatDateTime(moveDateStr);
 			const outItem = items.find(
 				(it) =>
-					it.itemType === 'room_move_out' &&
+					it.itemType === 'contract' &&
+					it._moveSubStatus === 'ROOM_MOVE_OUT' &&
 					it.group === move.originalRoomEsntlId &&
-					it.start === moveStart
+					formatDateOnly(it.end) === moveDateStr
 			);
 			const inItem = items.find(
 				(it) =>
-					it.itemType === 'room_move_in' &&
+					it.itemType === 'contract' &&
+					it._moveSubStatus === 'ROOM_MOVE_IN' &&
 					it.group === move.targetRoomEsntlId &&
-					it.start === moveStart
+					formatDateOnly(it.start) === moveDateStr
 			);
 			if (outItem != null && inItem != null) {
-				dependency.push({
-					id: dependencyId++,
-					id_item_1: outItem.id,
-					id_item_2: inItem.id,
-					title: '방이동',
-					direction: 1,
-					color: '#4A67DD',
-					line: 2,
-					type: 2,
-				});
+				const moveID = moveIDCounter++;
+				const moveFrom = outItem.id;
+				const moveTo = inItem.id;
+				outItem.moveID = moveID;
+				outItem.moveFrom = moveFrom;
+				outItem.moveTo = moveTo;
+				outItem.moveRole = 'out'; // 이 방에서 out
+				inItem.moveID = moveID;
+				inItem.moveFrom = moveFrom;
+				inItem.moveTo = moveTo;
+				inItem.moveRole = 'in'; // 이 방으로 in
 			}
+		});
+		// 응답에 내보낼 때 사용한 내부 표시 제거
+		items.forEach((it) => {
+			if (it._moveSubStatus !== undefined) delete it._moveSubStatus;
 		});
 
 		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - 날짜 범위 필터 적용
@@ -672,6 +642,8 @@ exports.mngChartMain = async (req, res, next) => {
 				colors: [statusInfo.color],
 				start: formatDateTime(statusDate),
 				end: null,
+				contractStart: null,
+				contractEnd: null,
 				className: 'room-statuses',
 			});
 		});
@@ -722,13 +694,12 @@ exports.mngChartMain = async (req, res, next) => {
 		// 7. 전체 페이지 수 계산 (최대 12개월까지 조회 가능하다고 가정)
 		const totalPages = 12; // 1년치 데이터
 
-		// 8. 응답 데이터 구성
+		// 8. 응답 데이터 구성 (dependency 제거, 방이동은 items의 moveID·moveFrom·moveTo로 표시)
 		const responseData = {
 			gosiwonEsntlId: gosiwonEsntlId,
 			gosiwonName: gosiwonName,
 			groups: groups,
 			items: items,
-			dependency: dependency,
 			roomStatuses: roomStatusesArray,
 			page: pageNum,
 			totalPages: totalPages,

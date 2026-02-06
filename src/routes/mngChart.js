@@ -16,7 +16,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  * /v1/mngChart/main:
  *   get:
  *     summary: 관리객실현황 차트 데이터 조회
- *     description: 고시원 ID를 입력받아 해당 고시원의 방 목록(groups), 계약 및 상태 정보(items), 방 상태 이력(roomStatuses)을 조회합니다.
+ *     description: "고시원 ID를 입력받아 해당 고시원의 방 목록(groups), 계약 및 상태 정보(items), 방 상태 이력(roomStatuses)을 조회합니다. 별도 room_move 아이템 없이, roomStatus.subStatus가 ROOM_MOVE_IN/ROOM_MOVE_OUT인 contract item에 moveID(유니크), moveFrom, moveTo, moveRole(out=이 방에서 나감, in=이 방으로 들어옴)로 이동 쌍을 표시합니다."
  *     tags: [관리객실현황]
  *     security:
  *       - bearerAuth: []
@@ -110,7 +110,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                                 description: 상태 텍스트 색상
  *                     items:
  *                       type: array
- *                       description: 계약 및 상태 정보 (vis-timeline items)
+ *                       description: "roomStatus 테이블 기준 계약 및 상태 정보 (vis-timeline items). start/end는 roomStatus 값, contractStart/contractEnd는 roomContract의 startDate/endDate"
  *                       items:
  *                         type: object
  *                         properties:
@@ -123,15 +123,42 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           itemType:
  *                             type: string
  *                             enum: [contract, disabled, system]
- *                             description: '아이템 타입 (contract: 계약, disabled: 비활성 상태, system: 시스템 상태)'
+ *                             description: '아이템 타입 (contract: 계약, disabled: 비활성 상태, system: 시스템 상태). 방이동은 contract+subStatus ROOM_MOVE_IN/OUT으로 moveID·moveRole로 표시'
  *                           start:
  *                             type: string
  *                             format: date-time
- *                             description: 시작 일시
+ *                             description: 시작 일시 (roomStatus 기준)
  *                           end:
  *                             type: string
  *                             format: date-time
- *                             description: 종료 일시
+ *                             description: 종료 일시 (roomStatus 기준)
+ *                           contractStart:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                             description: "계약 시작 일시 (roomContract.startDate, 계약 연동 시에만)"
+ *                           contractEnd:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                             description: "계약 종료 일시 (roomContract.endDate, 계약 연동 시에만)"
+ *                           moveID:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: "방이동 쌍 ID (roomStatus.subStatus가 ROOM_MOVE_IN/OUT인 contract item에만, 동일 이동 쌍은 같은 moveID)"
+ *                           moveFrom:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: "방이동 출발 item id (어디서 이동했는지)"
+ *                           moveTo:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: "방이동 도착 item id (어디로 이동했는지)"
+ *                           moveRole:
+ *                             type: string
+ *                             enum: [out, in]
+ *                             nullable: true
+ *                             description: "방이동 역할. out=이 방에서 나감, in=이 방으로 들어옴 (subStatus ROOM_MOVE_OUT/ROOM_MOVE_IN인 contract item에만)"
  *                           period:
  *                             type: string
  *                             description: 기간 표시 (MM-dd ~ MM-dd 형식)

@@ -162,11 +162,12 @@ exports.createParkStatus = async (req, res, next) => {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
 
+		const PARK_STATUS_VALUES = ['PENDING', 'CONTRACT', 'ENDED'];
 		const {
 			gosiwonEsntlId,
 			contractEsntlId,
 			customerEsntlId,
-			status = 'AVAILABLE',
+			status = 'PENDING',
 			useStartDate,
 			useEndDate,
 		} = req.body;
@@ -174,6 +175,10 @@ exports.createParkStatus = async (req, res, next) => {
 		// 필수 필드 검증
 		if (!gosiwonEsntlId) {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
+		}
+		// status 허용값: PENDING(입금대기), CONTRACT(사용중), ENDED(만료됨)
+		if (status && !PARK_STATUS_VALUES.includes(status)) {
+			errorHandler.errorThrow(400, `status는 ${PARK_STATUS_VALUES.join(', ')} 중 하나여야 합니다.`);
 		}
 
 		// contractEsntlId 유효성 검증 (빈 문자열이거나 유효하지 않으면 null)
@@ -222,10 +227,9 @@ exports.createParkStatus = async (req, res, next) => {
 		// 히스토리 생성
 		const historyId = await generateHistoryId(transaction);
 		const statusText = {
-			AVAILABLE: '사용가능',
+			PENDING: '입금대기',
 			CONTRACT: '사용중',
-			RESERVED: '예약됨',
-			EXPIRED: '만료됨',
+			ENDED: '만료됨',
 		}[status] || status;
 		
 		const dateRange = useStartDate && useEndDate 
@@ -347,16 +351,16 @@ exports.updateParkStatus = async (req, res, next) => {
 			updateData.customerEsntlId = customerEsntlId || null;
 			changes.push(`고객: ${existingParkStatus.customerEsntlId || '없음'} → ${customerEsntlId || '없음'}`);
 		}
+		// status 허용값: PENDING(입금대기), CONTRACT(사용중), ENDED(만료됨)
+		const PARK_STATUS_VALUES = ['PENDING', 'CONTRACT', 'ENDED'];
+		const PARK_STATUS_LABELS = { PENDING: '입금대기', CONTRACT: '사용중', ENDED: '만료됨' };
 		if (status !== undefined && status !== existingParkStatus.status) {
+			if (!PARK_STATUS_VALUES.includes(status)) {
+				errorHandler.errorThrow(400, `status는 ${PARK_STATUS_VALUES.join(', ')} 중 하나여야 합니다.`);
+			}
 			updateData.status = status;
-			const statusText = {
-				AVAILABLE: '사용가능',
-				CONTRACT: '사용중',
-				RESERVED: '예약됨',
-				EXPIRED: '만료됨',
-			};
-			const oldStatusText = statusText[existingParkStatus.status] || existingParkStatus.status;
-			const newStatusText = statusText[status] || status;
+			const oldStatusText = PARK_STATUS_LABELS[existingParkStatus.status] || existingParkStatus.status;
+			const newStatusText = PARK_STATUS_LABELS[status] || status;
 			changes.push(`상태: ${oldStatusText} → ${newStatusText}`);
 		}
 		if (useStartDate !== undefined && useStartDate !== existingParkStatus.useStartDate) {

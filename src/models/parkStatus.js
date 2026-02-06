@@ -30,9 +30,9 @@ module.exports = (sequelize, DataTypes) => {
 			status: {
 				type: DataTypes.STRING(50),
 				allowNull: false,
-				defaultValue: 'AVAILABLE',
+				defaultValue: 'PENDING',
 				field: 'status',
-				comment: '주차 상태 (AVAILABLE: 사용가능, CONTRACT: 사용중, RESERVED: 예약됨, EXPIRED: 만료됨)',
+				comment: '주차 상태 (PENDING: 입금대기, CONTRACT: 사용중, ENDED: 만료됨)',
 			},
 			useStartDate: {
 				type: DataTypes.DATEONLY,
