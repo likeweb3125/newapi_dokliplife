@@ -174,8 +174,11 @@ exports.mngChartMain = async (req, res, next) => {
 		// Groups 데이터 변환 - id는 room.esntlId 사용
 		// subStatus가 ROOM_MOVE_OUT/ROOM_MOVE_IN이면 '방이동'(ROOM_MOVE)으로 표시
 		// roomEsntlId -> roomStatus.status(원본) 매핑 (items의 itemStatus용)
+		// roomEsntlId -> roomNumber 매핑 (방이동 content용)
 		const roomIdToStatusRaw = {};
+		const roomIdToRoomNumber = {};
 		const groups = rooms.map((room) => {
+			roomIdToRoomNumber[room.id] = room.roomNumber || room.id;
 			const baseStatus = room.status || 'BEFORE_SALES';
 			const statusKey = (room.roomSubStatus === 'ROOM_MOVE_OUT' || room.roomSubStatus === 'ROOM_MOVE_IN')
 				? 'ROOM_MOVE'
@@ -450,6 +453,10 @@ exports.mngChartMain = async (req, res, next) => {
 			if (!moveDateStr) return;
 			const moveStart = formatDateTime(moveDateStr);
 			const moveEnd = formatDateTime(moveDateStr + ' 23:59:59');
+			const originalRoomNumber = roomIdToRoomNumber[move.originalRoomEsntlId] ?? move.originalRoomEsntlId;
+			const targetRoomNumber = roomIdToRoomNumber[move.targetRoomEsntlId] ?? move.targetRoomEsntlId;
+			const moveOutContent = `방이동(출 ${originalRoomNumber}->${targetRoomNumber})`;
+			const moveInContent = `방이동(입 ${originalRoomNumber}->${targetRoomNumber})`;
 			items.push({
 				id: itemIdCounter++,
 				group: move.originalRoomEsntlId,
@@ -458,7 +465,7 @@ exports.mngChartMain = async (req, res, next) => {
 				className: 'room-move-out',
 				start: moveStart,
 				end: moveEnd,
-				content: '방이동(출)',
+				content: moveOutContent,
 				title: '방이동',
 			});
 			items.push({
@@ -469,7 +476,7 @@ exports.mngChartMain = async (req, res, next) => {
 				className: 'room-move-in',
 				start: moveStart,
 				end: moveEnd,
-				content: '방이동(입)',
+				content: moveInContent,
 				title: '방이동',
 			});
 		});

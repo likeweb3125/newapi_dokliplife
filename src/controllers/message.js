@@ -3,6 +3,7 @@ const { mariaDBSequelize } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const historyController = require('./history');
 
 // 공통 토큰 검증 함수 (관리자/파트너)
 const verifyAdminToken = (req) => {
@@ -38,7 +39,7 @@ exports.sendSMS = async (req, res, next) => {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
 
-		const { receiver, message, title, gosiwonEsntlId = null, userEsntlId = null } = req.body;
+		const { receiver, message, title, gosiwonEsntlId = null, userEsntlId = null, roomEsntlId: bodyRoomEsntlId = null } = req.body;
 
 		if (!receiver) {
 			errorHandler.errorThrow(400, 'receiver(수신번호)를 입력해주세요.');
@@ -70,6 +71,23 @@ exports.sendSMS = async (req, res, next) => {
 			? userRows[0].esntlId
 			: (userEsntlId || null);
 
+		// history 저장용: 방·계약 정보 (body에 없으면 사용자 기준 USED 계약에서 조회)
+		let resolvedRoomEsntlId = bodyRoomEsntlId || null;
+		let resolvedContractEsntlId = null;
+		if (resolvedUserEsntlId && !resolvedRoomEsntlId) {
+			const [contractRow] = await mariaDBSequelize.query(
+				`SELECT esntlId, roomEsntlId FROM roomContract WHERE customerEsntlId = ? AND status = 'USED' ORDER BY contractDate DESC LIMIT 1`,
+				{
+					replacements: [resolvedUserEsntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				}
+			);
+			if (contractRow) {
+				resolvedContractEsntlId = contractRow.esntlId;
+				resolvedRoomEsntlId = contractRow.roomEsntlId;
+			}
+		}
+
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO messageSmsHistory (
@@ -97,6 +115,26 @@ exports.sendSMS = async (req, res, next) => {
 				type: mariaDBSequelize.QueryTypes.INSERT,
 			}
 		);
+
+		// history 테이블에 방·고시원·사용자 기준 기록 (공통 저장 함수 사용)
+		try {
+			const historyContent = `문자 발송: ${title || '문자 발송'} - 수신 ${firstReceiver}${message ? ` (${String(message).slice(0, 50)}${message.length > 50 ? '…' : ''})` : ''}`;
+			await historyController.createHistoryRecord({
+				gosiwonEsntlId: gosiwonEsntlId || null,
+				roomEsntlId: resolvedRoomEsntlId,
+				contractEsntlId: resolvedContractEsntlId,
+				content: historyContent,
+				category: 'ETC',
+				priority: 'NORMAL',
+				publicRange: 0,
+				writerAdminId: writerAdminId || null,
+				writerCustomerId: resolvedUserEsntlId,
+				writerType: 'ADMIN',
+			});
+		} catch (historyErr) {
+			console.error('문자 발송 history 생성 실패:', historyErr);
+			// history 실패해도 문자 발송 성공 응답 유지
+		}
 
 		errorHandler.successThrow(res, '문자 발송 성공', {
 			result,

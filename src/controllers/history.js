@@ -352,6 +352,38 @@ exports.createHistory = async (req, res, next) => {
 	}
 };
 
+/**
+ * 다른 컨트롤러에서 호출하는 히스토리 저장 함수 (API 요청 없이 레코드만 생성)
+ * @param {Object} options - gosiwonEsntlId, roomEsntlId, contractEsntlId, content, category, writerAdminId, writerCustomerId 등
+ * @param {Object} [transaction] - Sequelize transaction (선택)
+ * @returns {Promise<Object>} 생성된 history
+ */
+exports.createHistoryRecord = async (options, transaction = null) => {
+	const historyId = await generateHistoryId(transaction);
+	const newHistory = await history.create(
+		{
+			esntlId: historyId,
+			gosiwonEsntlId: options.gosiwonEsntlId ?? null,
+			roomEsntlId: options.roomEsntlId ?? null,
+			contractEsntlId: options.contractEsntlId ?? null,
+			depositEsntlId: options.depositEsntlId ?? null,
+			etcEsntlId: options.etcEsntlId ?? null,
+			content: options.content ?? '',
+			category: options.category ?? null,
+			priority: options.priority ?? 'NORMAL',
+			publicRange: options.publicRange === 1 || options.publicRange === '1' ? 1 : 0,
+			writerAdminId: options.writerAdminId ?? null,
+			writerCustomerId: options.writerCustomerId ?? null,
+			writerType: options.writerType ?? 'ADMIN',
+			tags: options.tags ?? null,
+			isPinned: options.isPinned === 1 || options.isPinned === '1' ? 1 : 0,
+			deleteYN: 'N',
+		},
+		transaction ? { transaction } : {}
+	);
+	return newHistory;
+};
+
 // 히스토리 수정
 exports.updateHistory = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
