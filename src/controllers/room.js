@@ -751,6 +751,93 @@ exports.updateRoom = async (req, res, next) => {
 	}
 };
 
+// 여러 방의 카테고리(room.roomCategory) 한 번에 변경
+exports.updateRoomCategory = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { target, category } = req.body;
+
+		if (!target || typeof target !== 'string') {
+			errorHandler.errorThrow(400, 'target(방 ID 목록, 쉼표 구분)을 입력해주세요.');
+		}
+		if (!category || typeof category !== 'string') {
+			errorHandler.errorThrow(400, 'category(카테고리 ID)를 입력해주세요.');
+		}
+
+		const roomIds = target.split(',').map((id) => id.trim()).filter(Boolean);
+		if (roomIds.length === 0) {
+			errorHandler.errorThrow(400, 'target에 유효한 방 ID가 없습니다.');
+		}
+
+		// 카테고리 존재 여부 확인
+		const categoryRow = await roomCategory.findByPk(category);
+		if (!categoryRow) {
+			errorHandler.errorThrow(404, '해당 카테고리를 찾을 수 없습니다.');
+		}
+		const categoryName = categoryRow.name || category;
+
+		const updatedRooms = [];
+		const errors = [];
+
+		for (const roomEsntlId of roomIds) {
+			const roomInfo = await room.findByPk(roomEsntlId, { transaction });
+			if (!roomInfo) {
+				errors.push({ roomEsntlId, error: '방을 찾을 수 없습니다.' });
+				continue;
+			}
+			if (roomInfo.roomCategory === category) {
+				// 이미 동일 카테고리면 스킵 (히스토리만 남기지 않음)
+				updatedRooms.push({ roomEsntlId, skipped: true });
+				continue;
+			}
+
+			const previousCategory = roomInfo.roomCategory || '없음';
+
+			await room.update(
+				{ roomCategory: category },
+				{ where: { esntlId: roomEsntlId }, transaction }
+			);
+
+			// 해당 방의 history에 카테고리 변경 기록
+			const historyId = await generateHistoryId(transaction);
+			const historyContent = `카테고리 변경: ${previousCategory} → ${categoryName}(${category})`;
+
+			await history.create(
+				{
+					esntlId: historyId,
+					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+					roomEsntlId: roomEsntlId,
+					content: historyContent,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: writerAdminId,
+					writerType: 'ADMIN',
+					deleteYN: 'N',
+				},
+				{ transaction }
+			);
+
+			updatedRooms.push({ roomEsntlId, updated: true });
+		}
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '방 카테고리 일괄 변경 완료', {
+			updated: updatedRooms.filter((r) => r.updated).length,
+			skipped: updatedRooms.filter((r) => r.skipped).length,
+			errors: errors.length > 0 ? errors : undefined,
+			rooms: updatedRooms,
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
 // 방 특약 내역 수정
 exports.updateRoomAgreement = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();

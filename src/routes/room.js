@@ -967,6 +967,80 @@ router.get('/category/list', roomCategoryController.getCategoryList);
 
 /**
  * @swagger
+ * /v1/room/category/bulk:
+ *   put:
+ *     summary: 여러 방의 카테고리 일괄 변경
+ *     description: "여러 방의 roomCategory를 한 번에 변경합니다. 성공 시 각 방의 history에 카테고리 변경 기록을 남깁니다."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - target
+ *               - category
+ *             properties:
+ *               target:
+ *                 type: string
+ *                 description: "방 ID 목록 (쉼표로 구분, 예: ROOM0000002549, ROOM0000024066, ROOM0000002816)"
+ *                 example: "ROOM0000002549, ROOM0000024066, ROOM0000002816"
+ *               category:
+ *                 type: string
+ *                 description: "변경할 카테고리 ID (roomCategory.esntlId)"
+ *                 example: CATE0000000006
+ *     responses:
+ *       200:
+ *         description: 방 카테고리 일괄 변경 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 카테고리 일괄 변경 완료
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     updated:
+ *                       type: integer
+ *                       description: 실제 변경된 방 수
+ *                     skipped:
+ *                       type: integer
+ *                       description: 이미 동일 카테고리라 스킵된 방 수
+ *                     errors:
+ *                       type: array
+ *                       description: "방을 찾을 수 없을 때만 존재"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomEsntlId:
+ *                             type: string
+ *                           error:
+ *                             type: string
+ *                     rooms:
+ *                       type: array
+ *                       description: 방별 처리 결과 (updated 또는 skipped)
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         description: 카테고리를 찾을 수 없음
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/category/bulk', roomController.updateRoomCategory);
+
+/**
+ * @swagger
  * /v1/room/category/create:
  *   post:
  *     summary: 방 카테고리 등록
