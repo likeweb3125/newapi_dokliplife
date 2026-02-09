@@ -57,6 +57,14 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                       type: string
  *                       description: 현재 검색 중인 고시원 고유 아이디
  *                       example: GOSI0000000199
+ *                     gosiwonCeo:
+ *                       type: string
+ *                       nullable: true
+ *                       description: "고시원 대표자명 (gosiwonAdmin.ceo, gosiwon.adminEsntlId로 조회)"
+ *                     gosiwonCeoHp:
+ *                       type: string
+ *                       nullable: true
+ *                       description: "고시원 대표자 연락처 (gosiwonAdmin.hp)"
  *                     groups:
  *                       type: array
  *                       description: 방 목록 (vis-timeline groups)

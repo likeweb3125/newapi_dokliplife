@@ -97,15 +97,20 @@ exports.mngChartMain = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
 		}
 
-		// 고시원 이름 조회 (응답에 gosiwonName 포함)
+		// 고시원 이름 및 관리자(대표자·연락처) 조회 (gosiwon.adminEsntlId → gosiwonAdmin)
 		const [gosiwonRow] = await mariaDBSequelize.query(
-			`SELECT name FROM gosiwon WHERE esntlId = ? LIMIT 1`,
+			`SELECT G.name, GA.ceo AS gosiwonCeo, GA.hp AS gosiwonCeoHp
+			 FROM gosiwon G
+			 LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
+			 WHERE G.esntlId = ? LIMIT 1`,
 			{
 				replacements: [gosiwonEsntlId],
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}
 		);
 		const gosiwonName = gosiwonRow?.name ?? null;
+		const gosiwonCeo = gosiwonRow?.gosiwonCeo ?? null;
+		const gosiwonCeoHp = gosiwonRow?.gosiwonCeoHp ?? null;
 
 		// 페이징 처리: 오늘 기준으로 2개월 간격 (로컬 날짜 사용, toISOString은 UTC라 KST에서 하루 밀림 방지)
 		const pageNum = parseInt(page) || 1;
@@ -698,6 +703,8 @@ exports.mngChartMain = async (req, res, next) => {
 		const responseData = {
 			gosiwonEsntlId: gosiwonEsntlId,
 			gosiwonName: gosiwonName,
+			gosiwonCeo: gosiwonCeo,
+			gosiwonCeoHp: gosiwonCeoHp,
 			groups: groups,
 			items: items,
 			roomStatuses: roomStatusesArray,
