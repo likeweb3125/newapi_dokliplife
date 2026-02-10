@@ -648,6 +648,18 @@ router.get('/data', refundController.getRefundRequestData);
  *                           type: string
  *                         roomNumber:
  *                           type: string
+ *                         agreementType:
+ *                           type: string
+ *                           description: "특약 타입 (GENERAL, GOSIWON, ROOM)"
+ *                         agreementContent:
+ *                           type: string
+ *                           description: "방 특약 내용 (HTML 등)"
+ *                         gsw_contract:
+ *                           type: string
+ *                           description: "고시원 계약서 (gosiwon.contract)"
+ *                         gs_contract:
+ *                           type: string
+ *                           description: "관리자 기본 계약서 (adminContract 1건)"
  *                         checkinName:
  *                           type: string
  *                         contractorName:

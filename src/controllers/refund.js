@@ -1074,7 +1074,7 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
 		}
 
-		// 2. 계약정보 (roomContract 기준 + 방·입실자·계약자)
+		// 2. 계약정보 (roomContract 기준 + 방·입실자·계약자 + roomContract/detail과 동일한 agreement·계약서)
 		const contractInfoQuery = `
 			SELECT 
 				RC.esntlId AS contractId,
@@ -1088,6 +1088,10 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				R.esntlId AS roomEsntlId,
 				R.roomNumber,
 				R.roomType,
+				R.agreementType AS agreementType,
+				R.agreementContent AS agreementContent,
+				G.contract AS gsw_contract,
+				(SELECT content FROM adminContract ORDER BY numberOrder ASC LIMIT 1) AS gs_contract,
 				C.name AS customerName,
 				C.phone AS customerPhone,
 				C.gender AS customerGender,
