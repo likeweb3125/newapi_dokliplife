@@ -1130,6 +1130,7 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			FROM paymentLog
 			WHERE contractEsntlId = ?
 				AND (withdrawalStatus IS NULL OR withdrawalStatus != 'WITHDRAWAL')
+				AND calculateStatus = 'SUCCESS'
 			ORDER BY pDate DESC, pTime DESC
 		`;
 		const paymentInfo = await mariaDBSequelize.query(paymentInfoQuery, {
