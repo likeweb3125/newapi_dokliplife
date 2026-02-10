@@ -18,7 +18,7 @@ const depositController = require('../controllers/deposit');
  * /v1/deposit/reservationList:
  *   get:
  *     summary: 예약금 목록 조회
- *     description: 예약금  목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다. roomStatus.status가 ON_SALE이고 subStatus가 END가 아닌 경우의 statusStartDate 기준 내림차순으로 정렬됩니다.
+ *     description: 삭제되지 않은 방(room.deleteYN이 'N')을 기준으로 예약금 목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다. roomStatus.status가 ON_SALE이고 subStatus가 END가 아닌 경우의 statusStartDate 기준 내림차순으로 정렬됩니다.
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
