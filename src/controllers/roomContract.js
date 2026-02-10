@@ -339,6 +339,7 @@ exports.getContractDetail = async (req, res, next) => {
 				PL.pDate,
 				PL.pTime,
 				PL.pyl_goods_amount,
+				PL.paymentAmount AS rawPaymentAmount,
 				FORMAT(IFNULL(PL.paymentAmount, 0), 0) AS paymentAmount,
 				PL.paymentType,
 				PL.calculateStatus,
@@ -361,6 +362,12 @@ exports.getContractDetail = async (req, res, next) => {
 		contractInfo.paymentStatus =
 			paymentLogList && paymentLogList.length > 0
 				? (paymentLogList[0].calculateStatus ?? paymentLogList[0].calculatestatus ?? null)
+				: null;
+
+		// 메인 결제 금액 (refund dataWithDetail의 paymentAmount와 동일하게, 최신 일반 결제 1건의 원본 paymentAmount)
+		contractInfo.paymentAmount =
+			paymentLogList && paymentLogList.length > 0
+				? (paymentLogList[0].rawPaymentAmount ?? paymentLogList[0].paymentAmount ?? null)
 				: null;
 
 		// 추가 결제 내역 조회 (extraPayment)
