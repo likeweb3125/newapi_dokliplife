@@ -736,8 +736,8 @@ exports.getRefundRequestList = async (req, res, next) => {
 		const safeLimit = Math.max(parseInt(limit) || 50, 1);
 		const offset = (safePage - 1) * safeLimit;
 
-		// WHERE 조건 구성
-		let whereClause = "WHERE NOT PL.paymentType = 'REFUND'";
+		// WHERE 조건 구성 (환불 요청 1건당 1행만 나오도록 paymentLog 조인 제거)
+		let whereClause = 'WHERE 1=1';
 		const replacements = [];
 
 		// 고시원 ID 필터 (GOSI로 시작하는 경우만)
@@ -772,7 +772,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 			replacements.push(searchValue, searchValue, searchValue, searchValue);
 		}
 
-		// 메인 쿼리
+		// 메인 쿼리 (il_room_refund_request 1건당 1행, paymentLog 조인 제거로 중복 제거)
 		const query = `
 			SELECT 
 				RRR.rrr_sno,
@@ -785,13 +785,13 @@ exports.getRefundRequestList = async (req, res, next) => {
 				ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365) AS age,
 				C.gender,
 				C.phone,
-				PL.pDate,
-				PL.pTime,
-				PL.calAmount,
-				PL.paymentType,
-				PL.paymentAmount,
-				PL.paymentPoint,
-				PL.paymentCoupon,
+				DATE(RRR.rrr_leave_date) AS pDate,
+				TIME(RRR.rrr_regist_dtm) AS pTime,
+				RRR.rrr_payment_amt AS calAmount,
+				NULL AS paymentType,
+				RRR.rrr_payment_amt AS paymentAmount,
+				0 AS paymentPoint,
+				0 AS paymentCoupon,
 				RRR.rrr_use_amt,
 				RRR.rrr_penalty_amt,
 				RRR.rrr_refund_total_amt,
@@ -805,13 +805,12 @@ exports.getRefundRequestList = async (req, res, next) => {
 			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
 			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
 			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
-			LEFT OUTER JOIN paymentLog AS PL ON RC.esntlId = PL.contractEsntlId
 			${whereClause}
 			ORDER BY RRR.rrr_sno DESC
 			LIMIT ? OFFSET ?
 		`;
 
-		// 전체 개수 조회
+		// 전체 개수 조회 (동일하게 paymentLog 미조인)
 		const countQuery = `
 			SELECT COUNT(*) AS total
 			FROM il_room_refund_request RRR
@@ -819,7 +818,6 @@ exports.getRefundRequestList = async (req, res, next) => {
 			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
 			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
 			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
-			LEFT OUTER JOIN paymentLog AS PL ON RC.esntlId = PL.contractEsntlId
 			${whereClause}
 		`;
 
@@ -828,7 +826,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 전체 개수 조회 (필터 없음)
+		// 전체 개수 조회 (필터 없음, paymentLog 미조인)
 		const totalCountQuery = `
 			SELECT COUNT(*) AS total
 			FROM il_room_refund_request RRR
@@ -836,8 +834,6 @@ exports.getRefundRequestList = async (req, res, next) => {
 			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
 			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
 			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
-			LEFT OUTER JOIN paymentLog AS PL ON RC.esntlId = PL.contractEsntlId
-			WHERE NOT PL.paymentType = 'REFUND'
 		`;
 
 		const [countResult, totalCountResult] = await Promise.all([
