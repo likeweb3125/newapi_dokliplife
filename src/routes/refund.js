@@ -660,6 +660,14 @@ router.get('/data', refundController.getRefundRequestData);
  *                         gs_contract:
  *                           type: string
  *                           description: "관리자 기본 계약서 (adminContract 1건)"
+ *                         adminName:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "고시원 관리자 대표자명 (gosiwonAdmin.ceo)"
+ *                         adminPhone:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "고시원 관리자 연락처 (gosiwonAdmin.hp)"
  *                         checkinName:
  *                           type: string
  *                         contractorName:

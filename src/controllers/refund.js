@@ -1092,6 +1092,8 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				R.agreementContent AS agreementContent,
 				G.contract AS gsw_contract,
 				(SELECT content FROM adminContract ORDER BY numberOrder ASC LIMIT 1) AS gs_contract,
+				GA.ceo AS adminName,
+				GA.hp AS adminPhone,
 				C.name AS customerName,
 				C.phone AS customerPhone,
 				C.gender AS customerGender,
@@ -1103,6 +1105,7 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
+			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			WHERE RC.esntlId = ?
