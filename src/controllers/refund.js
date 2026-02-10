@@ -1019,6 +1019,184 @@ exports.getRefundRequestData = async (req, res, next) => {
 	}
 };
 
+// 계약서 기반 환불 데이터 조회 + 계약정보·결제정보·정산정보 상세 (dataWithDetail)
+exports.getRefundDataWithDetail = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { cttEid } = req.query;
+		if (!cttEid) {
+			errorHandler.errorThrow(400, 'cttEid(계약 고유 아이디)는 필수입니다.');
+		}
+
+		// 1. 기존 /data와 동일한 기본 데이터 (RRR은 LEFT JOIN으로 없어도 조회 가능)
+		const baseQuery = `
+			SELECT 
+				RC.esntlId,
+				RC.startDate,
+				RC.endDate,
+				DATEDIFF(NOW(), RC.startDate) AS dateDiff,
+				PL.paymentAmount,
+				PL.paymentType,
+				RC.monthlyRent,
+				C.name,
+				C.phone,
+				R.esntlId AS romId,
+				R.status AS roomStatus,
+				RC.status AS roomContractStatus,
+				RC.contractDate,
+				R.gosiwonEsntlId AS gswId,
+				RC.customerEsntlId AS mbrId,
+				RRR.rrr_leave_type_cd AS leaveType,
+				RRR.rrr_leave_reason AS reason,
+				RRR.rrr_liability_reason AS liabilityReason,
+				RRR.rrr_leave_date AS cancelDate,
+				NULL AS refundMethod,
+				RRR.rrr_payment_amt AS refundPaymentAmount,
+				RRR.rrr_use_amt AS proratedRent,
+				RRR.rrr_penalty_amt AS penalty,
+				RRR.rrr_refund_total_amt AS totalRefundAmount
+			FROM roomContract AS RC
+			LEFT JOIN paymentLog AS PL ON PL.contractEsntlId = RC.esntlId
+			JOIN customer AS C ON RC.customerEsntlId = C.esntlId
+			JOIN room AS R ON RC.roomEsntlId = R.esntlId
+			LEFT JOIN il_room_refund_request AS RRR ON RRR.ctt_eid = RC.esntlId
+			WHERE RC.esntlId = ?
+			ORDER BY PL.pDate DESC, PL.pTime DESC
+			LIMIT 1
+		`;
+		const [baseRow] = await mariaDBSequelize.query(baseQuery, {
+			replacements: [cttEid],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		if (!baseRow) {
+			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+		}
+
+		// 2. 계약정보 (roomContract 기준 + 방·입실자·계약자)
+		const contractInfoQuery = `
+			SELECT 
+				RC.esntlId AS contractId,
+				RC.contractDate,
+				RC.startDate,
+				RC.endDate,
+				RC.month,
+				RC.status AS roomContractStatus,
+				RC.monthlyRent,
+				G.name AS gosiwonName,
+				R.esntlId AS roomEsntlId,
+				R.roomNumber,
+				R.roomType,
+				C.name AS customerName,
+				C.phone AS customerPhone,
+				C.gender AS customerGender,
+				ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365) AS customerAge,
+				RCW.checkinName,
+				RCW.checkinPhone,
+				RCW.customerName AS contractorName,
+				RCW.customerPhone AS contractorPhone
+			FROM roomContract RC
+			JOIN room R ON RC.roomEsntlId = R.esntlId
+			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
+			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+			WHERE RC.esntlId = ?
+			LIMIT 1
+		`;
+		const [contractInfo] = await mariaDBSequelize.query(contractInfoQuery, {
+			replacements: [cttEid],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 3. 결제정보 (paymentLog 목록) - paymentLog 테이블 컬럼 기준 (paymentStatus 없음 → calculateStatus, createdAt 없음 → pDate+pTime)
+		const paymentInfoQuery = `
+			SELECT 
+				esntlId,
+				contractEsntlId,
+				pDate,
+				pTime,
+				paymentType,
+				paymentAmount,
+				pyl_goods_amount,
+				paymentPoint,
+				paymentCoupon,
+				calculateStatus,
+				CONCAT(pDate, ' ', COALESCE(pTime, '00:00:00')) AS paymentCompleteDtm
+			FROM paymentLog
+			WHERE contractEsntlId = ?
+				AND (withdrawalStatus IS NULL OR withdrawalStatus != 'WITHDRAWAL')
+			ORDER BY pDate DESC, pTime DESC
+		`;
+		const paymentInfo = await mariaDBSequelize.query(paymentInfoQuery, {
+			replacements: [cttEid],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		// 4. 정산정보 (il_daily_selling_closing: 해당 고시원·결제일 기준 PAYMENT 마감 행 1건)
+		let settlementInfo = null;
+		if (baseRow?.gswId && Array.isArray(paymentInfo) && paymentInfo.length > 0) {
+			const pDateRaw = paymentInfo[0].pDate;
+			let firstPaymentDate = null;
+			if (pDateRaw) {
+				if (typeof pDateRaw === 'string') {
+					firstPaymentDate = pDateRaw.split('T')[0].substring(0, 10);
+				} else if (pDateRaw instanceof Date && !isNaN(pDateRaw.getTime())) {
+					firstPaymentDate = pDateRaw.toISOString().slice(0, 10);
+				}
+			}
+			if (firstPaymentDate) {
+				const settlementQuery = `
+					SELECT 
+						dsc_sno,
+						gsw_eid,
+						dsc_closing_date,
+						dsc_selling_type_cd,
+						dsc_selling_cnt,
+						dsc_goods_total_amt,
+						dsc_gosiwon_coupon_total_amt,
+						dsc_selling_total_amt,
+						dsc_fee_total_amt,
+						dsc_average_fee_percent,
+						dsc_expected_payment_total_amt,
+						dsc_refund_base_date,
+						dsc_use_coupon_total_amt,
+						dsc_use_point_total_amt,
+						dsc_payment_total_amt,
+						dsc_coupon_refund_amt,
+						dsc_point_refund_amt,
+						dsc_fee_refund_amt,
+						dsc_business_support_amt,
+						dsc_calculation_total_amt,
+						dsc_complete_dtm,
+						dsc_regist_dtm
+					FROM il_daily_selling_closing
+					WHERE gsw_eid = ?
+						AND dsc_closing_date = ?
+						AND dsc_selling_type_cd = 'PAYMENT'
+					LIMIT 1
+				`;
+				const [settlementRow] = await mariaDBSequelize.query(settlementQuery, {
+					replacements: [baseRow.gswId, firstPaymentDate],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				});
+				settlementInfo = settlementRow || null;
+			}
+		}
+
+		const result = {
+			...baseRow,
+			contractInfo: contractInfo || null,
+			paymentInfo: Array.isArray(paymentInfo) ? paymentInfo : [],
+			settlementInfo,
+		};
+
+		return errorHandler.successThrow(res, '환불 데이터(상세) 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
 // 환불 요청 정보 업데이트
 exports.updateRefundRequest = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();

@@ -598,6 +598,107 @@ router.get('/data', refundController.getRefundRequestData);
 
 /**
  * @swagger
+ * /v1/refund/dataWithDetail:
+ *   get:
+ *     summary: 계약서 기반 환불 데이터(상세) 조회
+ *     description: "계약 ID(cttEid)로 기존 /data 리턴값에 계약정보(roomContract), 결제정보(paymentLog), 정산정보(il_daily_selling_closing)를 추가하여 반환합니다."
+ *     tags: [환불관리]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: cttEid
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 계약 고유 아이디
+ *         example: 'RCTT0000000001'
+ *     responses:
+ *       200:
+ *         description: 환불 데이터(상세) 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 환불 데이터(상세) 조회 성공
+ *                 data:
+ *                   type: object
+ *                   description: "기존 /data 필드 + contractInfo, paymentInfo, settlementInfo"
+ *                   properties:
+ *                     contractInfo:
+ *                       type: object
+ *                       nullable: true
+ *                       description: "계약정보 (roomContract·방·입실자·계약자)"
+ *                       properties:
+ *                         contractId:
+ *                           type: string
+ *                         contractDate:
+ *                           type: string
+ *                         startDate:
+ *                           type: string
+ *                         endDate:
+ *                           type: string
+ *                         gosiwonName:
+ *                           type: string
+ *                         roomNumber:
+ *                           type: string
+ *                         checkinName:
+ *                           type: string
+ *                         contractorName:
+ *                           type: string
+ *                     paymentInfo:
+ *                       type: array
+ *                       description: "결제정보 (paymentLog 목록)"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                           pDate:
+ *                             type: string
+ *                           pTime:
+ *                             type: string
+ *                           paymentType:
+ *                             type: string
+ *                           paymentAmount:
+ *                             type: string
+ *                     settlementInfo:
+ *                       type: object
+ *                       nullable: true
+ *                       description: "정산정보 (il_daily_selling_closing, 결제일·PAYMENT 기준 1건)"
+ *                       properties:
+ *                         dsc_sno:
+ *                           type: integer
+ *                         dsc_closing_date:
+ *                           type: string
+ *                         dsc_selling_total_amt:
+ *                           type: integer
+ *                         dsc_fee_total_amt:
+ *                           type: integer
+ *                         dsc_calculation_total_amt:
+ *                           type: integer
+ *                         dsc_complete_dtm:
+ *                           type: string
+ *                           nullable: true
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         description: 계약 정보를 찾을 수 없음
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/dataWithDetail', refundController.getRefundDataWithDetail);
+
+/**
+ * @swagger
  * /v1/refund/update:
  *   put:
  *     summary: 환불 요청 정보 업데이트
