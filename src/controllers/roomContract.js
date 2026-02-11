@@ -279,6 +279,7 @@ exports.getContractDetail = async (req, res, next) => {
 				R.roomNumber,
 				R.roomType,
 				R.window,
+				R.deposit AS roomDeposit,
 				R.monthlyRent AS roomMonthlyRent,
 				RC.checkInTime AS checkInTime,
 				C.name AS customerName,
@@ -470,6 +471,10 @@ exports.getContractDetail = async (req, res, next) => {
 				roomEsntlId: contractInfo.roomEsntlId,
 				customerNameForDeposit: customerNameForDeposit,
 			});
+		}
+		// il_room_deposit 없으면 room.deposit 사용 (우선순위: il_room_deposit > room.deposit)
+		if (deposit == null && contractInfo.roomDeposit != null) {
+			deposit = parseInt(contractInfo.roomDeposit, 10) || contractInfo.roomDeposit;
 		}
 		contractInfo.deposit = deposit;
 
