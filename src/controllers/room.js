@@ -1294,6 +1294,7 @@ exports.roomReserve = async (req, res, next) => {
 		const {
 			roomEsntlId,
 			deposit,
+			monthlyRent,
 			receiver,
 			checkInDate,
 			paymentType,
@@ -1353,6 +1354,7 @@ exports.roomReserve = async (req, res, next) => {
 				ror_sn,
 				rom_sn,
 				ror_deposit,
+				ror_monthlyRent,
 				ror_hp_no,
 				ror_check_in_date,
 				ror_status_cd,
@@ -1370,6 +1372,7 @@ exports.roomReserve = async (req, res, next) => {
 				?,
 				?,
 				?,
+				?,
 				'WAIT',
 				NOW(),
 				?,
@@ -1382,11 +1385,15 @@ exports.roomReserve = async (req, res, next) => {
 			)
 		`;
 
+		// monthlyRent는 room.monthlyRent와 동일하게 문자열로 저장 (0.5, 1 등 만원 단위)
+		const monthlyRentToStore = (monthlyRent !== undefined && monthlyRent !== null && monthlyRent !== '') ? String(monthlyRent) : null;
+
 		await mariaDBSequelize.query(insertReservationQuery, {
 			replacements: [
 				reservationId,
 				roomEsntlId,
 				deposit,
+				monthlyRentToStore,
 				receiver,
 				checkInDate,
 				userSn,
@@ -1456,7 +1463,7 @@ exports.roomReserve = async (req, res, next) => {
 		// 4. History 기록 생성
 		try {
 			const historyId = await generateHistoryId(transaction);
-			const historyContent = `방 예약 생성: 예약ID ${reservationId}, 입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${rorPayMethod ? `, 결제방법 ${rorPayMethod}` : ''}`;
+			const historyContent = `방 예약 생성: 예약ID ${reservationId}, 입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${monthlyRentToStore ? `, 월세 ${monthlyRentToStore}` : ''}${rorPayMethod ? `, 결제방법 ${rorPayMethod}` : ''}`;
 
 			await history.create(
 				{

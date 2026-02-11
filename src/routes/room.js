@@ -1228,6 +1228,10 @@ router.delete('/category/delete', roomCategoryController.deleteCategory);
  *                 type: integer
  *                 description: 보증금 금액
  *                 example: 500000
+ *               monthlyRent:
+ *                 type: string
+ *                 description: 월세 (만원 단위, 0.5·1 등 문자열)
+ *                 example: "50"
  *               receiver:
  *                 type: string
  *                 description: 수신자 전화번호
