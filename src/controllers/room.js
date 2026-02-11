@@ -1687,9 +1687,9 @@ exports.startRoomSell = async (req, res, next) => {
 					finalEtcEndDate = etcEndDate;
 				}
 
-				// 기존 roomStatus 레코드 확인
-				const [existingStatus] = await mariaDBSequelize.query(
-					`SELECT esntlId, status FROM roomStatus WHERE roomEsntlId = ?`,
+				// 기존 ON_SALE 레코드 확인 (해당 방의 ON_SALE 행만 대상)
+				const [existingOnSale] = await mariaDBSequelize.query(
+					`SELECT esntlId, status FROM roomStatus WHERE roomEsntlId = ? AND status = 'ON_SALE' LIMIT 1`,
 					{
 						replacements: [singleRoomId],
 						type: mariaDBSequelize.QueryTypes.SELECT,
@@ -1697,24 +1697,55 @@ exports.startRoomSell = async (req, res, next) => {
 					}
 				);
 
-				if (existingStatus) {
-					// 기존 레코드의 status가 'ON_SALE'인 경우에만 업데이트
-					if (existingStatus.status === 'ON_SALE') {
+				if (existingOnSale) {
+					// ON_SALE 업데이트: 판매 기간만 저장 (statusStartDate, statusEndDate / etc는 동일)
+					await mariaDBSequelize.query(
+						`UPDATE roomStatus 
+						SET status = 'ON_SALE',
+							gosiwonEsntlId = ?,
+							statusStartDate = ?,
+							statusEndDate = ?,
+							etcStartDate = ?,
+							etcEndDate = ?,
+							updatedAt = NOW()
+						WHERE roomEsntlId = ? AND status = 'ON_SALE'`,
+						{
+							replacements: [
+								roomInfo.gosiwonEsntlId,
+								statusStartDate,
+								finalStatusEndDate,
+								statusStartDate, // etcStartDate: ON_SALE은 판매 기간과 동일
+								finalStatusEndDate, // etcEndDate
+								singleRoomId,
+							],
+							type: mariaDBSequelize.QueryTypes.UPDATE,
+							transaction,
+						}
+					);
+					// CAN_CHECKIN: 입실가능 기간(기존 etc)으로 업데이트 또는 삽입
+					const [existingCanCheckin] = await mariaDBSequelize.query(
+						`SELECT esntlId FROM roomStatus WHERE roomEsntlId = ? AND status = 'CAN_CHECKIN' LIMIT 1`,
+						{
+							replacements: [singleRoomId],
+							type: mariaDBSequelize.QueryTypes.SELECT,
+							transaction,
+						}
+					);
+					if (existingCanCheckin) {
 						await mariaDBSequelize.query(
 							`UPDATE roomStatus 
-							SET status = 'ON_SALE',
-								gosiwonEsntlId = ?,
+							SET gosiwonEsntlId = ?,
 								statusStartDate = ?,
 								statusEndDate = ?,
 								etcStartDate = ?,
 								etcEndDate = ?,
 								updatedAt = NOW()
-							WHERE roomEsntlId = ?`,
+							WHERE roomEsntlId = ? AND status = 'CAN_CHECKIN'`,
 							{
 								replacements: [
 									roomInfo.gosiwonEsntlId,
-									statusStartDate,
-									finalStatusEndDate,
+									finalEtcStartDate,
+									finalEtcEndDate,
 									finalEtcStartDate,
 									finalEtcEndDate,
 									singleRoomId,
@@ -1723,26 +1754,64 @@ exports.startRoomSell = async (req, res, next) => {
 								transaction,
 							}
 						);
-						// room 테이블 status를 OPEN으로 변경
+					} else {
+						const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 						await mariaDBSequelize.query(
-							`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
+							`INSERT INTO roomStatus (
+								esntlId,
+								roomEsntlId,
+								gosiwonEsntlId,
+								status,
+								statusStartDate,
+								statusEndDate,
+								etcStartDate,
+								etcEndDate,
+								createdAt,
+								updatedAt
+							) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, NOW(), NOW())`,
 							{
-								replacements: [singleRoomId],
-								type: mariaDBSequelize.QueryTypes.UPDATE,
+								replacements: [
+									canCheckinId,
+									singleRoomId,
+									roomInfo.gosiwonEsntlId,
+									finalEtcStartDate,
+									finalEtcEndDate,
+									finalEtcStartDate,
+									finalEtcEndDate,
+								],
+								type: mariaDBSequelize.QueryTypes.INSERT,
 								transaction,
 							}
 						);
-						results.push({
-							roomId: singleRoomId,
-							action: 'updated',
-							esntlId: existingStatus.esntlId,
-						});
-					} else {
-						// status가 'ON_SALE'이 아닌 경우 에러 처리
-						errorHandler.errorThrow(400, `해당 방의 상태가 'ON_SALE'이 아니어서 판매 시작을 할 수 없습니다. (현재 상태: ${existingStatus.status}, roomId: ${singleRoomId})`);
 					}
+					// room 테이블 status를 OPEN으로 변경
+					await mariaDBSequelize.query(
+						`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
+						{
+							replacements: [singleRoomId],
+							type: mariaDBSequelize.QueryTypes.UPDATE,
+							transaction,
+						}
+					);
+					results.push({
+						roomId: singleRoomId,
+						action: 'updated',
+						esntlId: existingOnSale.esntlId,
+					});
 				} else {
-					// 새 레코드 생성 (IDS 테이블 roomStatus RSTA)
+					// 해당 방에 ON_SALE이 없으면 판매 시작 불가 (BEFORE_SALES 등만 있는 경우)
+					const [anyStatus] = await mariaDBSequelize.query(
+						`SELECT status FROM roomStatus WHERE roomEsntlId = ? LIMIT 1`,
+						{
+							replacements: [singleRoomId],
+							type: mariaDBSequelize.QueryTypes.SELECT,
+							transaction,
+						}
+					);
+					if (anyStatus) {
+						errorHandler.errorThrow(400, `해당 방의 상태가 'ON_SALE'이 아니어서 판매 시작을 할 수 없습니다. (현재 상태: ${anyStatus.status}, roomId: ${singleRoomId})`);
+					}
+					// roomStatus가 아무 것도 없을 때: ON_SALE + CAN_CHECKIN 새로 생성
 					const newStatusId = await idsNext('roomStatus', undefined, transaction);
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (
@@ -1764,6 +1833,34 @@ exports.startRoomSell = async (req, res, next) => {
 								roomInfo.gosiwonEsntlId,
 								statusStartDate,
 								finalStatusEndDate,
+								statusStartDate,
+								finalStatusEndDate,
+							],
+							type: mariaDBSequelize.QueryTypes.INSERT,
+							transaction,
+						}
+					);
+					const canCheckinId = await idsNext('roomStatus', undefined, transaction);
+					await mariaDBSequelize.query(
+						`INSERT INTO roomStatus (
+							esntlId,
+							roomEsntlId,
+							gosiwonEsntlId,
+							status,
+							statusStartDate,
+							statusEndDate,
+							etcStartDate,
+							etcEndDate,
+							createdAt,
+							updatedAt
+						) VALUES (?, ?, ?, 'CAN_CHECKIN', ?, ?, ?, ?, NOW(), NOW())`,
+						{
+							replacements: [
+								canCheckinId,
+								singleRoomId,
+								roomInfo.gosiwonEsntlId,
+								finalEtcStartDate,
+								finalEtcEndDate,
 								finalEtcStartDate,
 								finalEtcEndDate,
 							],

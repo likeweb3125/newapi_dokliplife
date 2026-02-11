@@ -428,6 +428,51 @@ exports.getContractDetail = async (req, res, next) => {
 		contractInfo.contractStatus =
 			contractInfo.contractStatus ?? contractInfo.contractstatus ?? null;
 
+		// il_room_deposit: 고시원id·방id·rdp_customer_name 일치 시 rdp_price를 deposit으로 반환
+		const customerNameForDeposit =
+			contractInfo.customerName ||
+			contractInfo.checkinName ||
+			contractInfo.contractCustomerName ||
+			null;
+		let deposit = null;
+		if (contractInfo.gosiwonEsntlId && contractInfo.roomEsntlId && customerNameForDeposit) {
+			console.log('[roomContract/detail] il_room_deposit 조회 조건:', {
+				gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+				roomEsntlId: contractInfo.roomEsntlId,
+				rdp_customer_name: customerNameForDeposit,
+			});
+			const depositQuery = `
+				SELECT rdp_price
+				FROM il_room_deposit
+				WHERE gsw_eid = ?
+					AND rom_eid = ?
+					AND rdp_customer_name = ?
+					AND (rdp_delete_dtm IS NULL)
+				ORDER BY rdp_regist_dtm DESC
+				LIMIT 1
+			`;
+			const [depositRow] = await mariaDBSequelize.query(depositQuery, {
+				replacements: [
+					contractInfo.gosiwonEsntlId,
+					contractInfo.roomEsntlId,
+					customerNameForDeposit,
+				],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			});
+			// console.log('[roomContract/detail] il_room_deposit 조회 결과:', { depositRow: depositRow || null });
+			if (depositRow && depositRow.rdp_price != null) {
+				deposit = parseInt(depositRow.rdp_price, 10) || depositRow.rdp_price;
+			}
+			// console.log('[roomContract/detail] deposit 반환값:', deposit);
+		} else {
+			console.log('[roomContract/detail] il_room_deposit 조회 생략 (조건 부족):', {
+				gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+				roomEsntlId: contractInfo.roomEsntlId,
+				customerNameForDeposit: customerNameForDeposit,
+			});
+		}
+		contractInfo.deposit = deposit;
+
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
 			contractInfo: contractInfo,
 			paymentLogList: paymentLogList || [],
