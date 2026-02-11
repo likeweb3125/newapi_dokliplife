@@ -1527,6 +1527,7 @@ exports.roomReserve = async (req, res, next) => {
 		}
 
 		// 3. 예약이 오늘이면 방 정보 조회 및 알림톡 발송
+		// gosiwonAdmin은 LEFT JOIN (관리자 정보 없어도 방·고시원 정보로 진행)
 		const roomInfoQuery = `
 			SELECT 
 				g.name AS gsw_name,
@@ -1539,16 +1540,18 @@ exports.roomReserve = async (req, res, next) => {
 				r.esntlId AS rom_eid
 			FROM room AS r
 			JOIN gosiwon AS g ON r.gosiwonEsntlId = g.esntlId
-			JOIN gosiwonAdmin AS ga ON ga.esntlId = g.adminEsntlId
+			LEFT JOIN gosiwonAdmin AS ga ON ga.esntlId = g.adminEsntlId
 			LEFT JOIN customer AS c ON c.esntlId = r.customerEsntlId
 			WHERE r.esntlId = ?
 		`;
 
-		const [roomInfoData] = await mariaDBSequelize.query(roomInfoQuery, {
+		const roomInfoResult = await mariaDBSequelize.query(roomInfoQuery, {
 			replacements: [receiver, roomEsntlId],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 			transaction,
 		});
+
+		const roomInfoData = Array.isArray(roomInfoResult) && roomInfoResult.length > 0 ? roomInfoResult[0] : null;
 
 		if (!roomInfoData) {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
