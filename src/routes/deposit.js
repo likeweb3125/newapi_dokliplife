@@ -483,7 +483,7 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  * /v1/deposit/depositList:
  *   get:
  *     summary: 보증금 목록 조회
- *     description: 보증금 목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다. deposit.createdAt 기준 신규일자순으로 정렬됩니다.
+ *     description: "보증금 목록을 조회합니다. 검색, 필터링, 페이징을 지원합니다. 입실자가 있을 때(roomStatus=CONTRACT) 계약자, 환불계좌번호, 입실일, 퇴실일, 계약상태가 추가로 반환됩니다."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -610,6 +610,11 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                             nullable: true
  *                             description: 현재 입실자 계좌번호 (customer.bankAccount)
  *                             example: 123-456-789012
+ *                           refundBankAccount:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "환불계좌번호 (il_customer_refund.cre_bank_name + cre_account_number)"
+ *                             example: "국민은행 123-456-789012"
  *                           checkinName:
  *                             type: string
  *                             nullable: true

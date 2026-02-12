@@ -1554,7 +1554,14 @@ exports.roomReserve = async (req, res, next) => {
 		const roomInfoData = Array.isArray(roomInfoResult) && roomInfoResult.length > 0 ? roomInfoResult[0] : null;
 
 		if (!roomInfoData) {
-			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+			// room·gosiwon 조인 결과 0건 (DB 연결 DB와 SQL 클라이언트 DB가 다를 수 있음)
+			if (process.env.NODE_ENV === 'development') {
+				console.warn(`[roomReserve] 방·고시원 조회 실패 roomEsntlId=${roomEsntlId}, checkInDate=${checkInDate}, 결과건수=${Array.isArray(roomInfoResult) ? roomInfoResult.length : 'N/A'}, DB=${mariaDBSequelize.config.database}`);
+			}
+			errorHandler.errorThrow(
+				404,
+				`방·고시원 정보를 조회할 수 없습니다. (roomEsntlId: ${roomEsntlId}) DB 연결(${mariaDBSequelize.config.database})과 room, gosiwon 연결 관계를 확인해주세요.`
+			);
 		}
 
 		await transaction.commit();

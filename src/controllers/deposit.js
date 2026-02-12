@@ -773,6 +773,7 @@ exports.registerDeposit = async (req, res, next) => {
 		const finalAmount = depositAmountValue;
 
 		// il_room_deposit 메인 레코드 생성 (예약금 입력 = 보증금으로 등록)
+		// registrantId, updaterId: ilRoomDeposit 모델 필수 (rdp_registrant_id, rdp_updater_id)
 		await ilRoomDeposit.create(
 			{
 				esntlId: newDepositId,
@@ -795,6 +796,8 @@ exports.registerDeposit = async (req, res, next) => {
 				virtualAccountNumber: null,
 				virtualAccountExpiryDate: null,
 				deleteYN: 'N',
+				registrantId: managerId,
+				updaterId: managerId,
 			},
 			{ transaction }
 		);
@@ -969,8 +972,8 @@ exports.getDepositGroupByDepositor = async (req, res, next) => {
 				D.rdp_customer_name as checkinName,
 				D.rdp_customer_phone as checkinPhone,
 				NULL as manager,
-				DATE(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR)) as recordDate,
-				DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%H:%i') as recordTime
+				DATE(D.rdp_regist_dtm) as recordDate,
+				DATE_FORMAT(D.rdp_regist_dtm, '%H:%i') as recordTime
 			FROM il_room_deposit D
 			LEFT JOIN (
 				SELECT RC1.* FROM roomContract RC1
@@ -1429,14 +1432,14 @@ exports.getReservationList = async (req, res, next) => {
 				R.roomNumber,
 				R.gosiwonEsntlId,
 				G.name as gosiwonName,
-				RC.esntlId as contractEsntlId,
+				COALESCE(RS.contractEsntlId, RC.esntlId) as contractEsntlId,
 				RS.status as roomStatus,
-				RCW.checkinName as reservationName,
-				RCW.checkinPhone as reservationPhone,
-				RCW.customerName as contractorName,
-				RCW.customerPhone as contractorPhone,
-				DATE(RC.startDate) as checkInDate,
-				DATE(RC.endDate) as checkOutDate,
+				COALESCE(RCW_RS.checkinName, RCW.checkinName) as reservationName,
+				COALESCE(RCW_RS.checkinPhone, RCW.checkinPhone) as reservationPhone,
+				COALESCE(RCW_RS.customerName, RCW.customerName) as contractorName,
+				COALESCE(RCW_RS.customerPhone, RCW.customerPhone) as contractorPhone,
+				DATE(COALESCE(RC_RS.startDate, RC.startDate)) as checkInDate,
+				DATE(COALESCE(RC_RS.endDate, RC.endDate)) as checkOutDate,
 				CASE WHEN RS.status = 'ON_SALE' AND (RS.subStatus IS NULL OR RS.subStatus != 'END') THEN RS.statusStartDate ELSE NULL END as sortDate,
 				CASE 
 					WHEN D_latest.rom_eid IS NULL THEN NULL
@@ -1466,7 +1469,9 @@ exports.getReservationList = async (req, res, next) => {
 					AND RC1.contractDate = RC2.maxContractDate
 					AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
+			LEFT JOIN roomContract RC_RS ON RS.contractEsntlId = RC_RS.esntlId AND RS.status = 'CONTRACT'
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+			LEFT JOIN roomContractWho RCW_RS ON RS.contractEsntlId = RCW_RS.contractEsntlId AND RS.status = 'CONTRACT'
 			LEFT JOIN (
 				SELECT D_inner.rom_eid, D_inner.rdp_eid, D_inner.rdp_completed_dtm
 				FROM il_room_deposit D_inner
@@ -1577,8 +1582,8 @@ exports.getReservationList = async (req, res, next) => {
 					D.rdp_check_in_date as checkInDate,
 					D.rdp_customer_name as checkinName,
 					D.rdp_customer_phone as checkinPhone,
-					DATE(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR)) as recordDate,
-					DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%H:%i') as recordTime
+					DATE(D.rdp_regist_dtm) as recordDate,
+					DATE_FORMAT(D.rdp_regist_dtm, '%H:%i') as recordTime
 				FROM il_room_deposit D
 				WHERE D.rom_eid IN (${roomEsntlIds.map(() => '?').join(',')})
 					AND D.rdp_delete_dtm IS NULL
@@ -1686,11 +1691,11 @@ exports.getDepositList = async (req, res, next) => {
 			}
 		}
 
-		// contractEsntlId 필터 처리 (값이 있으면 WHERE 절에 추가)
+		// contractEsntlId 필터 처리 (값이 있으면 WHERE 절에 추가, RS.contractEsntlId 또는 RC.esntlId)
 		if (contractEsntlId) {
 			const contractEsntlIdValue = String(contractEsntlId).trim();
 			if (contractEsntlIdValue) {
-				whereConditions.push('RC.esntlId = ?');
+				whereConditions.push('COALESCE(RS.contractEsntlId, RC.esntlId) = ?');
 				replacements.push(contractEsntlIdValue);
 			}
 		}
@@ -1719,6 +1724,7 @@ exports.getDepositList = async (req, res, next) => {
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
 		// il_room_deposit 주테이블 (모든 보증금 행 기준, 최신순 정렬)
+		// RS.status='CONTRACT'일 때 roomStatus.contractEsntlId로 RC/RCW 조인하여 계약자·입실일·퇴실일·계약상태 보강
 		const query = `
 			SELECT
 				D.rdp_eid as depositEsntlId,
@@ -1728,33 +1734,34 @@ exports.getDepositList = async (req, res, next) => {
 				G.name as gosiwonName,
 				C.name as currentOccupantName,
 				R.customerEsntlId as currentOccupantID,
-				C.bank as customerBank,
-				C.bankAccount as customerBankAccount,
-				RCW.checkinName AS checkinName,
-				RCW.checkinPhone AS checkinPhone,
-				RCW.customerName as contractorName,
-				RCW.customerPhone as contractorPhone,
+				ICR.cre_bank_name as customerBank,
+				ICR.cre_account_number as customerBankAccount,
+				TRIM(CONCAT(IFNULL(ICR.cre_bank_name,''), ' ', IFNULL(ICR.cre_account_number,''))) as refundBankAccount,
+				COALESCE(RCW_RS.checkinName, RCW.checkinName) AS checkinName,
+				COALESCE(RCW_RS.checkinPhone, RCW.checkinPhone) AS checkinPhone,
+				COALESCE(RCW_RS.customerName, RCW.customerName) as contractorName,
+				COALESCE(RCW_RS.customerPhone, RCW.customerPhone) as contractorPhone,
 				D.rdp_price as depositAmount,
-				RC.esntlId as contractEsntlId,
-				DATE(RC.startDate) as moveInDate,
-				DATE(RC.endDate) as moveOutDate,
-				RC.status as contractStatus,
+				COALESCE(RS.contractEsntlId, RC.esntlId) as contractEsntlId,
+				DATE(COALESCE(RC_RS.startDate, RC.startDate)) as moveInDate,
+				DATE(COALESCE(RC_RS.endDate, RC.endDate)) as moveOutDate,
+				COALESCE(RC_RS.status, RC.status) as contractStatus,
 				CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as depositStatus,
 				D.rdp_price as depositLastestAmount,
-				DATE_FORMAT(DATE_ADD(D.rdp_regist_dtm, INTERVAL 9 HOUR), '%Y-%m-%d %H:%i') as depositLastestTime,
+				DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i') as depositLastestTime,
 				D.rdp_regist_dtm as depositCreatedAt,
 				(
 					SELECT DR.status
 					FROM depositRefund DR
-					WHERE DR.contractEsntlId = RC.esntlId
+					WHERE DR.contractEsntlId = COALESCE(RS.contractEsntlId, RC.esntlId)
 						AND (DR.deleteYN IS NULL OR DR.deleteYN = 'N')
 					ORDER BY DR.createdAt DESC
 					LIMIT 1
 				) as refundStatus,
 				(
-					SELECT DATE_FORMAT(DATE_ADD(DR.createdAt, INTERVAL 9 HOUR), '%Y-%m-%d %H:%i')
+					SELECT DATE_FORMAT(DR.createdAt, '%Y-%m-%d %H:%i')
 					FROM depositRefund DR
-					WHERE DR.contractEsntlId = RC.esntlId
+					WHERE DR.contractEsntlId = COALESCE(RS.contractEsntlId, RC.esntlId)
 						AND (DR.deleteYN IS NULL OR DR.deleteYN = 'N')
 					ORDER BY DR.createdAt DESC
 					LIMIT 1
@@ -1763,6 +1770,8 @@ exports.getDepositList = async (req, res, next) => {
 			LEFT JOIN room R ON R.esntlId = D.rom_eid
 			LEFT JOIN gosiwon G ON R.gosiwonEsntlId = G.esntlId
 			LEFT JOIN customer C ON R.customerEsntlId = C.esntlId
+			LEFT JOIN il_customer_refund ICR ON ICR.cus_eid = C.esntlId AND ICR.cre_delete_dtm IS NULL
+				AND ICR.cre_regist_dtm = (SELECT MAX(cre_regist_dtm) FROM il_customer_refund i2 WHERE i2.cus_eid = C.esntlId AND i2.cre_delete_dtm IS NULL)
 			LEFT JOIN (
 				SELECT RS1.*
 				FROM roomStatus RS1
@@ -1782,7 +1791,9 @@ exports.getDepositList = async (req, res, next) => {
 					GROUP BY roomEsntlId
 				) RC2 ON RC1.roomEsntlId = RC2.roomEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON R.esntlId = RC.roomEsntlId
+			LEFT JOIN roomContract RC_RS ON RS.contractEsntlId = RC_RS.esntlId AND RS.status = 'CONTRACT'
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+			LEFT JOIN roomContractWho RCW_RS ON RS.contractEsntlId = RCW_RS.contractEsntlId AND RS.status = 'CONTRACT'
 			${whereClause}
 			ORDER BY 
 				COALESCE(D.rdp_regist_dtm, '1970-01-01') DESC,
@@ -1797,6 +1808,15 @@ exports.getDepositList = async (req, res, next) => {
 			SELECT COUNT(*) as total
 			FROM il_room_deposit D
 			LEFT JOIN room R ON R.esntlId = D.rom_eid
+			LEFT JOIN (
+				SELECT RS1.*
+				FROM roomStatus RS1
+				INNER JOIN (
+					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
+					FROM roomStatus
+					GROUP BY roomEsntlId
+				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
+			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
 				SELECT RC1.*
 				FROM roomContract RC1
@@ -1839,6 +1859,7 @@ exports.getDepositList = async (req, res, next) => {
 				currentOccupantID: row.currentOccupantID || null,
 				customerBank: row.customerBank || null,
 				customerBankAccount: row.customerBankAccount || null,
+				refundBankAccount: (row.refundBankAccount && String(row.refundBankAccount).trim()) || null,
 				checkinName: row.checkinName || null,
 				checkinPhone: row.checkinPhone || null,
 				contractorName: row.contractorName || null,

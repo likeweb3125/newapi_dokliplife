@@ -304,34 +304,69 @@ exports.getParkingList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// parkStatus 기준: contractEsntlId로 계약 조회, 1:1로 extraPayment 매칭(optionName=parkType, optionInfo=parkNumber, useStartDate)
+		// parkStatus 기준: contractEsntlId로 계약 조회, extraPayment 서브쿼리로 주차비(paymentAmount, cost) 매칭
+		// optionName=parkType, optionInfo=parkNumber 기준 (useStartDate 부합 시 우선, 없으면 최신 extraPayment)
 		const query = `
 			SELECT 
-				EP.esntlId AS paymentLogId,
+				(SELECT EP2.esntlId FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS paymentLogId,
 				PS.esntlId AS parkStatusId,
-				COALESCE(EP.optionName, PS.parkType) AS optionName,
-				COALESCE(EP.optionInfo, PS.parkNumber) AS optionInfo,
+				PS.parkType AS optionName,
+				PS.parkNumber AS optionInfo,
 				PS.parkType,
 				PS.parkNumber,
 				PS.useStartDate,
 				PS.useEndDate,
-				COALESCE(EP.pyl_goods_amount, PS.cost) AS cost,
+				COALESCE(
+					(SELECT EP2.pyl_goods_amount FROM extraPayment EP2 
+					 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+					   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+					 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+					 LIMIT 1),
+					(SELECT EP2.paymentAmount FROM extraPayment EP2 
+					 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+					   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+					 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+					 LIMIT 1),
+					PS.cost
+				) AS cost,
 				PS.cost AS parkStatusCost,
-				EP.paymentAmount,
-				EP.paymentType,
-				EP.extendWithPayment,
-				EP.pDate,
-				EP.pTime,
+				(SELECT EP2.paymentAmount FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS paymentAmount,
+				(SELECT EP2.paymentType FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS paymentType,
+				(SELECT EP2.extendWithPayment FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS extendWithPayment,
+				(SELECT EP2.pDate FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS pDate,
+				(SELECT EP2.pTime FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS pTime,
 				PS.status,
-				COALESCE(PS.memo, EP.memo) AS memo,
-				EP.paymentStatus AS paymentStatus
+				PS.memo,
+				(SELECT EP2.paymentStatus FROM extraPayment EP2 
+				 WHERE EP2.contractEsntlId = PS.contractEsntlId AND EP2.deleteYN = 'N' AND EP2.extraCostName = '주차비'
+				   AND (EP2.optionName <=> PS.parkType) AND (TRIM(IFNULL(EP2.optionInfo,'')) <=> TRIM(IFNULL(PS.parkNumber,'')))
+				 ORDER BY CASE WHEN (EP2.useStartDate <=> PS.useStartDate) THEN 0 ELSE 1 END, EP2.createdAt DESC
+				 LIMIT 1) AS paymentStatus
 			FROM parkStatus PS
-			LEFT JOIN extraPayment EP ON EP.contractEsntlId = PS.contractEsntlId
-				AND EP.deleteYN = 'N'
-				AND EP.extraCostName = '주차비'
-				AND (EP.optionName <=> PS.parkType)
-				AND (EP.optionInfo <=> PS.parkNumber)
-				AND (EP.useStartDate <=> PS.useStartDate)
 			WHERE PS.contractEsntlId = ?
 				AND PS.deleteYN = 'N'
 				AND (PS.status IN ('PENDING', 'CONTRACT', 'ENDED'))
