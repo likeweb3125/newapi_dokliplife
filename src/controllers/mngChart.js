@@ -70,7 +70,6 @@ const STATUS_MAP = {
 	'PENDING': { color: '#FFB800', label: '입금대기중' },
 	'VBANK_PENDING': { color: '#FFB800', label: '입금대기중' },
 	'RESERVE_PENDING': { color: '#FFB800', label: '예약금 입금대기중' },
-	'RESERVE_PENGIND': { color: '#FFB800', label: '예약금 입금대기중' },
 	'RESERVED': { color: '#35BB88', label: '예약중' },
 	'CONTRACT': { color: '#FF8A00', label: '이용중' },
 	'OVERDUE': { color: '#D25454', label: '체납상태' },
@@ -122,17 +121,29 @@ exports.mngChartMain = async (req, res, next) => {
 		const gosiwonCeo = gosiwonRow?.gosiwonCeo ?? null;
 		const gosiwonCeoHp = gosiwonRow?.gosiwonCeoHp ?? null;
 
-		// 페이징 처리: 오늘 기준으로 2개월 간격 (로컬 날짜 사용, toISOString은 UTC라 KST에서 하루 밀림 방지)
-		const pageNum = parseInt(page) || 1;
+		// 페이징 처리: 오늘 기준 1개월 간격 (로컬 날짜 사용)
+		// page=1: 오늘 ~ 1개월 전 (과거), page=0: 오늘 ~ 1개월 후 (미래), page=-1: 1개월후~2개월후...
+		const parsed = parseInt(page);
+		const pageNum = (page !== undefined && page !== '' && !isNaN(parsed)) ? parsed : 1;
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
 		
-		// page=1: 오늘 ~ 1개월 전, page=2: 1개월 전 ~ 2개월 전
-		const endDate = new Date(today);
-		endDate.setMonth(endDate.getMonth() - (pageNum - 1));
-		
-		const startDate = new Date(today);
-		startDate.setMonth(startDate.getMonth() - pageNum);
+		let startDate;
+		let endDate;
+		if (pageNum >= 1) {
+			// 과거: page=1 → 오늘~1개월전, page=2 → 1개월전~2개월전
+			endDate = new Date(today);
+			endDate.setMonth(endDate.getMonth() - (pageNum - 1));
+			startDate = new Date(today);
+			startDate.setMonth(startDate.getMonth() - pageNum);
+		} else {
+			// 미래: page=0 → 오늘~1개월후, page=-1 → 1개월후~2개월후
+			const absPage = Math.abs(pageNum);
+			startDate = new Date(today);
+			startDate.setMonth(startDate.getMonth() + absPage);
+			endDate = new Date(today);
+			endDate.setMonth(endDate.getMonth() + absPage + 1);
+		}
 		
 		const pad2 = (n) => String(n).padStart(2, '0');
 		const toYmd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -387,7 +398,7 @@ exports.mngChartMain = async (req, res, next) => {
 			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
-				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE')
+				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE', 'RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING')
 				AND (
 					(RS.status IN ('CONTRACT', 'OVERDUE', 'ROOM_MOVE')
 						AND RS.statusStartDate <= ?
@@ -400,8 +411,13 @@ exports.mngChartMain = async (req, res, next) => {
 							OR (COALESCE(RS.etcEndDate, RS.statusEndDate) >= ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) < ?)
 							OR (COALESCE(RS.etcStartDate, RS.statusEndDate) < ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) >= ?)
 						))
-				)
-			ORDER BY COALESCE(RS.statusStartDate, RS.etcStartDate, RS.statusEndDate) ASC
+					OR
+					(RS.status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING')
+						AND COALESCE(RS.statusStartDate, RS.etcStartDate, RS.createdAt) <= ?
+						AND (COALESCE(RS.statusEndDate, RS.etcEndDate) >= ? OR (RS.statusEndDate IS NULL AND RS.etcEndDate IS NULL))
+					)
+			)
+			ORDER BY COALESCE(RS.statusStartDate, RS.etcStartDate, RS.statusEndDate, RS.createdAt) ASC
 		`;
 
 		const roomStatusItems = await mariaDBSequelize.query(roomStatusItemsQuery, {
@@ -414,7 +430,9 @@ exports.mngChartMain = async (req, res, next) => {
 				startDateStr,
 				endDateStr,
 				startDateStr,
-				endDateStr
+				endDateStr,
+				endDateStr,
+				startDateStr,
 			],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
@@ -449,12 +467,15 @@ exports.mngChartMain = async (req, res, next) => {
 			const groupIndex = roomIdToGroupIndex[row.roomEsntlId];
 			if (groupIndex === undefined) return;
 
-			// start/end: roomStatus 값 (CONTRACT/OVERDUE/ROOM_MOVE는 statusStartDate/statusEndDate, CHECKOUT_REQUESTED는 etcStartDate/statusEndDate)
+			// start/end: roomStatus 값
 			let statusStartRaw = null;
 			let statusEndRaw = null;
 			if (row.status === 'CHECKOUT_REQUESTED') {
 				statusStartRaw = row.etcStartDate || row.statusEndDate;
 				statusEndRaw = row.etcEndDate;
+			} else if (['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING'].includes(row.status)) {
+				statusStartRaw = row.statusStartDate || row.etcStartDate || row.createdAt;
+				statusEndRaw = row.statusEndDate || row.etcEndDate;
 			} else {
 				statusStartRaw = row.statusStartDate;
 				statusEndRaw = row.statusEndDate;
@@ -470,8 +491,77 @@ exports.mngChartMain = async (req, res, next) => {
 			const contractStart = row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null;
 			const contractEnd = row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null;
 
-			if (row.status !== 'CHECKOUT_REQUESTED') {
-				// CONTRACT, OVERDUE, ROOM_MOVE → contract
+			// 통일된 item 구조 (contract 형식, 없으면 null/빈값)
+			const baseItem = (overrides = {}) => ({
+				id: itemIdCounter++,
+				group: row.roomEsntlId,
+				itemType: 'contract',
+				itemStatus: row.status,
+				typeName: getTypeName(row.status, row.statusMemo),
+				start: formattedStart,
+				end: formattedEnd,
+				contractStart: row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null,
+				contractEnd: row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null,
+				period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
+				currentGuest: '',
+				guestPhone: null,
+				customerGender: null,
+				customerAge: null,
+				checkinGender: null,
+				checkinAge: null,
+				className: 'room-statuses',
+				contractNumber: null,
+				guest: '',
+				contractPerson: '',
+				periodType: '',
+				contractType: '',
+				entryFee: '0',
+				paymentAmount: '0',
+				accountInfo: '-',
+				deposit: '0 원',
+				additionalPaymentOption: '-',
+				...overrides,
+			});
+
+			const isReserveType = ['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING'].includes(row.status);
+			if (isReserveType) {
+				// RESERVE_PENDING, RESERVED, VBANK_PENDING, PENDING → contract 형식 (있으면 포함)
+				const reserveOverrides = {};
+				if (row.contractEsntlIdVal || row.contractEsntlId) {
+					reserveOverrides.contractStart = contractStart;
+					reserveOverrides.contractEnd = contractEnd;
+					reserveOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
+					reserveOverrides.periodType = row.month ? `${row.month}개월` : '';
+				}
+				if (row.checkinName || row.customerName) {
+					const gn = row.checkinName || row.customerName || '';
+					const ga = row.checkinAge ?? row.customerAge ?? '';
+					const gg = row.checkinGender ?? row.customerGender ?? '';
+					const gp = row.checkinPhone ?? row.customerPhone ?? '';
+					reserveOverrides.currentGuest = gn;
+					reserveOverrides.guestPhone = gp || null;
+					reserveOverrides.customerGender = row.customerGender ?? null;
+					reserveOverrides.customerAge = row.customerAge ?? null;
+					reserveOverrides.checkinGender = row.checkinGender ?? null;
+					reserveOverrides.checkinAge = row.checkinAge ?? null;
+					reserveOverrides.guest = `${gn} / ${ga} / ${gg}(${gp})`;
+				}
+				if (row.contractorName || row.customerName) {
+					const cn = row.contractorName || row.customerName || '';
+					const ca = row.contractorAge ?? row.customerAge ?? '';
+					const cg = row.contractorGender ?? row.customerGender ?? '';
+					const cp = row.contractorPhone ?? row.customerPhone ?? '';
+					reserveOverrides.contractPerson = `${cn} / ${ca} / ${cg}(${cp})`;
+					if (row.customerBank && row.customerBankAccount) {
+						reserveOverrides.accountInfo = `${row.customerBank} ${row.customerBankAccount} ${cn}`;
+					}
+				}
+				if (row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
+				if ((parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
+				if ((parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
+				items.push(baseItem(reserveOverrides));
+			} else if (row.status !== 'CHECKOUT_REQUESTED') {
+				// CONTRACT, OVERDUE, ROOM_MOVE → contract (계약 정보 포함)
 				const contractType = getContractType(row.contractDate, row.contractStartDate);
 				const paymentAmount = parseInt(row.paymentAmount) || 0;
 				const entryFee = row.pyl_goods_amount || 0;
@@ -493,29 +583,18 @@ exports.mngChartMain = async (req, res, next) => {
 					: '-';
 
 				const deposit = row.roomDeposit || 0;
-				const period = startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string'
-					? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}`
-					: '';
-
 				const contractStatus = row.contractStatus;
 				let className = 'timeline-item leave';
 				if (contractStatus === 'ACTIVE' || contractStatus === 'CONTRACT') {
 					className = 'timeline-item in-progress';
 				}
 
-				const contractItem = {
-					id: itemIdCounter++,
-					group: row.roomEsntlId,
-					itemType: 'contract',
-					itemStatus: row.status,
-					typeName: getTypeName(row.status, row.statusMemo),
-					start: formattedStart,
-					end: formattedEnd,
+				const contractItem = baseItem({
 					contractStart,
 					contractEnd,
-					period,
+					period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
 					currentGuest: guestName,
-					guestPhone,
+					guestPhone: guestPhone || null,
 					customerGender: row.customerGender ?? null,
 					customerAge: row.customerAge ?? null,
 					checkinGender: row.checkinGender ?? null,
@@ -525,44 +604,43 @@ exports.mngChartMain = async (req, res, next) => {
 					guest,
 					contractPerson: contractor,
 					periodType: row.month ? `${row.month}개월` : '1개월',
-					contractType: contractType,
+					contractType,
 					entryFee: entryFee > 0 ? `${entryFee}` : '0',
 					paymentAmount: paymentAmount > 0 ? `${paymentAmount}` : '0',
 					accountInfo,
 					deposit: deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원',
-					additionalPaymentOption: '-',
-				};
-				// roomStatus.subStatus가 ROOM_MOVE_IN/OUT이면 나중에 moveID·moveFrom·moveTo 매칭용으로 표시
+				});
 				if (row.subStatus === 'ROOM_MOVE_OUT' || row.subStatus === 'ROOM_MOVE_IN') {
 					contractItem._moveSubStatus = row.subStatus;
 				}
 				items.push(contractItem);
 			} else {
-				// CHECKOUT_CONFIRMED, CHECKOUT_REQUESTED → disabled
-				let content = '퇴실';
-				if (row.statusMemo) {
-					content = row.statusMemo;
-				} else if (row.status === 'CHECKOUT_CONFIRMED') {
-					content = '퇴실';
-				} else if (row.status === 'CHECKOUT_REQUESTED') {
-					content = '점검중';
-				}
-
-				items.push({
-					id: itemIdCounter++,
-					group: row.roomEsntlId,
-					itemType: 'disabled',
-					itemStatus: row.status,
-					typeName: getTypeName(row.status, row.statusMemo),
-					className: 'disabled',
-					start: formattedStart,
-					end: formattedEnd,
+				// CHECKOUT_REQUESTED → contract 형식 (계약 정보 있으면 포함, 없으면 null/빈값)
+				const guestName = row.checkinName || row.customerName || '';
+				const contractorName = row.contractorName || row.customerName || '';
+				const guest = guestName ? `${guestName} / ${row.checkinAge || row.customerAge || ''} / ${row.checkinGender || row.customerGender || ''}(${row.checkinPhone || row.customerPhone || ''})` : '';
+				const contractor = contractorName ? `${contractorName} / ${row.contractorAge || row.customerAge || ''} / ${row.contractorGender || row.customerGender || ''}(${row.contractorPhone || row.customerPhone || ''})` : '';
+				items.push(baseItem({
 					contractStart,
 					contractEnd,
-					content,
-					reason: row.statusMemo || '',
-					description: row.statusMemo || '판매 및 룸투어, 입실이 불가합니다.',
-				});
+					period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
+					currentGuest: guestName,
+					guestPhone: row.checkinPhone || row.customerPhone || null,
+					customerGender: row.customerGender ?? null,
+					customerAge: row.customerAge ?? null,
+					checkinGender: row.checkinGender ?? null,
+					checkinAge: row.checkinAge ?? null,
+					className: 'disabled',
+					contractNumber: row.contractEsntlIdVal || row.contractEsntlId,
+					guest,
+					contractPerson: contractor,
+					periodType: row.month ? `${row.month}개월` : '',
+					contractType: row.contractDate && row.contractStartDate ? getContractType(row.contractDate, row.contractStartDate) : '',
+					entryFee: row.pyl_goods_amount ? `${row.pyl_goods_amount}` : '0',
+					paymentAmount: (parseInt(row.paymentAmount) || 0) > 0 ? `${parseInt(row.paymentAmount) || 0}` : '0',
+					accountInfo: row.customerBank && row.customerBankAccount ? `${row.customerBank} ${row.customerBankAccount} ${contractorName}` : '-',
+					deposit: (parseInt(row.roomDeposit) || 0) > 0 ? `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원` : '0 원',
+				}));
 			}
 		});
 
@@ -605,7 +683,7 @@ exports.mngChartMain = async (req, res, next) => {
 			if (it._moveSubStatus !== undefined) delete it._moveSubStatus;
 		});
 
-		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - RESERVE_PENDING, RESERVED, ON_SALE, VBANK_PENDING, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED만
+		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED만 (RESERVE_*, RESERVED, VBANK_PENDING은 items로)
 		const roomStatusesQuery = `
 			SELECT 
 				RS.esntlId AS id,
@@ -624,8 +702,7 @@ exports.mngChartMain = async (req, res, next) => {
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 				AND RS.status IN (
-					'RESERVE_PENDING', 'RESERVE_PENGIND', 'RESERVED', 'ON_SALE', 'VBANK_PENDING', 'PENDING',
-					'CHECKOUT_ONSALE', 'END_DEPOSIT', 'END', 'ETC', 'BEFORE_SALES', 'CHECKOUT_CONFIRMED'
+					'ON_SALE', 'CHECKOUT_ONSALE', 'END_DEPOSIT', 'END', 'ETC', 'BEFORE_SALES', 'CHECKOUT_CONFIRMED'
 				)
 				AND DATE(RS.createdAt) >= ?
 				AND DATE(RS.createdAt) < ?

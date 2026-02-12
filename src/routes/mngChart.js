@@ -34,7 +34,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *         schema:
  *           type: integer
  *           default: 1
- *         description: 페이지 번호 (1=오늘~1개월 전, 2=1개월 전~2개월 전, ...)
+ *         description: "페이지 번호. 1=오늘~1개월 전, 2=1개월 전~2개월 전(과거). 0=오늘~1개월 후, -1=1개월후~2개월후(미래)"
  *         example: 1
  *     responses:
  *       200:
@@ -118,7 +118,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                                 description: 상태 텍스트 색상
  *                     items:
  *                       type: array
- *                       description: "계약 타입 아이템 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE). roomStatus 기준, start/end=roomStatus, contractStart/contractEnd=roomContract"
+ *                       description: "계약·예약·입금대기 아이템 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_PENDING, RESERVED, VBANK_PENDING). roomStatus 기준"
  *                       items:
  *                         type: object
  *                         properties:
@@ -134,7 +134,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: '아이템 타입 (contract: 계약, disabled: 비활성 상태, system: 시스템 상태). 방이동은 contract+subStatus ROOM_MOVE_IN/OUT으로 moveID·moveRole로 표시'
  *                           itemStatus:
  *                             type: string
- *                             description: "roomStatus.status (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE)"
+ *                             description: "roomStatus.status (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_PENDING, RESERVED, VBANK_PENDING)"
  *                           typeName:
  *                             type: string
  *                             description: "상태 한글 명칭 (예: 이용중, 체납상태, 퇴실요청, 방이동). STATUS_MAP.label 기반"
@@ -229,7 +229,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: 상태 색상 배열 (system 타입일 때)
  *                     roomStatuses:
  *                       type: array
- *                       description: "방 상태 이력 (RESERVE_PENDING, RESERVED, ON_SALE, VBANK_PENDING, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED)"
+ *                       description: "방 상태 이력 (ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED)"
  *                       items:
  *                         type: object
  *                         properties:
