@@ -1432,7 +1432,7 @@ exports.roomReserve = async (req, res, next) => {
 			}
 		);
 
-		// 3. roomStatus 테이블: PENDING(입금대기중) 레코드 추가
+		// 3. roomStatus 테이블: RESERVE_PENDING(예약금 입금대기중) 레코드 추가
 		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);
 		await mariaDBSequelize.query(
 			`INSERT INTO roomStatus (
@@ -1445,7 +1445,7 @@ exports.roomReserve = async (req, res, next) => {
 				statusEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'PENDING', ?, ?, ?, NOW(), NOW())`,
+			) VALUES (?, ?, ?, 'RESERVE_PENDING', ?, ?, ?, NOW(), NOW())`,
 			{
 				replacements: [
 					newRoomStatusId,
