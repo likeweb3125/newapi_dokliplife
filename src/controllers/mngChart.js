@@ -63,7 +63,7 @@ const getContractType = (contractDate, startDate) => {
 	return diffDays === 0 ? '신규' : '연장';
 };
 
-// 방 상태 매핑 (roomStatus.status 값 기준, Untitled-2 목록)
+// 방 상태 매핑 (roomStatus.status 값 기준) - color, label 관리
 const STATUS_MAP = {
 	'BEFORE_SALES': { color: '#9B9B9B', label: '판매신청전' },
 	'ON_SALE': { color: '#27A644', label: '판매중' },
@@ -75,15 +75,25 @@ const STATUS_MAP = {
 	'CONTRACT': { color: '#FF8A00', label: '이용중' },
 	'OVERDUE': { color: '#D25454', label: '체납상태' },
 	'CHECKOUT_REQUESTED': { color: '#9B9B9B', label: '퇴실요청' },
-	'CHECKOUT_CONFIRMED': { color: '#9B9B9B', label: '퇴실확정' },
-	'CHECKOUT_ONSALE': { color: '#9B9B9B', label: '퇴실확정(방 판매중)' },
-	'END_DEPOSIT': { color: '#9B9B9B', label: '퇴실완료(보증금 반환 완료)' },
-	'END': { color: '#9B9B9B', label: '퇴실완료(보증금 반환 필요)' },
+	'CHECKOUT_CONFIRMED': { color: '#9B9B9B', label: '퇴실확정(원장님이 확인)' },
+	'CHECKOUT_ONSALE': { color: '#9B9B9B', label: '퇴실확정 방 판매중' },
+	'END_DEPOSIT': { color: '#9B9B9B', label: '퇴실완료, 보증금 반환 필요' },
+	'END': { color: '#9B9B9B', label: '퇴실완료, 보증금 반환 완료' },
 	'ROOM_MOVE': { color: '#4A67DD', label: '방이동' },
 	'ETC': { color: '#9B9B9B', label: '기타' },
 	'disabled': { color: '#9B9B9B', label: '비활성' },
 	'in-progress': { color: '#FF8A00', label: '이용중' },
 	'leave': { color: '#9B9B9B', label: '퇴실' },
+};
+
+// typeName 조회 (STATUS_MAP.label 기반, ETC는 메모 추가)
+const getTypeName = (status, statusMemo) => {
+	if (!status) return '';
+	const info = STATUS_MAP[status] || { label: String(status) };
+	if (status === 'ETC' && statusMemo) {
+		return `${info.label} (${statusMemo})`;
+	}
+	return info.label;
 };
 
 // 관리객실현황 차트 데이터 조회
@@ -319,7 +329,7 @@ exports.mngChartMain = async (req, res, next) => {
 			roomIdToGroupIndex[group.id] = index; // group.id는 esntlId
 		});
 
-		// 2. Items 데이터 조회 (roomStatus 테이블 기준) - CONTRACT·CHECKOUT_* 기간이 날짜 범위와 겹치는 행, roomContract JOIN으로 contractStart/contractEnd·게스트 정보
+		// 2. Items 데이터 조회 (roomStatus: CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE만)
 		const roomStatusItemsQuery = `
 			SELECT 
 				RS.esntlId AS id,
@@ -377,12 +387,13 @@ exports.mngChartMain = async (req, res, next) => {
 			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
+				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE')
 				AND (
-					(RS.status = 'CONTRACT'
+					(RS.status IN ('CONTRACT', 'OVERDUE', 'ROOM_MOVE')
 						AND RS.statusStartDate <= ?
 						AND (RS.statusEndDate >= ? OR RS.statusEndDate IS NULL))
 					OR
-					(RS.status IN ('CHECKOUT_CONFIRMED', 'CHECKOUT_REQUESTED')
+					(RS.status = 'CHECKOUT_REQUESTED'
 						AND (RS.etcStartDate IS NOT NULL OR RS.statusEndDate IS NOT NULL)
 						AND (
 							(COALESCE(RS.etcStartDate, RS.statusEndDate) >= ? AND COALESCE(RS.etcStartDate, RS.statusEndDate) < ?)
@@ -433,20 +444,20 @@ exports.mngChartMain = async (req, res, next) => {
 		const items = [];
 		let itemIdCounter = 0;
 
-		// roomStatus 기준 Items 추가 (CONTRACT → contract, CHECKOUT_* → disabled)
+		// roomStatus 기준 Items 추가 (CONTRACT/OVERDUE/ROOM_MOVE → contract, CHECKOUT_REQUESTED → disabled)
 		roomStatusItems.forEach((row) => {
 			const groupIndex = roomIdToGroupIndex[row.roomEsntlId];
 			if (groupIndex === undefined) return;
 
-			// start/end: roomStatus 값 (CONTRACT는 statusStartDate/statusEndDate, CHECKOUT_*는 etcStartDate/statusEndDate, etcEndDate)
+			// start/end: roomStatus 값 (CONTRACT/OVERDUE/ROOM_MOVE는 statusStartDate/statusEndDate, CHECKOUT_REQUESTED는 etcStartDate/statusEndDate)
 			let statusStartRaw = null;
 			let statusEndRaw = null;
-			if (row.status === 'CONTRACT') {
-				statusStartRaw = row.statusStartDate;
-				statusEndRaw = row.statusEndDate;
-			} else {
+			if (row.status === 'CHECKOUT_REQUESTED') {
 				statusStartRaw = row.etcStartDate || row.statusEndDate;
 				statusEndRaw = row.etcEndDate;
+			} else {
+				statusStartRaw = row.statusStartDate;
+				statusEndRaw = row.statusEndDate;
 			}
 			const startDate = formatDateOnly(statusStartRaw);
 			if (!startDate) return;
@@ -459,7 +470,8 @@ exports.mngChartMain = async (req, res, next) => {
 			const contractStart = row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null;
 			const contractEnd = row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null;
 
-			if (row.status === 'CONTRACT') {
+			if (row.status !== 'CHECKOUT_REQUESTED') {
+				// CONTRACT, OVERDUE, ROOM_MOVE → contract
 				const contractType = getContractType(row.contractDate, row.contractStartDate);
 				const paymentAmount = parseInt(row.paymentAmount) || 0;
 				const entryFee = row.pyl_goods_amount || 0;
@@ -495,7 +507,8 @@ exports.mngChartMain = async (req, res, next) => {
 					id: itemIdCounter++,
 					group: row.roomEsntlId,
 					itemType: 'contract',
-					itemStatus: roomIdToStatusRaw[row.roomEsntlId] ?? null,
+					itemStatus: row.status,
+					typeName: getTypeName(row.status, row.statusMemo),
 					start: formattedStart,
 					end: formattedEnd,
 					contractStart,
@@ -539,7 +552,8 @@ exports.mngChartMain = async (req, res, next) => {
 					id: itemIdCounter++,
 					group: row.roomEsntlId,
 					itemType: 'disabled',
-					itemStatus: roomIdToStatusRaw[row.roomEsntlId] ?? null,
+					itemStatus: row.status,
+					typeName: getTypeName(row.status, row.statusMemo),
 					className: 'disabled',
 					start: formattedStart,
 					end: formattedEnd,
@@ -591,7 +605,7 @@ exports.mngChartMain = async (req, res, next) => {
 			if (it._moveSubStatus !== undefined) delete it._moveSubStatus;
 		});
 
-		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - 날짜 범위 필터 적용
+		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - RESERVE_PENDING, RESERVED, ON_SALE, VBANK_PENDING, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED만
 		const roomStatusesQuery = `
 			SELECT 
 				RS.esntlId AS id,
@@ -610,8 +624,8 @@ exports.mngChartMain = async (req, res, next) => {
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 				AND RS.status IN (
-					'BEFORE_SALES', 'ON_SALE', 'PENDING', 
-					'RESERVED', 'CHECKOUT_REQUESTED', 'CHECKOUT_CONFIRMED'
+					'RESERVE_PENDING', 'RESERVE_PENGIND', 'RESERVED', 'ON_SALE', 'VBANK_PENDING', 'PENDING',
+					'CHECKOUT_ONSALE', 'END_DEPOSIT', 'END', 'ETC', 'BEFORE_SALES', 'CHECKOUT_CONFIRMED'
 				)
 				AND DATE(RS.createdAt) >= ?
 				AND DATE(RS.createdAt) < ?
@@ -657,6 +671,7 @@ exports.mngChartMain = async (req, res, next) => {
 				group: status.roomEsntlId,
 				itemType: 'system',
 				itemStatus: status.status ?? null,
+				typeName: getTypeName(status.status, status.statusMemo),
 				content: [contentText],
 				colors: [statusInfo.color],
 				start: formatDateTime(statusDate),
@@ -714,6 +729,10 @@ exports.mngChartMain = async (req, res, next) => {
 		const totalPages = 12; // 1년치 데이터
 
 		// 8. 응답 데이터 구성 (dependency 제거, 방이동은 items의 moveID·moveFrom·moveTo로 표시)
+		// statusLabels: STATUS_MAP 기반 명칭 맵 (frontend 참조용, 관리 편의)
+		const statusLabels = Object.fromEntries(
+			Object.entries(STATUS_MAP).map(([k, v]) => [k, v.label])
+		);
 		const responseData = {
 			gosiwonEsntlId: gosiwonEsntlId,
 			gosiwonName: gosiwonName,
@@ -722,6 +741,7 @@ exports.mngChartMain = async (req, res, next) => {
 			groups: groups,
 			items: items,
 			roomStatuses: roomStatusesArray,
+			statusLabels,
 			page: pageNum,
 			totalPages: totalPages,
 			dateRange: {

@@ -118,7 +118,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                                 description: 상태 텍스트 색상
  *                     items:
  *                       type: array
- *                       description: "roomStatus 테이블 기준 계약 및 상태 정보 (vis-timeline items). start/end는 roomStatus 값, contractStart/contractEnd는 roomContract의 startDate/endDate"
+ *                       description: "계약 타입 아이템 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE). roomStatus 기준, start/end=roomStatus, contractStart/contractEnd=roomContract"
  *                       items:
  *                         type: object
  *                         properties:
@@ -132,6 +132,12 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             type: string
  *                             enum: [contract, disabled, system]
  *                             description: '아이템 타입 (contract: 계약, disabled: 비활성 상태, system: 시스템 상태). 방이동은 contract+subStatus ROOM_MOVE_IN/OUT으로 moveID·moveRole로 표시'
+ *                           itemStatus:
+ *                             type: string
+ *                             description: "roomStatus.status (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE)"
+ *                           typeName:
+ *                             type: string
+ *                             description: "상태 한글 명칭 (예: 이용중, 체납상태, 퇴실요청, 방이동). STATUS_MAP.label 기반"
  *                           start:
  *                             type: string
  *                             format: date-time
@@ -223,7 +229,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: 상태 색상 배열 (system 타입일 때)
  *                     roomStatuses:
  *                       type: array
- *                       description: 방 상태 이력 (vis-timeline system items)
+ *                       description: "방 상태 이력 (RESERVE_PENDING, RESERVED, ON_SALE, VBANK_PENDING, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED)"
  *                       items:
  *                         type: object
  *                         properties:
@@ -258,6 +264,17 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           className:
  *                             type: string
  *                             description: CSS 클래스명
+ *                           itemStatus:
+ *                             type: string
+ *                             description: "roomStatus.status (RESERVE_PENDING, RESERVED, ON_SALE 등)"
+ *                           typeName:
+ *                             type: string
+ *                             description: "상태 한글 명칭 (예: 판매중, 입금대기중). ETC는 메모 포함"
+ *                     statusLabels:
+ *                       type: object
+ *                       description: "상태 코드 → 한글 명칭 맵 (STATUS_MAP 기반, 관리 편의)"
+ *                       additionalProperties:
+ *                         type: string
  *                     page:
  *                       type: integer
  *                       description: 현재 페이지 번호
