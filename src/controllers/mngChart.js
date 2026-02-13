@@ -35,7 +35,8 @@ const formatDateTime = (dateString) => {
 	return date.toISOString().slice(0, 19).replace('T', ' ');
 };
 
-// 날짜에서 시간 제거 (YYYY-MM-DD 형식 문자열로 반환, slice 등 사용 가능)
+// 날짜에서 시간 제거 (YYYY-MM-DD 형식 문자열로 반환)
+// DB DATETIME은 드라이버가 UTC로 해석하는 경우가 있어, Date 객체일 때 getUTC* 사용하여 날짜 밀림 방지
 const formatDateOnly = (dateString) => {
 	if (!dateString) return null;
 	if (typeof dateString === 'string' && dateString.includes(' ')) {
@@ -44,11 +45,11 @@ const formatDateOnly = (dateString) => {
 	if (typeof dateString === 'string') {
 		return dateString;
 	}
-	// Date 객체 등: YYYY-MM-DD 문자열로 변환
+	// Date 객체: DB 값 그대로 사용 (UTC 기준으로 날짜 추출, timezone 밀림 방지)
 	const d = new Date(dateString);
 	if (isNaN(d.getTime())) return null;
 	const pad2 = (n) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+	return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 };
 
 // 계약 타입 판단 함수
