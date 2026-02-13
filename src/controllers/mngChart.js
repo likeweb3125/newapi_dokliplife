@@ -339,7 +339,7 @@ exports.mngChartMain = async (req, res, next) => {
 			roomIdToGroupIndex[group.id] = index; // group.id는 esntlId
 		});
 
-		// 2. Items 데이터 조회 (roomStatus: CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE만)
+		// 2. Items 데이터 조회 (roomStatus: CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_*, PENDING)
 		const roomStatusItemsQuery = `
 			SELECT 
 				RS.esntlId AS id,
@@ -353,6 +353,7 @@ exports.mngChartMain = async (req, res, next) => {
 				RS.etcStartDate,
 				RS.etcEndDate,
 				RS.contractEsntlId,
+				RS.createdAt AS roomStatusCreatedAt,
 				R.roomNumber,
 				RC.esntlId AS contractEsntlIdVal,
 				RC.startDate AS contractStartDate,
@@ -459,7 +460,9 @@ exports.mngChartMain = async (req, res, next) => {
 
 		// 4. Items 데이터 변환 (roomStatus 기준: start/end=roomStatus, contractStart/contractEnd=roomContract)
 		const items = [];
+		const roomStatusesArray = [];
 		let itemIdCounter = 0;
+		let statusItemIdCounter = 0;
 
 		// roomStatus 기준 Items 추가 (CONTRACT/OVERDUE/ROOM_MOVE → contract, CHECKOUT_REQUESTED → disabled)
 		roomStatusItems.forEach((row) => {
@@ -490,7 +493,8 @@ exports.mngChartMain = async (req, res, next) => {
 			const contractStart = row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null;
 			const contractEnd = row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null;
 
-			// 통일된 item 구조 (contract 형식, 없으면 null/빈값)
+			// 통일된 item 구조 (계약서 없으면 계약 관련 필드는 null, className은 timeline-item 고정)
+			const hasContract = !!(row.contractEsntlIdVal || row.contractEsntlId);
 			const baseItem = (overrides = {}) => ({
 				id: itemIdCounter++,
 				group: row.roomEsntlId,
@@ -499,40 +503,40 @@ exports.mngChartMain = async (req, res, next) => {
 				typeName: getTypeName(row.status, row.statusMemo),
 				start: formattedStart,
 				end: formattedEnd,
-				contractStart: row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null,
-				contractEnd: row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null,
+				contractStart: hasContract && row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null,
+				contractEnd: hasContract && row.contractEndDate ? formatDateTime(formatDateOnly(row.contractEndDate) + ' 23:59:59') : null,
 				period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
-				currentGuest: '',
+				currentGuest: null,
 				guestPhone: null,
 				customerGender: null,
 				customerAge: null,
 				checkinGender: null,
 				checkinAge: null,
-				className: 'room-statuses',
+				className: 'timeline-item',
 				contractNumber: null,
-				guest: '',
-				contractPerson: '',
-				periodType: '',
-				contractType: '',
-				entryFee: '0',
-				paymentAmount: '0',
-				accountInfo: '-',
-				deposit: '0 원',
-				additionalPaymentOption: '-',
+				guest: null,
+				contractPerson: null,
+				periodType: null,
+				contractType: null,
+				entryFee: null,
+				paymentAmount: null,
+				accountInfo: null,
+				deposit: null,
+				additionalPaymentOption: null,
 				...overrides,
 			});
 
 			const isReserveType = ['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING'].includes(row.status);
 			if (isReserveType) {
-				// RESERVE_PENDING, RESERVED, VBANK_PENDING, PENDING → contract 형식 (있으면 포함)
+				// RESERVE_PENDING, RESERVED, VBANK_PENDING, PENDING → contract 형식 (계약 있으면 포함, 없으면 null)
 				const reserveOverrides = {};
-				if (row.contractEsntlIdVal || row.contractEsntlId) {
+				if (hasContract) {
 					reserveOverrides.contractStart = contractStart;
 					reserveOverrides.contractEnd = contractEnd;
 					reserveOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
 					reserveOverrides.periodType = row.month ? `${row.month}개월` : '';
 				}
-				if (row.checkinName || row.customerName) {
+				if (hasContract && (row.checkinName || row.customerName)) {
 					const gn = row.checkinName || row.customerName || '';
 					const ga = row.checkinAge ?? row.customerAge ?? '';
 					const gg = row.checkinGender ?? row.customerGender ?? '';
@@ -545,7 +549,7 @@ exports.mngChartMain = async (req, res, next) => {
 					reserveOverrides.checkinAge = row.checkinAge ?? null;
 					reserveOverrides.guest = `${gn} / ${ga} / ${gg}(${gp})`;
 				}
-				if (row.contractorName || row.customerName) {
+				if (hasContract && (row.contractorName || row.customerName)) {
 					const cn = row.contractorName || row.customerName || '';
 					const ca = row.contractorAge ?? row.customerAge ?? '';
 					const cg = row.contractorGender ?? row.customerGender ?? '';
@@ -555,91 +559,107 @@ exports.mngChartMain = async (req, res, next) => {
 						reserveOverrides.accountInfo = `${row.customerBank} ${row.customerBankAccount} ${cn}`;
 					}
 				}
-				if (row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
-				if ((parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
-				if ((parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
+				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
+				if (hasContract && (parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
+				if (hasContract && (parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
 				items.push(baseItem(reserveOverrides));
+				roomStatusesArray.push({
+					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
+					group: row.roomEsntlId,
+					className: 'room-statuses',
+					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
+				});
 			} else if (row.status !== 'CHECKOUT_REQUESTED') {
-				// CONTRACT, OVERDUE, ROOM_MOVE → contract (계약 정보 포함)
-				const contractType = getContractType(row.contractDate, row.contractStartDate);
-				const paymentAmount = parseInt(row.paymentAmount) || 0;
-				const entryFee = row.pyl_goods_amount || 0;
+				// CONTRACT, OVERDUE, ROOM_MOVE → contract (계약 있으면 정보 포함, 없으면 null, className은 timeline-item 고정)
+				const contractOverrides = {};
+				if (hasContract) {
+					const contractType = getContractType(row.contractDate, row.contractStartDate);
+					const paymentAmount = parseInt(row.paymentAmount) || 0;
+					const entryFee = row.pyl_goods_amount || 0;
 
-				const guestName = row.checkinName || row.customerName || '';
-				const guestAge = row.checkinAge || row.customerAge || '';
-				const guestGender = row.checkinGender || row.customerGender || '';
-				const guestPhone = row.checkinPhone || row.customerPhone || '';
-				const guest = `${guestName} / ${guestAge} / ${guestGender}(${guestPhone})`;
+					const guestName = row.checkinName || row.customerName || '';
+					const guestAge = row.checkinAge || row.customerAge || '';
+					const guestGender = row.checkinGender || row.customerGender || '';
+					const guestPhone = row.checkinPhone || row.customerPhone || '';
+					const guest = `${guestName} / ${guestAge} / ${guestGender}(${guestPhone})`;
 
-				const contractorName = row.contractorName || row.customerName || '';
-				const contractorAge = row.contractorAge || row.customerAge || '';
-				const contractorGender = row.contractorGender || row.customerGender || '';
-				const contractorPhone = row.contractorPhone || row.customerPhone || '';
-				const contractor = `${contractorName} / ${contractorAge} / ${contractorGender}(${contractorPhone})`;
+					const contractorName = row.contractorName || row.customerName || '';
+					const contractorAge = row.contractorAge || row.customerAge || '';
+					const contractorGender = row.contractorGender || row.customerGender || '';
+					const contractorPhone = row.contractorPhone || row.customerPhone || '';
+					const contractor = `${contractorName} / ${contractorAge} / ${contractorGender}(${contractorPhone})`;
 
-				const accountInfo = row.customerBank && row.customerBankAccount
-					? `${row.customerBank} ${row.customerBankAccount} ${contractorName}`
-					: '-';
+					const accountInfo = row.customerBank && row.customerBankAccount
+						? `${row.customerBank} ${row.customerBankAccount} ${contractorName}`
+						: '-';
 
-				const deposit = row.roomDeposit || 0;
-				const contractStatus = row.contractStatus;
-				let className = 'timeline-item leave';
-				if (contractStatus === 'ACTIVE' || contractStatus === 'CONTRACT') {
-					className = 'timeline-item in-progress';
+					const deposit = row.roomDeposit || 0;
+
+					contractOverrides.contractStart = contractStart;
+					contractOverrides.contractEnd = contractEnd;
+					contractOverrides.period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
+					contractOverrides.currentGuest = guestName;
+					contractOverrides.guestPhone = guestPhone || null;
+					contractOverrides.customerGender = row.customerGender ?? null;
+					contractOverrides.customerAge = row.customerAge ?? null;
+					contractOverrides.checkinGender = row.checkinGender ?? null;
+					contractOverrides.checkinAge = row.checkinAge ?? null;
+					contractOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
+					contractOverrides.guest = guest;
+					contractOverrides.contractPerson = contractor;
+					contractOverrides.periodType = row.month ? `${row.month}개월` : '1개월';
+					contractOverrides.contractType = contractType;
+					contractOverrides.entryFee = entryFee > 0 ? `${entryFee}` : '0';
+					contractOverrides.paymentAmount = paymentAmount > 0 ? `${paymentAmount}` : '0';
+					contractOverrides.accountInfo = accountInfo;
+					contractOverrides.deposit = deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원';
 				}
 
-				const contractItem = baseItem({
-					contractStart,
-					contractEnd,
-					period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
-					currentGuest: guestName,
-					guestPhone: guestPhone || null,
-					customerGender: row.customerGender ?? null,
-					customerAge: row.customerAge ?? null,
-					checkinGender: row.checkinGender ?? null,
-					checkinAge: row.checkinAge ?? null,
-					className,
-					contractNumber: row.contractEsntlIdVal || row.contractEsntlId,
-					guest,
-					contractPerson: contractor,
-					periodType: row.month ? `${row.month}개월` : '1개월',
-					contractType,
-					entryFee: entryFee > 0 ? `${entryFee}` : '0',
-					paymentAmount: paymentAmount > 0 ? `${paymentAmount}` : '0',
-					accountInfo,
-					deposit: deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원',
-				});
+				const contractItem = baseItem(contractOverrides);
 				if (row.subStatus === 'ROOM_MOVE_OUT' || row.subStatus === 'ROOM_MOVE_IN') {
 					contractItem._moveSubStatus = row.subStatus;
 				}
 				items.push(contractItem);
+				roomStatusesArray.push({
+					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
+					group: row.roomEsntlId,
+					className: 'room-statuses',
+					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
+				});
 			} else {
-				// CHECKOUT_REQUESTED → contract 형식 (계약 정보 있으면 포함, 없으면 null/빈값)
-				const guestName = row.checkinName || row.customerName || '';
-				const contractorName = row.contractorName || row.customerName || '';
-				const guest = guestName ? `${guestName} / ${row.checkinAge || row.customerAge || ''} / ${row.checkinGender || row.customerGender || ''}(${row.checkinPhone || row.customerPhone || ''})` : '';
-				const contractor = contractorName ? `${contractorName} / ${row.contractorAge || row.customerAge || ''} / ${row.contractorGender || row.customerGender || ''}(${row.contractorPhone || row.customerPhone || ''})` : '';
-				items.push(baseItem({
-					contractStart,
-					contractEnd,
-					period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
-					currentGuest: guestName,
-					guestPhone: row.checkinPhone || row.customerPhone || null,
-					customerGender: row.customerGender ?? null,
-					customerAge: row.customerAge ?? null,
-					checkinGender: row.checkinGender ?? null,
-					checkinAge: row.checkinAge ?? null,
-					className: 'disabled',
-					contractNumber: row.contractEsntlIdVal || row.contractEsntlId,
-					guest,
-					contractPerson: contractor,
-					periodType: row.month ? `${row.month}개월` : '',
-					contractType: row.contractDate && row.contractStartDate ? getContractType(row.contractDate, row.contractStartDate) : '',
-					entryFee: row.pyl_goods_amount ? `${row.pyl_goods_amount}` : '0',
-					paymentAmount: (parseInt(row.paymentAmount) || 0) > 0 ? `${parseInt(row.paymentAmount) || 0}` : '0',
-					accountInfo: row.customerBank && row.customerBankAccount ? `${row.customerBank} ${row.customerBankAccount} ${contractorName}` : '-',
-					deposit: (parseInt(row.roomDeposit) || 0) > 0 ? `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원` : '0 원',
-				}));
+				// CHECKOUT_REQUESTED → contract 형식 (계약 있으면 포함, 없으면 null, className은 timeline-item 고정)
+				const checkoutOverrides = {};
+				if (hasContract) {
+					const guestName = row.checkinName || row.customerName || '';
+					const contractorName = row.contractorName || row.customerName || '';
+					const guest = guestName ? `${guestName} / ${row.checkinAge || row.customerAge || ''} / ${row.checkinGender || row.customerGender || ''}(${row.checkinPhone || row.customerPhone || ''})` : '';
+					const contractor = contractorName ? `${contractorName} / ${row.contractorAge || row.customerAge || ''} / ${row.contractorGender || row.customerGender || ''}(${row.contractorPhone || row.customerPhone || ''})` : '';
+					checkoutOverrides.contractStart = contractStart;
+					checkoutOverrides.contractEnd = contractEnd;
+					checkoutOverrides.period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
+					checkoutOverrides.currentGuest = guestName;
+					checkoutOverrides.guestPhone = row.checkinPhone || row.customerPhone || null;
+					checkoutOverrides.customerGender = row.customerGender ?? null;
+					checkoutOverrides.customerAge = row.customerAge ?? null;
+					checkoutOverrides.checkinGender = row.checkinGender ?? null;
+					checkoutOverrides.checkinAge = row.checkinAge ?? null;
+					checkoutOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
+					checkoutOverrides.guest = guest;
+					checkoutOverrides.contractPerson = contractor;
+					checkoutOverrides.periodType = row.month ? `${row.month}개월` : '';
+					checkoutOverrides.contractType = row.contractDate && row.contractStartDate ? getContractType(row.contractDate, row.contractStartDate) : '';
+					checkoutOverrides.entryFee = row.pyl_goods_amount ? `${row.pyl_goods_amount}` : '0';
+					checkoutOverrides.paymentAmount = (parseInt(row.paymentAmount) || 0) > 0 ? `${parseInt(row.paymentAmount) || 0}` : '0';
+					checkoutOverrides.accountInfo = row.customerBank && row.customerBankAccount ? `${row.customerBank} ${row.customerBankAccount} ${contractorName}` : '-';
+					checkoutOverrides.deposit = (parseInt(row.roomDeposit) || 0) > 0 ? `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원` : '0 원';
+				}
+				items.push(baseItem(checkoutOverrides));
+				roomStatusesArray.push({
+					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
+					group: row.roomEsntlId,
+					className: 'room-statuses',
+					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
+				});
 			}
 		});
 
@@ -713,10 +733,7 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// RoomStatuses 데이터 변환 (각 상태를 개별 아이템으로 분리)
-		const roomStatusesArray = [];
-		let statusItemIdCounter = 0;
-		
+		// RoomStatuses: items에 ON_SALE, CHECKOUT_ONSALE 등 추가 + roomStatuses는 createdAt, className만 리턴
 		roomStatuses.forEach((status) => {
 			const groupIndex = roomIdToGroupIndex[status.roomEsntlId];
 			if (groupIndex === undefined) return;
@@ -724,37 +741,44 @@ exports.mngChartMain = async (req, res, next) => {
 			const statusDate = formatDateOnly(status.createdAt);
 			if (!statusDate) return;
 
-			// 상태 레이블 변환
-			const statusInfo = STATUS_MAP[status.status] || { label: status.status, color: '#9B9B9B' };
-			const adminName = status.adminName || '관리자';
-			const timestamp = status.createdAt 
-				? new Date(status.createdAt).toLocaleString('ko-KR', { 
-					year: '2-digit', 
-					month: '2-digit', 
-					day: '2-digit', 
-					hour: '2-digit', 
-					minute: '2-digit', 
-					second: '2-digit',
-					hour12: false
-				}).replace(/\./g, '-').replace(/,/g, '').trim()
-				: '';
-			
-			const contentText = `${statusInfo.label} ${timestamp} ${adminName}(관리자)`;
+			// items에 roomStatus 전체 값 추가 (계약서 없음 → 계약 관련 null)
+			const formattedStart = formatDateTime(statusDate);
+			items.push({
+				id: itemIdCounter++,
+				group: status.roomEsntlId,
+				itemType: 'contract',
+				itemStatus: status.status ?? null,
+				typeName: getTypeName(status.status, status.statusMemo),
+				start: formattedStart,
+				end: formattedStart,
+				contractStart: null,
+				contractEnd: null,
+				period: '',
+				currentGuest: null,
+				guestPhone: null,
+				customerGender: null,
+				customerAge: null,
+				checkinGender: null,
+				checkinAge: null,
+				className: 'timeline-item',
+				contractNumber: null,
+				guest: null,
+				contractPerson: null,
+				periodType: null,
+				contractType: null,
+				entryFee: null,
+				paymentAmount: null,
+				accountInfo: null,
+				deposit: null,
+				additionalPaymentOption: null,
+			});
 
-			// 각 상태를 개별 아이템으로 생성
+			// roomStatuses: 등록일(createdAt), className "room-statuses" 고정
 			roomStatusesArray.push({
 				id: `room-${status.roomEsntlId}-statuses-${statusItemIdCounter++}`,
 				group: status.roomEsntlId,
-				itemType: 'system',
-				itemStatus: status.status ?? null,
-				typeName: getTypeName(status.status, status.statusMemo),
-				content: [contentText],
-				colors: [statusInfo.color],
-				start: formatDateTime(statusDate),
-				end: null,
-				contractStart: null,
-				contractEnd: null,
 				className: 'room-statuses',
+				createdAt: formatDateTime(status.createdAt),
 			});
 		});
 

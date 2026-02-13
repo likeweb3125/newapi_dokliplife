@@ -118,7 +118,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                                 description: 상태 텍스트 색상
  *                     items:
  *                       type: array
- *                       description: "계약·예약·입금대기 아이템 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_PENDING, RESERVED, VBANK_PENDING). roomStatus 기준"
+ *                       description: "roomStatus 전체 값 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_*, PENDING, ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED). 계약서 없으면 계약 관련 필드는 null, className은 timeline-item 고정"
  *                       items:
  *                         type: object
  *                         properties:
@@ -150,12 +150,12 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             type: string
  *                             format: date-time
  *                             nullable: true
- *                             description: "계약 시작 일시 (roomContract.startDate, 계약 연동 시에만)"
+ *                             description: "계약 시작 일시 (roomContract.startDate, 계약서 없으면 null)"
  *                           contractEnd:
  *                             type: string
  *                             format: date-time
  *                             nullable: true
- *                             description: "계약 종료 일시 (roomContract.endDate, 계약 연동 시에만)"
+ *                             description: "계약 종료 일시 (roomContract.endDate, 계약서 없으면 null)"
  *                           moveID:
  *                             type: integer
  *                             nullable: true
@@ -181,7 +181,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: 현재 입실자 이름
  *                           className:
  *                             type: string
- *                             description: CSS 클래스명 (timeline-item in-progress, timeline-item leave, disabled 등)
+ *                             description: "CSS 클래스명 (고정값: timeline-item)"
  *                           contractNumber:
  *                             type: string
  *                             description: 계약 번호 (itemType이 contract일 때)
@@ -229,7 +229,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: 상태 색상 배열 (system 타입일 때)
  *                     roomStatuses:
  *                       type: array
- *                       description: "방 상태 이력 (ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED)"
+ *                       description: "items에 표시되는 값들의 등록일(createdAt). className은 room-statuses 고정"
  *                       items:
  *                         type: object
  *                         properties:
@@ -239,37 +239,13 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           group:
  *                             type: string
  *                             description: 방 고유 아이디 (roomEsntlId)
- *                           itemType:
- *                             type: string
- *                             enum: [system]
- *                             description: 아이템 타입
- *                           content:
- *                             type: array
- *                             items:
- *                               type: string
- *                             description: 상태 내용 배열
- *                           colors:
- *                             type: array
- *                             items:
- *                               type: string
- *                             description: 상태 색상 배열
- *                           start:
- *                             type: string
- *                             format: date-time
- *                             description: 시작 일시
- *                           end:
- *                             type: string
- *                             nullable: true
- *                             description: 종료 일시 (null)
  *                           className:
  *                             type: string
- *                             description: CSS 클래스명
- *                           itemStatus:
+ *                             description: "CSS 클래스명 (고정값: room-statuses)"
+ *                           createdAt:
  *                             type: string
- *                             description: "roomStatus.status (RESERVE_PENDING, RESERVED, ON_SALE 등)"
- *                           typeName:
- *                             type: string
- *                             description: "상태 한글 명칭 (예: 판매중, 입금대기중). ETC는 메모 포함"
+ *                             format: date-time
+ *                             description: 등록일
  *                     statusLabels:
  *                       type: object
  *                       description: "상태 코드 → 한글 명칭 맵 (STATUS_MAP 기반, 관리 편의)"
