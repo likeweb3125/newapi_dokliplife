@@ -566,6 +566,7 @@ exports.mngChartMain = async (req, res, next) => {
 				roomStatusesArray.push({
 					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
 					group: row.roomEsntlId,
+					itemType: 'system',
 					className: 'room-statuses',
 					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
 				});
@@ -623,6 +624,7 @@ exports.mngChartMain = async (req, res, next) => {
 				roomStatusesArray.push({
 					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
 					group: row.roomEsntlId,
+					itemType: 'system',
 					className: 'room-statuses',
 					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
 				});
@@ -657,6 +659,7 @@ exports.mngChartMain = async (req, res, next) => {
 				roomStatusesArray.push({
 					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
 					group: row.roomEsntlId,
+					itemType: 'system',
 					className: 'room-statuses',
 					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
 				});
@@ -773,10 +776,11 @@ exports.mngChartMain = async (req, res, next) => {
 				additionalPaymentOption: null,
 			});
 
-			// roomStatuses: 등록일(createdAt), className "room-statuses" 고정
+			// roomStatuses: 등록일(createdAt), className "room-statuses" 고정, itemType "system"
 			roomStatusesArray.push({
 				id: `room-${status.roomEsntlId}-statuses-${statusItemIdCounter++}`,
 				group: status.roomEsntlId,
+				itemType: 'system',
 				className: 'room-statuses',
 				createdAt: formatDateTime(status.createdAt),
 			});

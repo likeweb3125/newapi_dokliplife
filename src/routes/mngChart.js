@@ -239,6 +239,9 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           group:
  *                             type: string
  *                             description: 방 고유 아이디 (roomEsntlId)
+ *                           itemType:
+ *                             type: string
+ *                             description: "아이템 타입 (고정값: system)"
  *                           className:
  *                             type: string
  *                             description: "CSS 클래스명 (고정값: room-statuses)"
