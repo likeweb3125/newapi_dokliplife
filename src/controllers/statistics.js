@@ -999,16 +999,17 @@ exports.getContractStats = async (req, res, next) => {
 
 		const mainPeriods = ['YEAR', 'MONTH', 'DAY'];
 		const finalResult = mainPeriods.map((period) => {
+			const currentCnt = countP[period] ?? 0;
+			const agoCnt = period === 'YEAR' ? (countP['YEAR_AGO'] ?? 0) : period === 'MONTH' ? (countP['MONTH_AGO'] ?? 0) : (countP['DAY_AGO'] ?? 0);
 			const row = {
 				type: period,
 				paymentAmount: amountP[period] ?? 0,
-				paymentCnt: countP[period] ?? 0,
+				paymentCnt: currentCnt,
 				refundAmount: amountRef[period] ?? 0,
 				refundCnt: countR[period] ?? 0,
+				ago: agoCnt,
+				agoType: currentCnt > agoCnt ? 'plus' : currentCnt < agoCnt ? 'minus' : 'same',
 			};
-			if (period === 'YEAR') row.ago = countP['YEAR_AGO'] ?? 0;
-			else if (period === 'MONTH') row.ago = countP['MONTH_AGO'] ?? 0;
-			else row.ago = countP['DAY_AGO'] ?? 0;
 			return row;
 		});
 

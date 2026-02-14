@@ -371,6 +371,11 @@ router.post('/realTimeList', isAuthMiddleware.isAuthAdmin, statController.getRea
  *                         type: integer
  *                         description: 비교 결제 건수 (YEAR=한 해 전, MONTH=한 달 전, DAY=하루 전)
  *                         example: 37
+ *                       agoType:
+ *                         type: string
+ *                         enum: [plus, minus, same]
+ *                         description: "전년/전달/전일(ago) 대비 증감. 현재 결제 건수 > ago 이면 plus, < ago 이면 minus, 같으면 same"
+ *                         example: plus
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
