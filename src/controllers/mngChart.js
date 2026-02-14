@@ -27,29 +27,30 @@ const verifyAdminToken = (req) => {
 	return decodedToken;
 };
 
-// 날짜 포맷팅 함수 (YYYY-MM-DD -> YYYY-MM-DD HH:mm:ss)
-const formatDateTime = (dateString) => {
-	if (!dateString) return null;
-	const date = new Date(dateString);
-	if (isNaN(date.getTime())) return null;
-	return date.toISOString().slice(0, 19).replace('T', ' ');
+// 날짜 포맷팅 - DB 값 그대로 사용 (UTC 변환 없음, 로컬 기준)
+const pad2 = (n) => String(n).padStart(2, '0');
+const formatDateTime = (val) => {
+	if (val == null) return null;
+	if (typeof val === 'string') {
+		const s = val.trim().slice(0, 19).replace('T', ' ');
+		if (s.length < 10) return null;
+		return s.length === 10 ? `${s} 00:00:00` : s;
+	}
+	const d = new Date(val);
+	if (isNaN(d.getTime())) return null;
+	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 };
 
-// 날짜에서 시간 제거 (YYYY-MM-DD 형식 문자열로 반환)
-// DB DATETIME은 드라이버가 UTC로 해석하는 경우가 있어, Date 객체일 때 getUTC* 사용하여 날짜 밀림 방지
-const formatDateOnly = (dateString) => {
-	if (!dateString) return null;
-	if (typeof dateString === 'string' && dateString.includes(' ')) {
-		return dateString.split(' ')[0];
+// 날짜에서 시간 제거 (YYYY-MM-DD 형식)
+const formatDateOnly = (val) => {
+	if (val == null) return null;
+	if (typeof val === 'string') {
+		if (val.includes(' ')) return val.split(' ')[0];
+		return val.length >= 10 ? val.slice(0, 10) : val;
 	}
-	if (typeof dateString === 'string') {
-		return dateString;
-	}
-	// Date 객체: DB 값 그대로 사용 (UTC 기준으로 날짜 추출, timezone 밀림 방지)
-	const d = new Date(dateString);
+	const d = new Date(val);
 	if (isNaN(d.getTime())) return null;
-	const pad2 = (n) => String(n).padStart(2, '0');
-	return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
 // 계약 타입 판단 함수
@@ -713,6 +714,10 @@ exports.mngChartMain = async (req, res, next) => {
 				RS.roomEsntlId,
 				RS.status,
 				RS.statusMemo,
+				RS.statusStartDate,
+				RS.statusEndDate,
+				RS.etcStartDate,
+				RS.etcEndDate,
 				RS.createdAt,
 				RS.updatedAt,
 				GA.ceo AS adminName,
@@ -737,16 +742,23 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// RoomStatuses: items에 ON_SALE, CHECKOUT_ONSALE 등 추가 + roomStatuses는 createdAt, className만 리턴
+		// RoomStatuses: items에 ON_SALE, CHECKOUT_ONSALE 등 추가 (start/end는 statusStartDate/statusEndDate 사용)
 		roomStatuses.forEach((status) => {
 			const groupIndex = roomIdToGroupIndex[status.roomEsntlId];
 			if (groupIndex === undefined) return;
 
-			const statusDate = formatDateOnly(status.createdAt);
-			if (!statusDate) return;
+			// start/end: roomStatus의 statusStartDate, statusEndDate 사용 (없으면 createdAt으로 대체)
+			const statusStartRaw = status.statusStartDate || status.etcStartDate || status.createdAt;
+			const statusEndRaw = status.statusEndDate || status.etcEndDate;
+			const startDate = formatDateOnly(statusStartRaw);
+			if (!startDate) return;
+
+			const endDate = formatDateOnly(statusEndRaw);
+			const formattedStart = formatDateTime(startDate);
+			const formattedEnd = endDate ? formatDateTime(endDate + ' 23:59:59') : formatDateTime(startDate + ' 23:59:59');
+			const period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
 
 			// items에 roomStatus 전체 값 추가 (계약서 없음 → 계약 관련 null)
-			const formattedStart = formatDateTime(statusDate);
 			items.push({
 				id: itemIdCounter++,
 				group: status.roomEsntlId,
@@ -754,10 +766,10 @@ exports.mngChartMain = async (req, res, next) => {
 				itemStatus: status.status ?? null,
 				typeName: getTypeName(status.status, status.statusMemo),
 				start: formattedStart,
-				end: formattedStart,
+				end: formattedEnd,
 				contractStart: null,
 				contractEnd: null,
-				period: '',
+				period,
 				currentGuest: null,
 				guestPhone: null,
 				customerGender: null,

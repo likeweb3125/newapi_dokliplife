@@ -42,7 +42,6 @@ const roomContractController = require('../controllers/roomContract');
  *         schema:
  *           type: string
  *         description: 계약 상태 필터
- *         example: ACTIVE
  *       - in: query
  *         name: roomStatus
  *         required: false
@@ -50,30 +49,50 @@ const roomContractController = require('../controllers/roomContract');
  *           type: string
  *           enum: [PENDING, RESERVED, CONTRACT, OVERDUE, CHECKOUT_CONFIRMED, UNPAID]
  *         description: 방 상태 필터 (입금대기중(PENDING), 예약중(RESERVED), 이용중(CONTRACT), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID))
- *         example: CONTRACT
  *       - in: query
  *         name: startDate
  *         required: false
  *         schema:
  *           type: string
  *           format: date
+ *           default: '2026-01-01'
  *         description: 계약일 시작일 (YYYY-MM-DD)
- *         example: 2024-01-01
+ *         example: 2026-01-01
  *       - in: query
  *         name: endDate
  *         required: false
  *         schema:
  *           type: string
  *           format: date
+ *           default: '2026-04-01'
  *         description: 계약일 종료일 (YYYY-MM-DD)
- *         example: 2024-12-31
+ *         example: 2026-04-01
  *       - in: query
  *         name: searchString
  *         required: false
  *         schema:
  *           type: string
+ *           default: 'GOSI0000000199'
  *         description: 검색어 (고시원 ID, 고시원명, 고객명, 고객 전화번호)
- *         example: 홍길동
+ *         example: GOSI0000000199
+ *       - in: query
+ *         name: roomEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디 필터
+ *       - in: query
+ *         name: gosiwonEsntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유 아이디 필터
+ *       - in: query
+ *         name: depositSearchString
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "il_room_deposit 입실자명/계약자명(rdp_customer_name) 검색"
  *       - in: query
  *         name: order
  *         required: false
@@ -208,8 +227,8 @@ const roomContractController = require('../controllers/roomContract');
  *                           depositStatus:
  *                             type: string
  *                             nullable: true
- *                             description: 보증금 상태 (deposit 테이블에서 방ID 기준 마지막 상태값)
- *                             example: COMPLETED
+ *                             description: "보증금 상태 (il_room_deposit 기준, 방·고시원·입실자/계약자명 매칭 최신 건). rdp_return_dtm 있음 → RETURN_COMPLETE, rdp_completed_dtm 있음 → COMPLETE, 없음 → PENDING"
+ *                             enum: [PENDING, COMPLETE, RETURN_COMPLETE]
  *                     totcnt:
  *                       type: integer
  *                       description: 전체 개수

@@ -68,6 +68,9 @@ exports.getContractList = async (req, res, next) => {
 			startDate,
 			endDate,
 			searchString,
+			roomEsntlId,
+			gosiwonEsntlId,
+			depositSearchString,
 			order = 'DESC',
 			limit = 50,
 		} = req.query;
@@ -88,6 +91,25 @@ exports.getContractList = async (req, res, next) => {
 				);
 				const searchPattern = `%${searchString}%`;
 				values.push(searchPattern, searchPattern, searchPattern, searchPattern);
+			}
+
+			if (roomEsntlId) {
+				conditions.push('RC.roomEsntlId = ?');
+				values.push(roomEsntlId);
+			}
+
+			if (gosiwonEsntlId) {
+				conditions.push('RC.gosiwonEsntlId = ?');
+				values.push(gosiwonEsntlId);
+			}
+
+			// il_room_deposit에서 입실자명/계약자명(rdp_customer_name)으로 검색
+			if (depositSearchString && String(depositSearchString).trim()) {
+				const depositPattern = `%${String(depositSearchString).trim()}%`;
+				conditions.push(
+					'EXISTS (SELECT 1 FROM il_room_deposit D2 WHERE D2.rom_eid = RC.roomEsntlId AND D2.gsw_eid = RC.gosiwonEsntlId AND D2.rdp_delete_dtm IS NULL AND D2.rdp_customer_name LIKE ?)'
+				);
+				values.push(depositPattern);
 			}
 
 			if (status) {
@@ -149,6 +171,8 @@ exports.getContractList = async (req, res, next) => {
 				COUNT(*) OVER() AS totcnt,
 				R.status AS status,
 				CASE
+					WHEN RC.contractDay IS NOT NULL AND RC.contractDay > 0 THEN 'part'
+					WHEN RC.month = 1 THEN 'month'
 					WHEN DATE_ADD(RC.startDate, INTERVAL 1 MONTH) = RC.endDate THEN 'month'
 					ELSE 'part'
 				END AS contractType,
@@ -160,12 +184,19 @@ exports.getContractList = async (req, res, next) => {
 					WHEN RC.status = 'CANCEL' THEN 'refund'
 					ELSE 'pay'
 				END AS paymentCategory,
-				(SELECT status 
-				 FROM deposit 
-				 WHERE roomEsntlId = RC.roomEsntlId 
-				   AND deleteYN = 'N'
-				 ORDER BY createdAt DESC 
-				 LIMIT 1) AS depositStatus
+				COALESCE((
+					SELECT CASE 
+						WHEN D.rdp_completed_dtm IS NOT NULL THEN 'COMPLETE'
+						WHEN D.rdp_return_dtm IS NOT NULL THEN 'RETURN_COMPLETE'
+						ELSE 'PENDING'
+					END
+					FROM il_room_deposit D
+					WHERE D.rom_eid = RC.roomEsntlId 
+					  AND D.gsw_eid = RC.gosiwonEsntlId
+					  AND D.rdp_delete_dtm IS NULL
+					ORDER BY D.rdp_regist_dtm DESC 
+					LIMIT 1
+				), 'PENDING') AS depositStatus
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId

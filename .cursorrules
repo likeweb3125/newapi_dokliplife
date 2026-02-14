@@ -25,5 +25,8 @@
 - **Raw SQL**에서 INSERT/UPDATE 시 현재 시각이 필요하면 `NOW()` 또는 `CURRENT_TIMESTAMP` 사용  
   (세션 타임존이 Asia/Seoul 이므로 KST로 저장됨).  
   `UTC_TIMESTAMP()` 또는 `DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)` 같은 UTC 기반 계산은 사용하지 않는다.
+- **날짜·시간 입출력 시 UTC 변환 금지**
+  - DB에서 읽거나 API로 내보낼 때 `toISOString()`, `getUTC*()` 등 UTC 관련 변환을 사용하지 않는다.
+  - DB 값·로컬(KST) 기준으로 그대로 입출력한다.
 - 자세한 설명: `docs/sequelize_datetime_timezone.md` 참고.
 

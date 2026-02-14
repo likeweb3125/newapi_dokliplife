@@ -1746,7 +1746,14 @@ exports.getDepositList = async (req, res, next) => {
 				DATE(COALESCE(RC_RS.startDate, RC.startDate)) as moveInDate,
 				DATE(COALESCE(RC_RS.endDate, RC.endDate)) as moveOutDate,
 				COALESCE(RC_RS.status, RC.status) as contractStatus,
-				CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as depositStatus,
+				CASE
+					WHEN DH.status IS NULL THEN NULL
+					WHEN DH.status = 'PENDING' THEN 'PENDING'
+					WHEN DH.status = 'PARTIAL' THEN 'PARTIAL'
+					WHEN DH.status = 'DELETED' THEN 'DELETED'
+					WHEN DH.status IN ('COMPLETED', 'RETURN_COMPLETED') THEN 'COMPLETE'
+					ELSE DH.status
+				END as depositStatus,
 				D.rdp_price as depositLastestAmount,
 				DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i') as depositLastestTime,
 				D.rdp_regist_dtm as depositCreatedAt,
@@ -1794,6 +1801,15 @@ exports.getDepositList = async (req, res, next) => {
 			LEFT JOIN roomContract RC_RS ON RS.contractEsntlId = RC_RS.esntlId AND RS.status = 'CONTRACT'
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN roomContractWho RCW_RS ON RS.contractEsntlId = RCW_RS.contractEsntlId AND RS.status = 'CONTRACT'
+			LEFT JOIN (
+				SELECT H1.depositEsntlId, H1.status
+				FROM il_room_deposit_history H1
+				INNER JOIN (
+					SELECT depositEsntlId, MAX(createdAt) as maxCreatedAt
+					FROM il_room_deposit_history
+					GROUP BY depositEsntlId
+				) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt
+			) DH ON D.rdp_eid = DH.depositEsntlId
 			${whereClause}
 			ORDER BY 
 				COALESCE(D.rdp_regist_dtm, '1970-01-01') DESC,

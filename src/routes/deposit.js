@@ -665,7 +665,7 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                           depositStatus:
  *                             type: string
  *                             nullable: true
- *                             description: 보증금 상태 (deposit.status - 해당 계약서 기준 제일 최근의 마지막 status값)
+ *                             description: "보증금 상태 (il_room_deposit_history 최신 이력 기준). PENDING, COMPLETE, PARTIAL, DELETED"
  *                             example: PENDING
  *                           depositLastestAmount:
  *                             type: integer
