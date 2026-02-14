@@ -152,7 +152,7 @@ exports.mngChartMain = async (req, res, next) => {
 		const endDateStr = toYmd(endDate);
 		const startDateStr = toYmd(startDate);
 
-		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, roomCategory·checkInName·contractEsntlId 포함
+		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, statusStartDate 기준 최신 상태 사용 (esntlId/updatedAt 아님)
 		const groupsQuery = `
 			SELECT DISTINCT
 				R.esntlId AS id,
@@ -204,18 +204,18 @@ exports.mngChartMain = async (req, res, next) => {
 				SELECT RS1.*
 				FROM roomStatus RS1
 				INNER JOIN (
-					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
+					SELECT roomEsntlId, MAX(COALESCE(statusStartDate, etcStartDate, createdAt)) AS maxStartDate
 					FROM roomStatus
 					WHERE status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
 					GROUP BY roomEsntlId
-				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId 
-					AND RS1.updatedAt = RS2.maxUpdatedAt
+				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId
+					AND COALESCE(RS1.statusStartDate, RS1.etcStartDate, RS1.createdAt) = RS2.maxStartDate
 					AND RS1.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
 				WHERE RS1.esntlId = (
-					SELECT esntlId 
-					FROM roomStatus RS3 
-					WHERE RS3.roomEsntlId = RS1.roomEsntlId 
-						AND RS3.updatedAt = RS2.maxUpdatedAt
+					SELECT esntlId
+					FROM roomStatus RS3
+					WHERE RS3.roomEsntlId = RS1.roomEsntlId
+						AND COALESCE(RS3.statusStartDate, RS3.etcStartDate, RS3.createdAt) = RS2.maxStartDate
 						AND RS3.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
 					ORDER BY RS3.esntlId DESC
 					LIMIT 1
