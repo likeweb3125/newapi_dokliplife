@@ -9,6 +9,7 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const formatAge = require('../utils/formatAge');
 
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
@@ -800,7 +801,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 				R.roomType,
 				R.window,
 				C.name AS userName,
-				ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365) AS age,
+				C.birth,
 				C.gender,
 				C.phone,
 				DATE(RRR.rrr_leave_date) AS pDate,
@@ -866,7 +867,10 @@ exports.getRefundRequestList = async (req, res, next) => {
 
 		const recordsFiltered = countResult[0]?.total || 0;
 		const recordsTotal = totalCountResult[0]?.total || 0;
-		const data = Array.isArray(rows) ? rows : [];
+		const data = (Array.isArray(rows) ? rows : []).map((row) => ({
+			...row,
+			age: formatAge(row.birth) ?? null,
+		}));
 
 		// 페이지 기반 형식으로 응답
 		const result = {
@@ -1115,7 +1119,7 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				C.name AS customerName,
 				C.phone AS customerPhone,
 				C.gender AS customerGender,
-				ROUND((TO_DAYS(NOW()) - (TO_DAYS(C.birth))) / 365) AS customerAge,
+				C.birth AS customerBirth,
 				RCW.checkinName,
 				RCW.checkinPhone,
 				RCW.customerName AS contractorName,
@@ -1212,7 +1216,9 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 
 		const result = {
 			...baseRow,
-			contractInfo: contractInfo || null,
+			contractInfo: contractInfo
+				? { ...contractInfo, customerAge: formatAge(contractInfo.customerBirth) ?? null }
+				: null,
 			paymentInfo: Array.isArray(paymentInfo) ? paymentInfo : [],
 			settlementInfo,
 		};

@@ -2,6 +2,7 @@ const { mariaDBSequelize, room, customer, history, deposit, extraPayment } = req
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const formatAge = require('../utils/formatAge');
 
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
@@ -315,6 +316,7 @@ exports.getContractDetail = async (req, res, next) => {
 				RC.checkInTime AS checkInTime,
 				C.name AS customerName,
 				C.phone AS customerPhone,
+				C.birth AS customerBirth,
 				RC.customerEsntlId AS customerEsntlId,
 				C.id AS customerId,
 				ICR.cre_bank_name AS customerBank,
@@ -363,6 +365,9 @@ exports.getContractDetail = async (req, res, next) => {
 		if (!contractInfo) {
 			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
 		}
+
+		// 나이: 생년월일 기준 계산 (formatAge), 없으면 RCW 저장값 사용
+		contractInfo.contractCustomerAge = formatAge(contractInfo.customerBirth) ?? contractInfo.contractCustomerAge ?? null;
 
 		// 연동 결제 내역 조회 (paymentLog, isExtra = 0인 것 = 일반 연장 결제)
 		const paymentLogQuery = `

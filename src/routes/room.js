@@ -175,6 +175,121 @@ router.get('/list', roomController.getRoomList);
 
 /**
  * @swagger
+ * /v1/room/{roomId}/tour-reservations:
+ *   get:
+ *     summary: 방별 룸 투어 예약 목록 조회
+ *     description: "방 ID(roomId)로 해당 방의 룸 투어 예약 목록을 조회합니다. il_tour_reservation 테이블 기준, 신규 예약순 정렬, 페이징 지원."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: roomId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 방 고유 아이디 (rom_eid)
+ *         example: ROOM0000026054
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: 페이지당 항목 수 (최대 100)
+ *     responses:
+ *       200:
+ *         description: 룸 투어 예약 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 룸 투어 예약 목록 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: 전체 예약 건수
+ *                     page:
+ *                       type: integer
+ *                       description: 현재 페이지
+ *                     limit:
+ *                       type: integer
+ *                       description: 페이지당 항목 수
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 투어 예약 고유 아이디 (rtr_eid)
+ *                           userEsntlId:
+ *                             type: string
+ *                             description: 유저 일련번호 (rtr_uid)
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             description: 고시원 일련번호
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 일련번호
+ *                           roomNumber:
+ *                             type: string
+ *                             description: 방 번호 (방이름)
+ *                           status:
+ *                             type: string
+ *                             description: 예약 상태 (rtr_status)
+ *                           tourDtm:
+ *                             type: string
+ *                             format: date-time
+ *                             description: 투어 일시 (방문 일자)
+ *                           message:
+ *                             type: string
+ *                             description: 희망 메시지
+ *                           joinDate:
+ *                             type: string
+ *                             description: 입실 희망일
+ *                           stayPeriod:
+ *                             type: string
+ *                             description: 예상 입실 기간
+ *                           userBizcall:
+ *                             type: string
+ *                             description: 방문서비스 문의처
+ *                           registDtm:
+ *                             type: string
+ *                             format: date-time
+ *                             description: 등록 일시 (예약 일자)
+ *                           applicantName:
+ *                             type: string
+ *                             description: 신청인 이름 (customer.name)
+ *                           applicantPhone:
+ *                             type: string
+ *                             description: 연락처 (customer.phone)
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/:roomId/tour-reservations', roomController.getTourReservationList);
+
+/**
+ * @swagger
  * /v1/room/dashboardCnt:
  *   get:
  *     summary: roomStatus - 계약현황용 대시보드 집계 조회

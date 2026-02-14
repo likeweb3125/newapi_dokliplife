@@ -1980,3 +1980,92 @@ exports.getFreeRoomList = async (req, res, next) => {
 	}
 };
 
+// 방별 룸 투어 예약 목록 조회 (il_tour_reservation, 페이징)
+exports.getTourReservationList = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const roomId = req.params.roomId;
+		const page = parseInt(req.query.page) || 1;
+		const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+
+		if (!roomId) {
+			errorHandler.errorThrow(400, 'roomId는 필수입니다.');
+		}
+
+		const offset = (page - 1) * limit;
+
+		const listQuery = `
+			SELECT
+				T.rtr_eid AS esntlId,
+				T.cus_eid AS userEsntlId,
+				T.gsw_eid AS gosiwonEsntlId,
+				T.rom_eid AS roomEsntlId,
+				R.roomNumber AS roomNumber,
+				T.rtr_status AS status,
+				DATE_FORMAT(T.rtr_tour_dtm, '%Y-%m-%d %H:%i:%s') AS tourDtm,
+				T.rtr_message AS message,
+				T.rtr_join_date AS joinDate,
+				T.rtr_stay_period AS stayPeriod,
+				T.rtr_user_bizcall AS userBizcall,
+				DATE_FORMAT(T.rtr_regist_dtm, '%Y-%m-%d %H:%i:%s') AS registDtm,
+				T.rtr_registrant_id AS registrantId,
+				DATE_FORMAT(T.rtr_confirm_dtm, '%Y-%m-%d %H:%i:%s') AS confirmDtm,
+				C.name AS applicantName,
+				C.phone AS applicantPhone
+			FROM il_tour_reservation T
+			LEFT JOIN room R ON R.esntlId = T.rom_eid
+			LEFT JOIN customer C ON C.esntlId = T.cus_eid
+			WHERE T.rom_eid = ?
+			ORDER BY T.rtr_regist_dtm DESC
+			LIMIT ? OFFSET ?
+		`;
+
+		const countQuery = `
+			SELECT COUNT(*) AS total
+			FROM il_tour_reservation T
+			WHERE T.rom_eid = ?
+		`;
+
+		const [rows, countResult] = await Promise.all([
+			mariaDBSequelize.query(listQuery, {
+				replacements: [roomId, limit, offset],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(countQuery, {
+				replacements: [roomId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+		]);
+
+		const total = countResult?.[0]?.total != null ? parseInt(countResult[0].total, 10) : 0;
+		const data = (rows || []).map((row) => ({
+			esntlId: row.esntlId ?? null,
+			userEsntlId: row.userEsntlId ?? null,
+			gosiwonEsntlId: row.gosiwonEsntlId ?? null,
+			roomEsntlId: row.roomEsntlId ?? null,
+			roomNumber: row.roomNumber ?? null,
+			status: row.status ?? null,
+			tourDtm: row.tourDtm ?? null,
+			message: row.message ?? null,
+			joinDate: row.joinDate ?? null,
+			stayPeriod: row.stayPeriod ?? null,
+			userBizcall: row.userBizcall ?? null,
+			registDtm: row.registDtm ?? null,
+			registrantId: row.registrantId ?? null,
+			confirmDtm: row.confirmDtm ?? null,
+			applicantName: row.applicantName ?? null,
+			applicantPhone: row.applicantPhone ?? null,
+		}));
+
+		return errorHandler.successThrow(res, '룸 투어 예약 목록 조회 성공', {
+			total,
+			page,
+			limit,
+			data,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+

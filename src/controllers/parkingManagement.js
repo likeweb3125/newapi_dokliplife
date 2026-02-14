@@ -8,6 +8,7 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const formatAge = require('../utils/formatAge');
 
 const EXTR_PREFIX = 'EXTR';
 const EXTR_PADDING = 10;
@@ -408,13 +409,8 @@ exports.getParkingNowList = async (req, res, next) => {
 				R.roomNumber AS roomNumber,
 				COALESCE(RCW.customerName, C.name) AS customerName,
 				COALESCE(RCW.customerGender, C.gender) AS customerGender,
-				COALESCE(RCW.customerAge, 
-					CASE 
-						WHEN C.birth IS NOT NULL AND C.birth != '' 
-						THEN ROUND((TO_DAYS(NOW()) - TO_DAYS(C.birth)) / 365)
-						ELSE NULL
-					END
-				) AS customerAge,
+				C.birth,
+				RCW.customerAge AS rcwCustomerAge,
 				PS.parkType AS parkType,
 				PS.parkNumber AS parkNumber,
 				PS.status AS status,
@@ -437,8 +433,13 @@ exports.getParkingNowList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
+		const list = (result || []).map((row) => ({
+			...row,
+			customerAge: row.rcwCustomerAge ?? formatAge(row.birth) ?? null,
+		}));
+
 		errorHandler.successThrow(res, '주차 사용 현황 리스트 조회 성공', {
-			list: result || [],
+			list,
 		});
 	} catch (err) {
 		next(err);

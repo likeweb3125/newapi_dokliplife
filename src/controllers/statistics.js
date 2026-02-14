@@ -12,6 +12,7 @@ const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
 const { QueryTypes } = require('sequelize');
 const logs = require('../models/logs');
+const formatAge = require('../utils/formatAge');
 
 // 전체통계
 // 2023.09.12 ash
@@ -664,7 +665,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				(SELECT roomNumber FROM room WHERE esntlId = pl.roomEsntlId) AS roomName,
 				pl.customerEsntlId,
 				c.name AS customerName,
-				ROUND((TO_DAYS(NOW()) - (TO_DAYS(c.birth))) / 365) AS age,
+				c.birth,
 				c.gender,
 				r.deposit AS roomDeposit,
 				gu.deposit AS gosiwonDeposit,
@@ -768,7 +769,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				roomName,
 				customerEsntlId,
 				customerName,
-				age,
+				birth,
 				gender,
 				roomDeposit,
 				gosiwonDeposit,
@@ -810,7 +811,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				roomName,
 				customerEsntlId,
 				customerName,
-				age,
+				age: formatAge(birth) ?? null,
 				gender,
 				roomDeposit,
 				gosiwonDeposit,

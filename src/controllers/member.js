@@ -9,6 +9,7 @@ const enumConfig = require('../middleware/enum');
 const isAuthControllers = require('../controllers/auth');
 const db = require('../models');
 const { getWriterAdminId } = require('../utils/auth');
+const formatAge = require('../utils/formatAge');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -507,29 +508,13 @@ exports.getMemberSearch = async (req, res, next) => {
 			type: db.mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// birth로 현재 나이 계산 (없거나 유효하지 않으면 빈 문자열)
-		const calcAgeFromBirth = (birth) => {
-			if (birth == null || String(birth).trim() === '') return '';
-			const s = String(birth).trim().replace(/-/g, '');
-			let y = null;
-			if (s.length >= 8) {
-				y = parseInt(s.slice(0, 4), 10);
-			} else if (s.length >= 4) {
-				y = parseInt(s.slice(0, 4), 10);
-			}
-			if (y == null || Number.isNaN(y) || y < 1900 || y > new Date().getFullYear()) return '';
-			const thisYear = new Date().getFullYear();
-			const age = thisYear - y;
-			return age >= 0 && age <= 150 ? age : '';
-		};
-
 		const list = (Array.isArray(rows) ? rows : []).map((row) => {
 			const item = {
 				esntlId: row.esntlId,
 				name: row.name,
 				phone: row.phone,
 				gender: row.gender,
-				age: calcAgeFromBirth(row.birth),
+				age: formatAge(row.birth) ?? '',
 			};
 			if (row.startDate != null && row.endDate != null) {
 				item.startDate = row.startDate;
