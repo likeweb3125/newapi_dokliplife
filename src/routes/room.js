@@ -290,6 +290,62 @@ router.get('/:roomId/tour-reservations', roomController.getTourReservationList);
 
 /**
  * @swagger
+ * /v1/room/addEventDirectly:
+ *   post:
+ *     summary: 방 이벤트 직접 입력
+ *     description: "방 이벤트 추가 (룸투어 예약·입실 불가 기간). roomStatus에 직접 INSERT. 1) 시작 일자~종료일자, 2) 상태값(ETC/BEFORE_SALES), 3) setRoomEmpty true 시 room.status=EMPTY, room.startDate/endDate 빈값."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomEsntlId
+ *               - startDate
+ *               - endDate
+ *               - status
+ *             properties:
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 시작 일자 (YYYY-MM-DD)
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 종료 일자 (YYYY-MM-DD)
+ *               status:
+ *                 type: string
+ *                 enum: [ETC, BEFORE_SALES]
+ *                 description: "상태값. ETC=기타(메모필수), BEFORE_SALES=판매신청전"
+ *               statusMemo:
+ *                 type: string
+ *                 description: "상태 메모 (status가 ETC일 때 필수, roomStatus.statusMemo)"
+ *               setRoomEmpty:
+ *                 type: boolean
+ *                 description: "true 시 room.status=EMPTY, room.startDate/endDate 빈값으로 설정"
+ *     responses:
+ *       200:
+ *         description: 방 이벤트 추가 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/addEventDirectly', roomController.addEventDirectly);
+
+/**
+ * @swagger
  * /v1/room/dashboardCnt:
  *   get:
  *     summary: roomStatus - 계약현황용 대시보드 집계 조회

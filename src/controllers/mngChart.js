@@ -206,17 +206,17 @@ exports.mngChartMain = async (req, res, next) => {
 				INNER JOIN (
 					SELECT roomEsntlId, MAX(updatedAt) as maxUpdatedAt
 					FROM roomStatus
-					WHERE status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE')
+					WHERE status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId 
 					AND RS1.updatedAt = RS2.maxUpdatedAt
-					AND RS1.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE')
+					AND RS1.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
 				WHERE RS1.esntlId = (
 					SELECT esntlId 
 					FROM roomStatus RS3 
 					WHERE RS3.roomEsntlId = RS1.roomEsntlId 
 						AND RS3.updatedAt = RS2.maxUpdatedAt
-						AND RS3.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE')
+						AND RS3.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
 					ORDER BY RS3.esntlId DESC
 					LIMIT 1
 				)
@@ -507,6 +507,7 @@ exports.mngChartMain = async (req, res, next) => {
 				itemType: 'contract',
 				itemStatus: row.status,
 				typeName: getTypeName(row.status, row.statusMemo),
+				statusMemo: row.statusMemo ?? null,
 				start: formattedStart,
 				end: formattedEnd,
 				contractStart: hasContract && row.contractStartDate ? formatDateTime(formatDateOnly(row.contractStartDate)) : null,
@@ -712,6 +713,7 @@ exports.mngChartMain = async (req, res, next) => {
 		});
 
 		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED만 (RESERVE_*, RESERVED, VBANK_PENDING은 items로)
+		// 포함 조건: 생성일이 구간 안에 있거나, 상태 기간(statusStartDate~statusEndDate)이 조회 구간과 겹치는 건 포함 (나중에 입력한 ETC 등도 해당 기간에 표시)
 		const roomStatusesQuery = `
 			SELECT 
 				RS.esntlId AS id,
@@ -736,13 +738,18 @@ exports.mngChartMain = async (req, res, next) => {
 				AND RS.status IN (
 					'ON_SALE', 'CHECKOUT_ONSALE', 'END_DEPOSIT', 'END', 'ETC', 'BEFORE_SALES', 'CHECKOUT_CONFIRMED'
 				)
-				AND DATE(RS.createdAt) >= ?
-				AND DATE(RS.createdAt) < ?
+				AND (
+					(DATE(RS.createdAt) >= ? AND DATE(RS.createdAt) < ?)
+					OR (
+						DATE(COALESCE(RS.statusStartDate, RS.etcStartDate, RS.createdAt)) < ?
+						AND (RS.statusEndDate IS NULL AND RS.etcEndDate IS NULL OR DATE(COALESCE(RS.statusEndDate, RS.etcEndDate)) >= ?)
+					)
+				)
 			ORDER BY RS.createdAt DESC
 		`;
 
 		const roomStatuses = await mariaDBSequelize.query(roomStatusesQuery, {
-			replacements: [gosiwonEsntlId, startDateStr, endDateStr],
+			replacements: [gosiwonEsntlId, startDateStr, endDateStr, endDateStr, startDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -762,13 +769,14 @@ exports.mngChartMain = async (req, res, next) => {
 			const formattedEnd = endDate ? formatDateTime(endDate + ' 23:59:59') : formatDateTime(startDate + ' 23:59:59');
 			const period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
 
-			// items에 roomStatus 전체 값 추가 (계약서 없음 → 계약 관련 null)
+			// items에 roomStatus 전체 값 추가 (계약서 없음 → 계약 관련 null). statusMemo 항상 리턴
 			items.push({
 				id: itemIdCounter++,
 				group: status.roomEsntlId,
 				itemType: 'contract',
 				itemStatus: status.status ?? null,
 				typeName: getTypeName(status.status, status.statusMemo),
+				statusMemo: status.statusMemo ?? null,
 				start: formattedStart,
 				end: formattedEnd,
 				contractStart: null,

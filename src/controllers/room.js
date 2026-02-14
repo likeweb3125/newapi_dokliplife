@@ -2069,3 +2069,108 @@ exports.getTourReservationList = async (req, res, next) => {
 	}
 };
 
+// 방 이벤트 직접 입력 (roomStatus INSERT, 룸투어 예약·입실 불가 기간)
+exports.addEventDirectly = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		verifyAdminToken(req);
+
+		const { roomEsntlId, startDate, endDate, status, statusMemo, setRoomEmpty } = req.body;
+
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId는 필수입니다.');
+		}
+		if (!startDate || !endDate) {
+			errorHandler.errorThrow(400, 'startDate, endDate는 필수입니다.');
+		}
+		if (!status) {
+			errorHandler.errorThrow(400, 'status는 필수입니다.');
+		}
+		if (status !== 'ETC' && status !== 'BEFORE_SALES') {
+			errorHandler.errorThrow(400, 'status는 ETC 또는 BEFORE_SALES만 허용됩니다.');
+		}
+		if (status === 'ETC' && (statusMemo == null || String(statusMemo).trim() === '')) {
+			errorHandler.errorThrow(400, 'status가 ETC일 때 statusMemo는 필수입니다.');
+		}
+
+		// 방 정보 조회 (gosiwonEsntlId)
+		const [roomRow] = await mariaDBSequelize.query(
+			`SELECT esntlId, gosiwonEsntlId FROM room WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (!roomRow) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+		const gosiwonEsntlId = roomRow.gosiwonEsntlId;
+
+		// 날짜를 DB 저장용 datetime 문자열로 (시작 00:00:00, 종료 23:59:59)
+		const startDtm = String(startDate).trim().length === 10 ? `${startDate} 00:00:00` : startDate;
+		const endDtm = String(endDate).trim().length === 10 ? `${endDate} 23:59:59` : endDate;
+
+		const statusId = await idsNext('roomStatus', undefined, transaction);
+		await mariaDBSequelize.query(
+			`
+			INSERT INTO roomStatus (
+				esntlId,
+				roomEsntlId,
+				gosiwonEsntlId,
+				status,
+				statusStartDate,
+				statusEndDate,
+				etcStartDate,
+				etcEndDate,
+				statusMemo,
+				createdAt,
+				updatedAt
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+			`,
+			{
+				replacements: [
+					statusId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					status,
+					startDtm,
+					endDtm,
+					startDtm,
+					endDtm,
+					status === 'ETC' ? (statusMemo != null ? String(statusMemo).trim() : null) : null,
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+
+		if (setRoomEmpty === true || setRoomEmpty === 'true') {
+			await mariaDBSequelize.query(
+				`UPDATE room SET status = 'EMPTY', startDate = NULL, endDate = NULL WHERE esntlId = ?`,
+				{
+					replacements: [roomEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+
+		await transaction.commit();
+
+		return errorHandler.successThrow(res, '방 이벤트가 추가되었습니다.', {
+			roomStatusEsntlId: statusId,
+			roomEsntlId,
+			gosiwonEsntlId,
+			status,
+			statusStartDate: startDtm,
+			statusEndDate: endDtm,
+			statusMemo: status === 'ETC' ? (statusMemo != null ? String(statusMemo).trim() : null) : null,
+			roomEmptyUpdated: !!(setRoomEmpty === true || setRoomEmpty === 'true'),
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
