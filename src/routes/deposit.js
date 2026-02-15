@@ -432,22 +432,28 @@ router.get('/reservationHistoryList', depositController.getDepositGroupByDeposit
  * @swagger
  * /v1/deposit/reservationDelete:
  *   delete:
- *     summary: 예약금 요청 취소
- *     description: 보증금 정보를 삭제 처리합니다. deleteYN을 'Y'로 설정하고, status를 'DELETED'로 변경하며, 삭제 이력을 depositHistory에 기록합니다.
+ *     summary: 예약금/보증금 삭제
+ *     description: "depositEsntlId(보증금 PK)로 il_room_deposit만 soft delete(rdp_delete_dtm, rdp_deleter_id 업데이트)합니다. il_room_deposit_history는 삭제하지 않습니다."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: esntlId
+ *         name: depositEsntlId
  *         required: true
  *         schema:
  *           type: string
- *         description: 보증금 고유 아이디
- *         example: DEPO0000000001
+ *         description: 보증금 고유 아이디 (il_room_deposit.rdp_eid)
+ *         example: RDP0000000001
+ *       - in: query
+ *         name: esntlId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "depositEsntlId와 동일 (호환용)"
  *     responses:
  *       200:
- *         description: 예약금 요청 취소 성공
+ *         description: 보증금 삭제 성공
  *         content:
  *           application/json:
  *             schema:
@@ -462,10 +468,10 @@ router.get('/reservationHistoryList', depositController.getDepositGroupByDeposit
  *                 data:
  *                   type: object
  *                   properties:
- *                     esntlId:
+ *                     depositEsntlId:
  *                       type: string
  *                       description: 삭제된 보증금 고유 아이디
- *                       example: DEPO0000000001
+ *                       example: RDP0000000001
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

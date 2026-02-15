@@ -545,12 +545,11 @@ exports.getRealTimeStats = async (req, res, next) => {
 		const monthFormatted = String(month).padStart(2, '0');
 		const dayFormatted = String(day).padStart(2, '0');
 
-		// 오늘 날짜 (서울 시간 기준)
+		// 오늘 날짜 (로컬 시스템 기준, UTC/+9 변환 금지)
 		const now = new Date();
-		const seoulTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-		const todayYear = seoulTime.getUTCFullYear();
-		const todayMonth = String(seoulTime.getUTCMonth() + 1).padStart(2, '0');
-		const todayDay = String(seoulTime.getUTCDate()).padStart(2, '0');
+		const todayYear = now.getFullYear();
+		const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+		const todayDay = String(now.getDate()).padStart(2, '0');
 		const todayDateStr = `${todayYear}-${todayMonth}-${todayDay}`;
 
 		const targetDateStr = `${year}-${monthFormatted}-${dayFormatted}`;
@@ -859,12 +858,11 @@ exports.getContractStats = async (req, res, next) => {
 		const monthFormatted = String(month).padStart(2, '0');
 		const dayFormatted = String(day).padStart(2, '0');
 
-		// 오늘 날짜 (서울 시간 기준)
+		// 오늘 날짜 (로컬 시스템 기준, UTC/+9 변환 금지)
 		const now = new Date();
-		const seoulTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-		const todayYear = seoulTime.getUTCFullYear();
-		const todayMonth = String(seoulTime.getUTCMonth() + 1).padStart(2, '0');
-		const todayDay = String(seoulTime.getUTCDate()).padStart(2, '0');
+		const todayYear = now.getFullYear();
+		const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+		const todayDay = String(now.getDate()).padStart(2, '0');
 		const todayDateStr = `${todayYear}-${todayMonth}-${todayDay}`;
 
 		const targetDateStr = `${year}-${monthFormatted}-${dayFormatted}`;
