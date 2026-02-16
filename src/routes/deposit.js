@@ -1016,8 +1016,8 @@ router.get('/depositInfo', depositController.getDepositInfo);
  * @swagger
  * /v1/deposit/depositCreate:
  *   post:
- *     summary: 보증금 등록 (type=DEPOSIT 고정)
- *     description: '보증금을 등록합니다. type은 DEPOSIT만 허용되며 다른 값이면 오류를 반환합니다.'
+ *     summary: 보증금 추가 입금 등록 (il_room_deposit_history만 INSERT)
+ *     description: "reservationRegist로 최초 생성된 보증금(il_room_deposit)에 대해 추가 입금 이력을 il_room_deposit_history에만 등록합니다. il_room_deposit는 생성/수정하지 않으며, 입금 합계가 목표 금액에 도달하면 rdp_completed_dtm만 갱신합니다."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -1028,39 +1028,25 @@ router.get('/depositInfo', depositController.getDepositInfo);
  *           schema:
  *             type: object
  *             required:
- *               - roomEsntlId
- *               - gosiwonEsntlId
+ *               - depositEsntlId
  *               - amount
- *               - depositDate
  *             properties:
- *               roomEsntlId:
+ *               depositEsntlId:
  *                 type: string
- *                 description: 방 고유 아이디
- *                 example: ROOM0000019357
- *               gosiwonEsntlId:
- *                 type: string
- *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000199
- *               customerEsntlId:
- *                 type: string
- *                 description: 예약자/입실자 고유 아이디 (DEPOSIT 타입일 때만 유효)
- *                 example: CUTR0000000001
- *               contractorEsntlId:
- *                 type: string
- *                 description: 계약자 고유 아이디 (DEPOSIT 타입일 때만 유효)
- *                 example: CUTR0000000001
+ *                 description: "보증금 고유 아이디 (il_room_deposit.rdp_eid). reservationRegist로 생성된 건만 유효"
+ *                 example: RDP0000000001
  *               contractEsntlId:
  *                 type: string
  *                 description: 방계약 고유 아이디 (선택)
  *                 example: RCO0000000001
  *               amount:
  *                 type: integer
- *                 description: 입금금액
+ *                 description: 이번 입금 금액
  *                 example: 500000
  *               depositDate:
  *                 type: string
  *                 format: date-time
- *                 description: 입금일시
+ *                 description: 입금일시 (선택, 미입력 시 현재 시각)
  *                 example: '2024-01-01T10:00:00'
  *               depositorName:
  *                 type: string
@@ -1070,27 +1056,6 @@ router.get('/depositInfo', depositController.getDepositInfo);
  *                 type: string
  *                 description: 입금자 전화번호
  *                 example: '010-1234-5678'
- *               accountBank:
- *                 type: string
- *                 description: 은행명
- *                 example: '신한은행'
- *               accountNumber:
- *                 type: string
- *                 description: 계좌번호
- *                 example: '110-123-456789'
- *               accountHolder:
- *                 type: string
- *                 description: 예금주명
- *                 example: '홍길동'
- *               virtualAccountNumber:
- *                 type: string
- *                 description: 가상계좌번호
- *                 example: '1234567890'
- *               virtualAccountExpiryDate:
- *                 type: string
- *                 format: date-time
- *                 description: 가상계좌 만료일시
- *                 example: '2024-01-31T23:59:59'
  *     responses:
  *       200:
  *         description: 보증금 등록 성공
@@ -1108,17 +1073,26 @@ router.get('/depositInfo', depositController.getDepositInfo);
  *                 data:
  *                   type: object
  *                   properties:
- *                     esntlId:
+ *                     depositEsntlId:
  *                       type: string
- *                       description: 생성/수정된 보증금 고유 아이디
+ *                       description: 보증금 고유 아이디
  *                       example: RDP0000000001
- *                     updated:
- *                       type: boolean
- *                       description: 기존 레코드 금액만 업데이트된 경우 true
- *                     receiver:
+ *                     historyId:
  *                       type: string
- *                       description: 수신자 휴대폰 번호 (depositorPhone/expectedOccupantPhone). 알림톡 발송 시 YawnMessage.send()의 targetData.receiver로 넘기면 msl_send_tel_no에 정상 저장됨
- *                       example: '01012345678'
+ *                       description: 생성된 il_room_deposit_history 고유 아이디
+ *                       example: RDPH0000000001
+ *                     amount:
+ *                       type: integer
+ *                       description: 이번 입금 금액
+ *                       example: 500000
+ *                     status:
+ *                       type: string
+ *                       description: "PARTIAL 또는 COMPLETED"
+ *                       example: COMPLETED
+ *                     unpaidAmount:
+ *                       type: integer
+ *                       description: 미납 잔액 (목표 금액 - 입금 합계)
+ *                       example: 0
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

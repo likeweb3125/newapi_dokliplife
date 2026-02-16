@@ -212,7 +212,7 @@ exports.getDepositInfo = async (req, res, next) => {
 	}
 };
 
-// 보증금 등록
+// 보증금 추가 입금 등록 (depositCreate) - il_room_deposit 생성 없음, il_room_deposit_history만 INSERT. reservationRegist로 최초 생성된 보증금에 추가 입금 시 사용. 합계가 목표 금액 도달 시 rdp_completed_dtm 업데이트
 exports.createDeposit = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
@@ -220,201 +220,95 @@ exports.createDeposit = async (req, res, next) => {
 		const registrantId = decodedToken.admin || decodedToken.partner;
 
 		const {
+			depositEsntlId,
 			roomEsntlId,
 			gosiwonEsntlId,
-			customerEsntlId,
-			contractorEsntlId,
 			contractEsntlId,
 			amount,
-			reservationDepositAmount, // 하위 호환성
-			depositAmount, // 하위 호환성
-			accountBank,
-			accountNumber,
-			accountHolder,
-			expectedOccupantName,
-			expectedOccupantPhone,
-			moveInDate,
-			moveOutDate,
-			contractStatus,
-			virtualAccountNumber,
-			virtualAccountExpiryDate,
+			reservationDepositAmount,
+			depositAmount,
 			depositDate,
 			depositorName,
 			depositorPhone,
 		} = req.body;
 
-		// type은 DEPOSIT으로 고정
-		const type = 'DEPOSIT';
-
-		if (!roomEsntlId || !gosiwonEsntlId) {
-			errorHandler.errorThrow(400, 'roomEsntlId와 gosiwonEsntlId는 필수입니다.');
-		}
-
-		// amount가 없으면 하위 호환성을 위해 기존 필드에서 가져오기
-		let finalAmount = amount;
-		if (!finalAmount || finalAmount === 0) {
-			if (depositAmount) {
-				finalAmount = depositAmount;
-			} else if (reservationDepositAmount) {
-				finalAmount = reservationDepositAmount;
-			} else {
-				finalAmount = 0;
-			}
-		}
-
-		if (!finalAmount || finalAmount <= 0) {
+		const paidAmount = amount ?? depositAmount ?? reservationDepositAmount ?? 0;
+		const finalAmount = parseInt(paidAmount, 10) || 0;
+		if (finalAmount <= 0) {
 			errorHandler.errorThrow(400, 'amount는 0보다 큰 값이어야 합니다.');
 		}
 
-		// il_room_deposit에 저장할 이름/전화번호 (rdp_customer_name, rdp_customer_phone)
-		const customerNameForDeposit = (depositorName || expectedOccupantName || '').trim() || null;
-		const customerPhoneForDeposit = (depositorPhone || expectedOccupantPhone || '').trim() || null;
+		// 기존 il_room_deposit 조회 (depositEsntlId = rdp_eid). 없으면 404 (reservationRegist로 최초 등록된 건만 추가 입금 가능)
+		const depositEsntlIdVal = depositEsntlId || null;
+		if (!depositEsntlIdVal) {
+			errorHandler.errorThrow(400, 'depositEsntlId(il_room_deposit.rdp_eid)는 필수입니다.');
+		}
 
-		// 같은 고시원·방·이름·전화번호로 이미 미삭제 레코드가 있으면 금액(rdp_price)만 업데이트
 		const existingDeposit = await ilRoomDeposit.findOne({
-			where: {
-				gosiwonEsntlId,
-				roomEsntlId,
-				customerName: customerNameForDeposit,
-				customerPhone: customerPhoneForDeposit,
-				deleteDtm: null,
-			},
+			where: { esntlId: depositEsntlIdVal, deleteDtm: null },
 			transaction,
 		});
+		if (!existingDeposit) {
+			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다. reservationRegist로 최초 등록 후 추가 입금해 주세요.');
+		}
 
-		if (existingDeposit) {
-			await ilRoomDeposit.update(
-				{
-					amount: finalAmount,
-					updateDtm: mariaDBSequelize.literal('NOW()'),
-					updaterId: registrantId,
+		const targetAmount = Number(existingDeposit.amount) || 0;
+		const existingSum =
+			(await ilRoomDepositHistory.sum('amount', {
+				where: {
+					depositEsntlId: depositEsntlIdVal,
+					type: 'DEPOSIT',
+					status: { [Op.in]: ['COMPLETED', 'PARTIAL'] },
 				},
-				{
-					where: { esntlId: existingDeposit.esntlId },
-					transaction,
-				}
-			);
-			await transaction.commit();
-			return errorHandler.successThrow(res, '보증금 등록 성공', {
-				esntlId: existingDeposit.esntlId,
-				updated: true,
-				receiver: customerPhoneForDeposit || undefined,
-			});
-		}
-
-		// 방 존재 여부 확인
-		const roomInfo = await room.findOne({
-			where: { esntlId: roomEsntlId },
-			transaction,
-		});
-
-		if (!roomInfo) {
-			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
-		}
-
-		// 고시원 존재 여부 확인
-		const gosiwonInfo = await gosiwon.findOne({
-			where: { esntlId: gosiwonEsntlId },
-			transaction,
-		});
-
-		if (!gosiwonInfo) {
-			errorHandler.errorThrow(404, '고시원 정보를 찾을 수 없습니다.');
-		}
-
-		// customerEsntlId 존재 여부 확인 (값이 있는 경우만)
-		let finalCustomerEsntlId = null;
-		if (customerEsntlId) {
-			const customerInfo = await customer.findOne({
-				where: { esntlId: customerEsntlId },
 				transaction,
-			});
-			if (!customerInfo) {
-				errorHandler.errorThrow(404, '예약자/입실자 정보를 찾을 수 없습니다.');
-			}
-			finalCustomerEsntlId = customerEsntlId;
-		}
+			})) || 0;
+		const totalPaidAfter = existingSum + finalAmount;
+		const depositStatus =
+			targetAmount <= 0 || totalPaidAfter >= targetAmount ? 'COMPLETED' : 'PARTIAL';
+		const unpaidAmount = Math.max(0, targetAmount - totalPaidAfter);
 
-		// contractorEsntlId 존재 여부 확인 (값이 있는 경우만)
-		let finalContractorEsntlId = null;
-		if (contractorEsntlId) {
-			const contractorInfo = await customer.findOne({
-				where: { esntlId: contractorEsntlId },
-				transaction,
-			});
-			if (!contractorInfo) {
-				errorHandler.errorThrow(404, '계약자 정보를 찾을 수 없습니다.');
-			}
-			finalContractorEsntlId = contractorEsntlId;
-		}
-
-		const esntlId = await generateIlRoomDepositId(transaction);
-
-		// 돈이 들어온 뒤 확정 입력이므로 COMPLETED로 등록 (completedDtm: 한국 시간 NOW() 또는 입금일)
-		const completedDtm = depositDate ? new Date(depositDate) : mariaDBSequelize.literal('NOW()');
-
-		const newDeposit = await ilRoomDeposit.create(
-			{
-				esntlId,
-				roomEsntlId,
-				gosiwonEsntlId,
-				customerName: customerNameForDeposit,
-				customerPhone: customerPhoneForDeposit,
-				customerEsntlId: finalCustomerEsntlId,
-				contractorEsntlId: finalContractorEsntlId,
-				contractEsntlId: contractEsntlId || null,
-				amount: finalAmount,
-				paidAmount: 0,
-				unpaidAmount: finalAmount,
-				accountBank: accountBank || null,
-				accountNumber: accountNumber || null,
-				accountHolder: accountHolder || null,
-				status: 'PENDING',
-				depositDate: depositDate || null,
-				depositorName: depositorName || null,
-				depositorPhone: depositorPhone || null,
-				virtualAccountNumber: virtualAccountNumber || null,
-				virtualAccountExpiryDate: virtualAccountExpiryDate || null,
-				deleteYN: 'N',
-				registrantId,
-				updaterId: registrantId,
-				completedDtm,
-			},
-			{ transaction }
-		);
-
-		// 계약서 보증금 대비 납입 합계로 PARTIAL/COMPLETED 및 미납액 결정
-		const { depositStatus, unpaidAmount } = await resolveDepositHistoryStatus(
-			roomEsntlId,
-			contractEsntlId || null,
-			finalAmount,
-			transaction
-		);
-
-		// 입금 확정 이력 생성 (il_room_deposit_history) - RDPH prefix, unpaidAmount = 계약 보증금 - 입금 합계
+		// il_room_deposit_history에만 INSERT (예전 방식대로 이력 쌓기)
 		const historyId = await generateIlRoomDepositHistoryId(transaction);
 		await ilRoomDepositHistory.create(
 			{
 				esntlId: historyId,
-				depositEsntlId: esntlId,
-				roomEsntlId: roomEsntlId,
+				depositEsntlId: depositEsntlIdVal,
+				roomEsntlId: existingDeposit.roomEsntlId,
 				contractEsntlId: contractEsntlId || null,
 				type: 'DEPOSIT',
 				amount: finalAmount,
 				status: depositStatus,
 				unpaidAmount,
-				depositorName: depositorName || null,
+				depositorName: (depositorName != null && String(depositorName).trim()) ? String(depositorName).trim() : null,
 				depositDate: depositDate || null,
-				manager: '시스템',
+				manager: decodedToken.admin?.name || '관리자',
 			},
 			{ transaction }
 		);
 
+		// 입금 합계가 보증금 목표 금액에 도달하면 il_room_deposit.rdp_completed_dtm 업데이트
+		if (totalPaidAfter >= targetAmount && targetAmount > 0) {
+			await ilRoomDeposit.update(
+				{
+					completedDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
+					updateDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
+					updaterId: registrantId,
+				},
+				{
+					where: { esntlId: depositEsntlIdVal },
+					transaction,
+				}
+			);
+		}
+
 		await transaction.commit();
 
 		return errorHandler.successThrow(res, '보증금 등록 성공', {
-			esntlId: newDeposit.esntlId,
-			receiver: customerPhoneForDeposit || undefined,
+			depositEsntlId: depositEsntlIdVal,
+			historyId,
+			amount: finalAmount,
+			status: depositStatus,
+			unpaidAmount,
 		});
 	} catch (error) {
 		await transaction.rollback();
