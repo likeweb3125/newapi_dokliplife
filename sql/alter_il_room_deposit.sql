@@ -7,13 +7,7 @@
 SET NAMES utf8mb3 COLLATE utf8mb3_general_ci;
 
 -- ---------------------------------------------
--- 1. rdp_memo 컬럼 추가 (메모 CRUD API용)
--- ---------------------------------------------
-ALTER TABLE il_room_deposit
-ADD COLUMN rdp_memo TEXT NULL COMMENT '메모' AFTER rdp_return_dtm;
-
--- ---------------------------------------------
--- 2. 인덱스 추가 (reservationList 등 방별 최신 1건 쿼리용)
+-- 1. 인덱스 추가 (reservationList 등 방별 최신 1건 쿼리용)
 -- ---------------------------------------------
 -- rom_eid + rdp_delete_dtm + rdp_regist_dtm 로 방별 미삭제·최신 1건 조회 가속
 -- 기존 동일 인덱스가 있으면 에러. 필요 시 DROP 후 실행.

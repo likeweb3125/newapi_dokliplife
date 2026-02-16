@@ -212,134 +212,6 @@ exports.getDepositInfo = async (req, res, next) => {
 	}
 };
 
-// il_room_deposit 메모 조회 (Read)
-exports.getDepositMemo = async (req, res, next) => {
-	try {
-		verifyAdminToken(req);
-		const { depositEsntlId } = req.query;
-		if (!depositEsntlId) {
-			errorHandler.errorThrow(400, 'depositEsntlId를 입력해주세요.');
-		}
-		const row = await ilRoomDeposit.findOne({
-			where: { esntlId: depositEsntlId, deleteDtm: null },
-			attributes: ['esntlId', 'memo'],
-		});
-		if (!row) {
-			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
-		}
-		return errorHandler.successThrow(res, '보증금 메모 조회 성공', {
-			depositEsntlId: row.esntlId,
-			memo: row.memo ?? null,
-		});
-	} catch (error) {
-		next(error);
-	}
-};
-
-// il_room_deposit 메모 등록 (Create)
-exports.createDepositMemo = async (req, res, next) => {
-	const transaction = await mariaDBSequelize.transaction();
-	try {
-		const decodedToken = verifyAdminToken(req);
-		const { depositEsntlId, memo } = req.body;
-		if (!depositEsntlId) {
-			errorHandler.errorThrow(400, 'depositEsntlId는 필수입니다.');
-		}
-		const deposit = await ilRoomDeposit.findOne({
-			where: { esntlId: depositEsntlId, deleteDtm: null },
-			transaction,
-		});
-		if (!deposit) {
-			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
-		}
-		const memoVal = memo != null ? String(memo).trim() || null : null;
-		await ilRoomDeposit.update(
-			{
-				memo: memoVal,
-				updateDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
-				updaterId: getWriterAdminId(decodedToken),
-			},
-			{ where: { esntlId: depositEsntlId }, transaction }
-		);
-		await transaction.commit();
-		return errorHandler.successThrow(res, '보증금 메모 등록 성공', {
-			depositEsntlId,
-			memo: memoVal,
-		});
-	} catch (error) {
-		await transaction.rollback();
-		next(error);
-	}
-};
-
-// il_room_deposit 메모 수정 (Update)
-exports.updateDepositMemo = async (req, res, next) => {
-	const transaction = await mariaDBSequelize.transaction();
-	try {
-		const decodedToken = verifyAdminToken(req);
-		const { depositEsntlId, memo } = req.body;
-		if (!depositEsntlId) {
-			errorHandler.errorThrow(400, 'depositEsntlId는 필수입니다.');
-		}
-		const deposit = await ilRoomDeposit.findOne({
-			where: { esntlId: depositEsntlId, deleteDtm: null },
-			transaction,
-		});
-		if (!deposit) {
-			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
-		}
-		const memoVal = memo != null ? String(memo).trim() || null : null;
-		await ilRoomDeposit.update(
-			{
-				memo: memoVal,
-				updateDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
-				updaterId: getWriterAdminId(decodedToken),
-			},
-			{ where: { esntlId: depositEsntlId }, transaction }
-		);
-		await transaction.commit();
-		return errorHandler.successThrow(res, '보증금 메모 수정 성공', {
-			depositEsntlId,
-			memo: memoVal,
-		});
-	} catch (error) {
-		await transaction.rollback();
-		next(error);
-	}
-};
-
-// il_room_deposit 메모 삭제 (Delete - 메모 내용만 비움)
-exports.deleteDepositMemo = async (req, res, next) => {
-	const transaction = await mariaDBSequelize.transaction();
-	try {
-		const decodedToken = verifyAdminToken(req);
-		const { depositEsntlId } = req.query;
-		if (!depositEsntlId) {
-			errorHandler.errorThrow(400, 'depositEsntlId를 입력해주세요.');
-		}
-		const deposit = await ilRoomDeposit.findOne({
-			where: { esntlId: depositEsntlId, deleteDtm: null },
-			transaction,
-		});
-		if (!deposit) {
-			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
-		}
-		await ilRoomDeposit.update(
-			{
-				memo: null,
-				updateDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
-				updaterId: getWriterAdminId(decodedToken),
-			},
-			{ where: { esntlId: depositEsntlId }, transaction }
-		);
-		await transaction.commit();
-		return errorHandler.successThrow(res, '보증금 메모 삭제 성공', { depositEsntlId });
-	} catch (error) {
-		await transaction.rollback();
-		next(error);
-	}
-};
-
 // 보증금 추가 입금 등록 (depositCreate) - il_room_deposit 생성 없음, il_room_deposit_history만 INSERT. reservationRegist로 최초 등록된 보증금에 추가 입금 시 사용. 합계가 목표 금액 도달 시 rdp_completed_dtm 업데이트
 exports.createDeposit = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
@@ -660,11 +532,13 @@ exports.deleteDepositOnly = async (req, res, next) => {
 			errorHandler.errorThrow(404, '보증금 정보를 찾을 수 없습니다.');
 		}
 
-		// 보증금 삭제 처리 (il_room_deposit)
+		// 보증금 soft delete (il_room_deposit: rdp_delete_dtm, rdp_deleter_id만 갱신. deleteYN/status 컬럼 없음)
 		await ilRoomDeposit.update(
 			{
-				deleteYN: 'Y',
-				status: 'DELETED',
+				deleteDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
+				deleterId: getWriterAdminId(decodedToken),
+				updateDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
+				updaterId: getWriterAdminId(decodedToken),
 			},
 			{
 				where: { esntlId: esntlId },

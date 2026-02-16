@@ -1032,135 +1032,6 @@ router.get('/depositInfo', depositController.getDepositInfo);
 
 /**
  * @swagger
- * /v1/deposit/memo:
- *   get:
- *     summary: 보증금 메모 조회 (Read)
- *     description: "il_room_deposit.rdp_memo를 depositEsntlId로 조회합니다. depositInfo 응답에도 memo가 포함됩니다."
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: depositEsntlId
- *         required: true
- *         schema:
- *           type: string
- *         description: "보증금 고유 아이디 (il_room_deposit.rdp_eid)"
- *     responses:
- *       200:
- *         description: 보증금 메모 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: object
- *                   properties:
- *                     depositEsntlId:
- *                       type: string
- *                     memo:
- *                       type: string
- *                       nullable: true
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- */
-router.get('/memo', depositController.getDepositMemo);
-
-/**
- * @swagger
- * /v1/deposit/memo:
- *   post:
- *     summary: 보증금 메모 등록 (Create)
- *     description: "il_room_deposit.rdp_memo에 메모를 등록합니다. 기존 메모가 있으면 덮어씁니다."
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - depositEsntlId
- *             properties:
- *               depositEsntlId:
- *                 type: string
- *                 description: "보증금 고유 아이디"
- *               memo:
- *                 type: string
- *                 nullable: true
- *                 description: 메모 내용 (빈 문자열이면 null로 저장)
- *     responses:
- *       200:
- *         description: 보증금 메모 등록 성공
- *       404:
- *         $ref: '#/components/responses/NotFound'
- */
-router.post('/memo', depositController.createDepositMemo);
-
-/**
- * @swagger
- * /v1/deposit/memo:
- *   put:
- *     summary: 보증금 메모 수정 (Update)
- *     description: "il_room_deposit.rdp_memo를 수정합니다."
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - depositEsntlId
- *             properties:
- *               depositEsntlId:
- *                 type: string
- *                 description: "보증금 고유 아이디"
- *               memo:
- *                 type: string
- *                 nullable: true
- *                 description: 메모 내용 (빈 문자열이면 null로 저장)
- *     responses:
- *       200:
- *         description: 보증금 메모 수정 성공
- *       404:
- *         $ref: '#/components/responses/NotFound'
- */
-router.put('/memo', depositController.updateDepositMemo);
-
-/**
- * @swagger
- * /v1/deposit/memo:
- *   delete:
- *     summary: 보증금 메모 삭제 (Delete)
- *     description: "il_room_deposit.rdp_memo를 null로 비웁니다. 보증금 행은 삭제되지 않습니다."
- *     tags: [Deposit]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: depositEsntlId
- *         required: true
- *         schema:
- *           type: string
- *         description: "보증금 고유 아이디"
- *     responses:
- *       200:
- *         description: 보증금 메모 삭제 성공
- *       404:
- *         $ref: '#/components/responses/NotFound'
- */
-router.delete('/memo', depositController.deleteDepositMemo);
-
-/**
- * @swagger
  * /v1/deposit/depositCreate:
  *   post:
  *     summary: 보증금 추가 입금 등록 (il_room_deposit_history만 INSERT)
@@ -1257,8 +1128,8 @@ router.put('/update', depositController.updateDeposit);
  * @swagger
  * /v1/deposit/depositDelete:
  *   delete:
- *     summary: 보증금 삭제 (type=DEPOSIT만)
- *     description: '보증금 정보를 삭제합니다. type이 DEPOSIT인 경우만 삭제 가능합니다. deleteYN을 Y로 설정하고, status를 DELETED로 변경하며, 삭제 이력을 depositHistory에 기록합니다.'
+ *     summary: 보증금 삭제 (il_room_deposit soft delete)
+ *     description: "il_room_deposit를 soft delete합니다. rdp_delete_dtm, rdp_deleter_id를 갱신하고, il_room_deposit_history에 삭제 이력(DELETED) 1건을 남깁니다. il_room_deposit에는 deleteYN/status 컬럼이 없습니다."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
