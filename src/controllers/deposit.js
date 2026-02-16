@@ -693,10 +693,12 @@ exports.registerDeposit = async (req, res, next) => {
 	try {
 		const decodedToken = verifyAdminToken(req);
 
-		// 1. 입금일자, 입금자, 납입금액을 받는다. (type은 RESERVATION 고정, contractEsntlId는 선택)
+		// 1. 입금일자, 입금자, 전화번호, 입실예정일, 납입금액 등 (il_room_deposit: rdp_customer_name, rdp_customer_phone, rdp_check_in_date)
 		const {
 			depositDate,
 			depositorName,
+			depositorPhone,
+			checkInDate,
 			paidAmount,
 			amount,
 			roomEsntlId,
@@ -746,76 +748,38 @@ exports.registerDeposit = async (req, res, next) => {
 		const paidAmountInt = parseInt(inputPaidAmount, 10) || 0;
 		const depositAmountValue = paidAmountInt;
 
-		// 계약서(방) 보증금 대비 납입 합계로 PARTIAL/COMPLETED 및 미납액 결정
-		const { depositStatus, unpaidAmount } = await resolveDepositHistoryStatus(
-			finalRoomEsntlId,
-			finalContractEsntlId,
-			paidAmountInt,
-			transaction
-		);
-
 		const managerId = getWriterAdminId(decodedToken);
 		const newDepositId = await generateIlRoomDepositId(transaction);
 
 		const finalAmount = depositAmountValue;
 
-		// il_room_deposit 메인 레코드 생성 (예약금 입력 = 보증금으로 등록)
-		// registrantId, updaterId: ilRoomDeposit 모델 필수 (rdp_registrant_id, rdp_updater_id)
+		// il_room_deposit 메인 레코드 생성 (예약금 입력 = 보증금으로 등록). 컬럼: rdp_customer_name, rdp_customer_phone, rdp_check_in_date
+		const customerNameVal = (depositorName != null && String(depositorName).trim()) ? String(depositorName).trim() : null;
+		const customerPhoneVal = (depositorPhone != null && String(depositorPhone).trim()) ? String(depositorPhone).trim() : null;
+		const checkInDateVal = checkInDate ? (typeof checkInDate === 'string' ? checkInDate.split('T')[0] : null) : null;
+
+		// il_room_deposit 등록 시 rdp_completed_dtm(completedDtm)은 입력하지 않음
 		await ilRoomDeposit.create(
 			{
 				esntlId: newDepositId,
 				roomEsntlId: finalRoomEsntlId,
 				gosiwonEsntlId: finalGosiwonEsntlId,
-				customerEsntlId: customerEsntlId,
-				contractorEsntlId: contractorEsntlId,
-				contractEsntlId: finalContractEsntlId,
+				customerName: customerNameVal,
+				customerPhone: customerPhoneVal,
 				amount: finalAmount,
-				paidAmount: 0,
-				unpaidAmount: 0,
-				accountBank: null,
-				accountNumber: null,
-				accountHolder: null,
-				status: depositStatus,
-				manager: managerId,
-				depositDate: depositDate,
-				depositorName: depositorName || null,
-				depositorPhone: null,
-				virtualAccountNumber: null,
-				virtualAccountExpiryDate: null,
-				deleteYN: 'N',
+				checkInDate: checkInDateVal,
 				registrantId: managerId,
 				updaterId: managerId,
 			},
 			{ transaction }
 		);
 
-		// 입금 이력 생성 (il_room_deposit_history) - unpaidAmount = 계약 보증금 - 입금 합계
-		const historyId = await generateIlRoomDepositHistoryId(transaction);
-		await ilRoomDepositHistory.create(
-			{
-				esntlId: historyId,
-				depositEsntlId: newDepositId,
-				roomEsntlId: finalRoomEsntlId,
-				contractEsntlId: finalContractEsntlId,
-				type: 'DEPOSIT',
-				amount: paidAmountInt,
-				status: depositStatus,
-				unpaidAmount,
-				depositorName: depositorName || null,
-				depositDate: depositDate,
-				manager: decodedToken.admin?.name || '관리자',
-			},
-			{ transaction }
-		);
+		// reservationRegist에서는 il_room_deposit_history INSERT 하지 않음
 
 		await transaction.commit();
 
 		return errorHandler.successThrow(res, '입금 등록 성공', {
 			depositEsntlId: newDepositId,
-			historyId: historyId,
-			status: depositStatus,
-			paidAmount: paidAmountInt,
-			unpaidAmount: 0,
 			amount: finalAmount,
 		});
 	} catch (error) {
@@ -1731,7 +1695,7 @@ exports.getDepositList = async (req, res, next) => {
 					WHEN DH.status IN ('COMPLETED', 'RETURN_COMPLETED') THEN 'COMPLETE'
 					ELSE DH.status
 				END as depositStatus,
-				D.rdp_price as depositLastestAmount,
+				(SELECT COALESCE(SUM(H_sum.amount), 0) FROM il_room_deposit_history H_sum WHERE H_sum.depositEsntlId = D.rdp_eid) as depositLastestAmount,
 				DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i') as depositLastestTime,
 				D.rdp_regist_dtm as depositCreatedAt,
 				(

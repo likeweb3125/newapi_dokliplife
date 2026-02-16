@@ -262,7 +262,14 @@ router.get('/reservationList', depositController.getReservationList);
  *                 description: 입금일시
  *               depositorName:
  *                 type: string
- *                 description: 입금자명
+ *                 description: "입금자명 (il_room_deposit.rdp_customer_name)"
+ *               depositorPhone:
+ *                 type: string
+ *                 description: "입금자 전화번호 (il_room_deposit.rdp_customer_phone)"
+ *               checkInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: "입실예정일 (il_room_deposit.rdp_check_in_date, YYYY-MM-DD)"
  *               amount:
  *                 type: integer
  *                 description: 입금금액
