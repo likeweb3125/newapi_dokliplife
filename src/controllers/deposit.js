@@ -155,6 +155,7 @@ exports.getDepositInfo = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
 		}
 
+		// ilRoomDeposit에는 customer/contractor association 없음 (rdp_customer_name, rdp_customer_phone만 있음)
 		const depositInfo = await ilRoomDeposit.findOne({
 			where: {
 				esntlId: esntlId,
@@ -170,18 +171,6 @@ exports.getDepositInfo = async (req, res, next) => {
 					model: gosiwon,
 					as: 'gosiwon',
 					attributes: ['esntlId', 'name'],
-					required: false,
-				},
-				{
-					model: customer,
-					as: 'customer',
-					attributes: ['esntlId', 'name', 'phone'],
-					required: false,
-				},
-				{
-					model: customer,
-					as: 'contractor',
-					attributes: ['esntlId', 'name', 'phone'],
 					required: false,
 				},
 			],
@@ -693,12 +682,13 @@ exports.registerDeposit = async (req, res, next) => {
 	try {
 		const decodedToken = verifyAdminToken(req);
 
-		// 1. 입금일자, 입금자, 전화번호, 입실예정일, 납입금액 등 (il_room_deposit: rdp_customer_name, rdp_customer_phone, rdp_check_in_date)
+		// 1. 입금일자, 입금자, 전화번호, 입실예정일, 납입금액, 메모 등 (il_room_deposit + il_room_deposit_history)
 		const {
 			depositDate,
 			depositorName,
 			depositorPhone,
 			checkInDate,
+			memo,
 			paidAmount,
 			amount,
 			roomEsntlId,
@@ -774,12 +764,30 @@ exports.registerDeposit = async (req, res, next) => {
 			{ transaction }
 		);
 
-		// reservationRegist에서는 il_room_deposit_history INSERT 하지 않음
+		// il_room_deposit_history에 PENDING 상태로 1건 등록 (type DEPOSIT, unpaidAmount = 요청 보증금, memo 포함)
+		const historyId = await generateIlRoomDepositHistoryId(transaction);
+		await ilRoomDepositHistory.create(
+			{
+				esntlId: historyId,
+				depositEsntlId: newDepositId,
+				roomEsntlId: finalRoomEsntlId,
+				contractEsntlId: finalContractEsntlId,
+				type: 'DEPOSIT',
+				amount: 0,
+				status: 'PENDING',
+				unpaidAmount: finalAmount,
+				depositorName: customerNameVal,
+				memo: (memo != null && String(memo).trim()) ? String(memo).trim() : null,
+				manager: decodedToken.admin?.name || '관리자',
+			},
+			{ transaction }
+		);
 
 		await transaction.commit();
 
 		return errorHandler.successThrow(res, '입금 등록 성공', {
 			depositEsntlId: newDepositId,
+			historyId,
 			amount: finalAmount,
 		});
 	} catch (error) {
@@ -1080,6 +1088,63 @@ exports.getRoomDepositList = async (req, res, next) => {
 		});
 
 		// unpaidAmount는 DB에 저장된 값 사용 (계약 보증금 - 그동안 입금 합계)
+		const result = (rows || []).map((r) => ({
+			esntlId: r.esntlId || null,
+			depositEsntlId: r.depositEsntlId || null,
+			contractEsntlId: r.contractEsntlId || null,
+			type: r.type || null,
+			status: r.status || null,
+			date: r.depositDate || r.createdAt || null,
+			amount: r.amount ?? null,
+			paidAmount: (r.status === 'COMPLETED' || r.status === 'PARTIAL') ? (r.amount ?? 0) : 0,
+			unpaidAmount: r.unpaidAmount != null && r.unpaidAmount !== '' ? Number(r.unpaidAmount) : 0,
+			manager: r.manager || null,
+			depositorName: r.depositorName || null,
+		}));
+
+		return errorHandler.successThrow(res, '방 보증금/예약금 이력 조회 성공', result);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 보증금 ID(il_room_deposit.rdp_eid) 기준 il_room_deposit_history 이력 조회 (리턴값은 getRoomDepositList와 동일)
+// type 필수: DEPOSIT(보증금 입금), RETURN(환불)
+exports.getRoomDepositListById = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { depositEsntlId, type } = req.query;
+
+		if (!depositEsntlId) {
+			errorHandler.errorThrow(400, 'depositEsntlId(il_room_deposit.rdp_eid)를 입력해주세요.');
+		}
+		if (type !== 'DEPOSIT' && type !== 'RETURN') {
+			errorHandler.errorThrow(400, 'type은 DEPOSIT 또는 RETURN 중 하나 필수입니다.');
+		}
+
+		const where = { depositEsntlId, type };
+
+		const rows = await ilRoomDepositHistory.findAll({
+			where,
+			attributes: [
+				'esntlId',
+				'depositEsntlId',
+				'roomEsntlId',
+				'contractEsntlId',
+				'type',
+				'amount',
+				'status',
+				'unpaidAmount',
+				'depositDate',
+				'depositorName',
+				'manager',
+				'createdAt',
+			],
+			order: [['depositDate', 'DESC'], ['createdAt', 'DESC']],
+			raw: true,
+		});
+
 		const result = (rows || []).map((r) => ({
 			esntlId: r.esntlId || null,
 			depositEsntlId: r.depositEsntlId || null,

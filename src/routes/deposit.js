@@ -270,6 +270,9 @@ router.get('/reservationList', depositController.getReservationList);
  *                 type: string
  *                 format: date
  *                 description: "입실예정일 (il_room_deposit.rdp_check_in_date, YYYY-MM-DD)"
+ *               memo:
+ *                 type: string
+ *                 description: "메모 (il_room_deposit_history.memo, PENDING 이력에 저장)"
  *               amount:
  *                 type: integer
  *                 description: 입금금액
@@ -1315,6 +1318,94 @@ router.get('/gosiwonList', depositController.getGosiwonList);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/getRoomDepositList', depositController.getRoomDepositList);
+
+/**
+ * @swagger
+ * /v1/deposit/getRoomDepositListById:
+ *   get:
+ *     summary: 보증금 ID 기준 보증금·예약금 이력 조회
+ *     description: "il_room_deposit.rdp_eid(depositEsntlId)로 il_room_deposit_history를 조회합니다. type 필수. 리턴값은 getRoomDepositList와 동일합니다."
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: depositEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: "보증금 고유 아이디 (il_room_deposit.rdp_eid)"
+ *         example: RDP0000000001
+ *       - in: query
+ *         name: type
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [DEPOSIT, RETURN]
+ *         description: "조회 타입 필수 (DEPOSIT: 보증금 입금, RETURN: 환불)"
+ *         example: DEPOSIT
+ *     responses:
+ *       200:
+ *         description: 방 보증금/예약금 이력 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방 보증금/예약금 이력 조회 성공
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 이력 고유아이디
+ *                       depositEsntlId:
+ *                         type: string
+ *                         description: 보증금 고유아이디
+ *                       contractEsntlId:
+ *                         type: string
+ *                         description: 계약서 고유아이디
+ *                       type:
+ *                         type: string
+ *                         description: DEPOSIT(입금), RETURN(반환)
+ *                       status:
+ *                         type: string
+ *                         description: 상태 (PENDING, COMPLETED 등)
+ *                       date:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 입금일시(depositDate) 또는 생성일
+ *                       amount:
+ *                         type: integer
+ *                         description: 금액
+ *                       paidAmount:
+ *                         type: integer
+ *                         description: 입금 완료액
+ *                       unpaidAmount:
+ *                         type: integer
+ *                         description: 미납액
+ *                       manager:
+ *                         type: string
+ *                         description: 담당자
+ *                       depositorName:
+ *                         type: string
+ *                         description: 입금자명
+ *                         nullable: true
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/getRoomDepositListById', depositController.getRoomDepositListById);
 
 module.exports = router;
 
