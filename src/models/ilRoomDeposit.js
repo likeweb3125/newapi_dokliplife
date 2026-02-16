@@ -1,7 +1,7 @@
 /**
  * il_room_deposit 테이블 (실제 DB 스키마 기준)
  * - rdp_eid (PK), gsw_eid, rom_eid, rdp_customer_name, rdp_customer_phone, rdp_price,
- *   rdp_check_in_date, rdp_completed_dtm, rdp_return_dtm, rdp_regist_dtm, rdp_registrant_id,
+ *   rdp_check_in_date, rdp_completed_dtm, rdp_return_dtm, rdp_memo, rdp_regist_dtm, rdp_registrant_id,
  *   rdp_update_dtm, rdp_updater_id, rdp_delete_dtm, rdp_deleter_id
  * - status 없음: rdp_completed_dtm IS NULL → PENDING, NOT NULL → COMPLETED
  * - deleteYN 없음: rdp_delete_dtm IS NULL → 미삭제
@@ -64,6 +64,12 @@ module.exports = (sequelize, DataTypes) => {
 				allowNull: true,
 				field: 'rdp_return_dtm',
 				comment: '반환일시',
+			},
+			memo: {
+				type: DataTypes.TEXT,
+				allowNull: true,
+				field: 'rdp_memo',
+				comment: '메모',
 			},
 			registDtm: {
 				type: DataTypes.DATE,

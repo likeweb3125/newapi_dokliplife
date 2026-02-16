@@ -703,6 +703,21 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                             nullable: true
  *                             description: '보증금 환불 등록일자 (depositRefund.createdAt, 형식: YYYY-MM-DD HH:MM)'
  *                             example: '2026-01-01 14:00'
+ *                           returnStatus:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "il_room_deposit_history type=RETURN 기준 최신 이력의 status (PARTIAL, COMPLETED). 반환 이력 없으면 null"
+ *                             example: COMPLETED
+ *                           returnLastestAmount:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: "해당 보증금(depositEsntlId)의 RETURN 이력 합계 (환불+차감 금액 합계)"
+ *                             example: 1000000
+ *                           returnLastestTime:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "해당 보증금의 RETURN 이력 중 가장 최근 반환일시 (형식: YYYY-MM-DD HH:MM). 반환 이력 없으면 null"
+ *                             example: '2026-01-15 10:00'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -821,8 +836,8 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  * @swagger
  * /v1/deposit/depositRefundRegist:
  *   post:
- *     summary: 보증금 환불 등록
- *     description: 보증금 환불 정보를 등록합니다. 환불 금액과 전체 예약금을 비교하여 status를 자동으로 설정합니다.
+ *     summary: 보증금 환불 등록 (il_room_deposit_history에 type=RETURN 이력만 INSERT)
+ *     description: "depositEsntlId(il_room_deposit) 기준으로 환불 이력을 il_room_deposit_history에만 등록합니다. type=RETURN, amount=환불금액, deductionAmount=차감금액, memo=차감내용 JSON 배열. 환불+차감 합계가 보증금 금액과 동일하면 status=COMPLETED, 아니면 PARTIAL. 전액 반환 시 il_room_deposit.rdp_return_dtm 갱신."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -833,52 +848,55 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *           schema:
  *             type: object
  *             required:
- *               - contractEsntlId
- *               - refundItems
- *               - totalDepositAmount
- *               - refundAmount
+ *               - depositEsntlId
+ *               - amount
  *             properties:
+ *               depositEsntlId:
+ *                 type: string
+ *                 description: "보증금 고유 아이디 (il_room_deposit.rdp_eid)"
+ *                 example: RDP0000000001
+ *               amount:
+ *                 type: integer
+ *                 description: 환불 금액 (실제 반환 금액)
+ *                 example: 900000
+ *               deductionAmount:
+ *                 type: integer
+ *                 description: 차감 금액 (0 가능)
+ *                 example: 100000
+ *               deductionItems:
+ *                 type: array
+ *                 description: "차감 내역 배열. memo에 JSON 배열로 저장되며, amount 합계는 deductionAmount와 일치해야 함."
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     content:
+ *                       type: string
+ *                       description: 차감 항목 내용
+ *                       example: '위약금 차감'
+ *                     amount:
+ *                       type: integer
+ *                       description: 차감 항목 금액
+ *                       example: 100000
  *               contractEsntlId:
  *                 type: string
- *                 description: 계약서 고유 아이디
- *                 example: RCTT0000000001
- *               bank:
+ *                 description: 방계약 고유 아이디 (선택)
+ *                 example: RCO0000000001
+ *               refundDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 반환일시 (선택, 미입력 시 현재 시각)
+ *               accountBank:
  *                 type: string
  *                 description: 환불 받을 은행명
  *                 example: '신한은행'
- *               bankAccount:
+ *               accountNumber:
  *                 type: string
  *                 description: 환불 받을 계좌번호
  *                 example: '110-123-456789'
  *               accountHolder:
  *                 type: string
- *                 description: 계좌소유자 이름
+ *                 description: 예금주명
  *                 example: '홍길동'
- *               refundItems:
- *                 type: array
- *                 description: 환불 항목 배열 (내용, 금액)
- *                 items:
- *                   type: object
- *                   required:
- *                     - content
- *                     - amount
- *                   properties:
- *                     content:
- *                       type: string
- *                       description: 환불 항목 내용
- *                       example: '위약금 차감'
- *                     amount:
- *                       type: integer
- *                       description: 환불 항목 금액
- *                       example: 50000
- *               totalDepositAmount:
- *                 type: integer
- *                 description: 전체 예약금 금액
- *                 example: 1000000
- *               refundAmount:
- *                 type: integer
- *                 description: 환불 항목 합계 금액 (기존 환불액 합계에 추가됩니다)
- *                 example: 80000
  *     responses:
  *       200:
  *         description: 보증금 환불 등록 성공
@@ -896,30 +914,30 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *                 data:
  *                   type: object
  *                   properties:
- *                     depositRefundEsntlId:
+ *                     depositEsntlId:
  *                       type: string
- *                       description: 보증금 환불 고유 아이디
- *                       example: DERF0000000001
- *                     contractEsntlId:
+ *                       description: 보증금 고유 아이디
+ *                       example: RDP0000000001
+ *                     historyId:
  *                       type: string
- *                       description: 계약서 고유 아이디
- *                       example: RCTT0000000001
+ *                       description: 생성된 il_room_deposit_history 고유 아이디
+ *                       example: RDPH0000000001
+ *                     amount:
+ *                       type: integer
+ *                       description: 환불 금액
+ *                       example: 900000
+ *                     deductionAmount:
+ *                       type: integer
+ *                       description: 차감 금액
+ *                       example: 100000
  *                     status:
  *                       type: string
- *                       description: '환불 상태 (COMPLETED: 전액환불, PARTIAL: 부분환불)'
- *                       example: PARTIAL
- *                     totalDepositAmount:
+ *                       description: "COMPLETED(전액 반환) 또는 PARTIAL(부분 반환)"
+ *                       example: COMPLETED
+ *                     totalReturnedAfter:
  *                       type: integer
- *                       description: 전체 예약금 금액
+ *                       description: "이번 등록 후 누적 반환 합계 (환불+차감)"
  *                       example: 1000000
- *                     refundAmount:
- *                       type: integer
- *                       description: 환불 항목 합계 금액
- *                       example: 920000
- *                     remainAmount:
- *                       type: integer
- *                       description: '잔여 환불 금액 (totalDepositAmount - 전체 refundAmount 합계, 0이면 COMPLETED)'
- *                       example: 920000
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -1011,6 +1029,135 @@ router.get(
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/depositInfo', depositController.getDepositInfo);
+
+/**
+ * @swagger
+ * /v1/deposit/memo:
+ *   get:
+ *     summary: 보증금 메모 조회 (Read)
+ *     description: "il_room_deposit.rdp_memo를 depositEsntlId로 조회합니다. depositInfo 응답에도 memo가 포함됩니다."
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: depositEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: "보증금 고유 아이디 (il_room_deposit.rdp_eid)"
+ *     responses:
+ *       200:
+ *         description: 보증금 메모 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     depositEsntlId:
+ *                       type: string
+ *                     memo:
+ *                       type: string
+ *                       nullable: true
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.get('/memo', depositController.getDepositMemo);
+
+/**
+ * @swagger
+ * /v1/deposit/memo:
+ *   post:
+ *     summary: 보증금 메모 등록 (Create)
+ *     description: "il_room_deposit.rdp_memo에 메모를 등록합니다. 기존 메모가 있으면 덮어씁니다."
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - depositEsntlId
+ *             properties:
+ *               depositEsntlId:
+ *                 type: string
+ *                 description: "보증금 고유 아이디"
+ *               memo:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 메모 내용 (빈 문자열이면 null로 저장)
+ *     responses:
+ *       200:
+ *         description: 보증금 메모 등록 성공
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.post('/memo', depositController.createDepositMemo);
+
+/**
+ * @swagger
+ * /v1/deposit/memo:
+ *   put:
+ *     summary: 보증금 메모 수정 (Update)
+ *     description: "il_room_deposit.rdp_memo를 수정합니다."
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - depositEsntlId
+ *             properties:
+ *               depositEsntlId:
+ *                 type: string
+ *                 description: "보증금 고유 아이디"
+ *               memo:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 메모 내용 (빈 문자열이면 null로 저장)
+ *     responses:
+ *       200:
+ *         description: 보증금 메모 수정 성공
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.put('/memo', depositController.updateDepositMemo);
+
+/**
+ * @swagger
+ * /v1/deposit/memo:
+ *   delete:
+ *     summary: 보증금 메모 삭제 (Delete)
+ *     description: "il_room_deposit.rdp_memo를 null로 비웁니다. 보증금 행은 삭제되지 않습니다."
+ *     tags: [Deposit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: depositEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: "보증금 고유 아이디"
+ *     responses:
+ *       200:
+ *         description: 보증금 메모 삭제 성공
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.delete('/memo', depositController.deleteDepositMemo);
 
 /**
  * @swagger
@@ -1298,7 +1445,7 @@ router.get('/getRoomDepositList', depositController.getRoomDepositList);
  * /v1/deposit/getRoomDepositListById:
  *   get:
  *     summary: 보증금 ID 기준 보증금·예약금 이력 조회
- *     description: "il_room_deposit.rdp_eid(depositEsntlId)로 il_room_deposit_history를 조회합니다. type 필수. 리턴값은 getRoomDepositList와 동일합니다."
+ *     description: "il_room_deposit.rdp_eid(depositEsntlId)로 il_room_deposit_history를 조회합니다. type 필수. type=RETURN일 때 차감 항목(deductionItems) 등 반환 전용 필드를 함께 내려줍니다."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -1351,26 +1498,63 @@ router.get('/getRoomDepositList', depositController.getRoomDepositList);
  *                         description: DEPOSIT(입금), RETURN(반환)
  *                       status:
  *                         type: string
- *                         description: 상태 (PENDING, COMPLETED 등)
+ *                         description: 상태 (PENDING, PARTIAL, COMPLETED 등)
  *                       date:
  *                         type: string
  *                         format: date-time
- *                         description: 입금일시(depositDate) 또는 생성일
+ *                         description: "입금일시(depositDate) 또는 반환일시(refundDate), 생성일"
  *                       amount:
  *                         type: integer
- *                         description: 금액
+ *                         description: "금액 (DEPOSIT: 입금액, RETURN: 환불액)"
  *                       paidAmount:
  *                         type: integer
- *                         description: 입금 완료액
+ *                         description: 입금 완료액 (DEPOSIT 시)
  *                       unpaidAmount:
  *                         type: integer
- *                         description: 미납액
+ *                         description: 미납액 (DEPOSIT 시)
  *                       manager:
  *                         type: string
  *                         description: 담당자
  *                       depositorName:
  *                         type: string
  *                         description: 입금자명
+ *                         nullable: true
+ *                       deductionAmount:
+ *                         type: integer
+ *                         description: "type=RETURN일 때만. 차감 금액"
+ *                         nullable: true
+ *                       refundAmount:
+ *                         type: integer
+ *                         description: "type=RETURN일 때만. 반환 금액"
+ *                         nullable: true
+ *                       refundDate:
+ *                         type: string
+ *                         format: date-time
+ *                         description: "type=RETURN일 때만. 반환일시"
+ *                         nullable: true
+ *                       deductionItems:
+ *                         type: array
+ *                         description: "type=RETURN일 때만. 차감 항목 목록 (memo JSON 파싱)"
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             content:
+ *                               type: string
+ *                               description: 차감 항목 내용
+ *                             amount:
+ *                               type: integer
+ *                               description: 차감 항목 금액
+ *                       accountBank:
+ *                         type: string
+ *                         description: "type=RETURN일 때만. 환불 계좌 은행"
+ *                         nullable: true
+ *                       accountNumber:
+ *                         type: string
+ *                         description: "type=RETURN일 때만. 환불 계좌번호"
+ *                         nullable: true
+ *                       accountHolder:
+ *                         type: string
+ *                         description: "type=RETURN일 때만. 예금주명"
  *                         nullable: true
  *       400:
  *         $ref: '#/components/responses/BadRequest'
