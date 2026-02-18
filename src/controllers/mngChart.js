@@ -389,26 +389,41 @@ exports.mngChartMain = async (req, res, next) => {
 				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
 					SELECT D.rdp_eid FROM il_room_deposit D
 					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
-						AND D.rdp_completed_dtm IS NOT NULL
-						AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate
 						AND (D.rdp_customer_name = C.name OR D.rdp_customer_name = RCW.checkinName OR D.rdp_customer_name = RCW.customerName)
-					ORDER BY D.rdp_completed_dtm DESC LIMIT 1
+						AND (
+							(D.rdp_completed_dtm IS NOT NULL AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate)
+							OR (D.rdp_completed_dtm IS NULL AND (
+								(D.rdp_check_in_date IS NOT NULL AND D.rdp_check_in_date >= RC.startDate AND D.rdp_check_in_date <= RC.endDate)
+								OR (DATE(D.rdp_regist_dtm) >= RC.startDate AND DATE(D.rdp_regist_dtm) <= RC.endDate)
+							))
+						)
+					ORDER BY D.rdp_completed_dtm DESC, D.rdp_regist_dtm DESC LIMIT 1
 				) ELSE NULL END AS depositEsntlId,
 				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
 					SELECT D.rdp_completed_dtm FROM il_room_deposit D
 					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
-						AND D.rdp_completed_dtm IS NOT NULL
-						AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate
 						AND (D.rdp_customer_name = C.name OR D.rdp_customer_name = RCW.checkinName OR D.rdp_customer_name = RCW.customerName)
-					ORDER BY D.rdp_completed_dtm DESC LIMIT 1
+						AND (
+							(D.rdp_completed_dtm IS NOT NULL AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate)
+							OR (D.rdp_completed_dtm IS NULL AND (
+								(D.rdp_check_in_date IS NOT NULL AND D.rdp_check_in_date >= RC.startDate AND D.rdp_check_in_date <= RC.endDate)
+								OR (DATE(D.rdp_regist_dtm) >= RC.startDate AND DATE(D.rdp_regist_dtm) <= RC.endDate)
+							))
+						)
+					ORDER BY D.rdp_completed_dtm DESC, D.rdp_regist_dtm DESC LIMIT 1
 				) ELSE NULL END AS depositCompleteDate,
 				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
 					SELECT D.rdp_price FROM il_room_deposit D
 					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
-						AND D.rdp_completed_dtm IS NOT NULL
-						AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate
 						AND (D.rdp_customer_name = C.name OR D.rdp_customer_name = RCW.checkinName OR D.rdp_customer_name = RCW.customerName)
-					ORDER BY D.rdp_completed_dtm DESC LIMIT 1
+						AND (
+							(D.rdp_completed_dtm IS NOT NULL AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate)
+							OR (D.rdp_completed_dtm IS NULL AND (
+								(D.rdp_check_in_date IS NOT NULL AND D.rdp_check_in_date >= RC.startDate AND D.rdp_check_in_date <= RC.endDate)
+								OR (DATE(D.rdp_regist_dtm) >= RC.startDate AND DATE(D.rdp_regist_dtm) <= RC.endDate)
+							))
+						)
+					ORDER BY D.rdp_completed_dtm DESC, D.rdp_regist_dtm DESC LIMIT 1
 				) ELSE NULL END AS depositPrice
 			FROM roomStatus RS
 			JOIN room R ON RS.roomEsntlId = R.esntlId
