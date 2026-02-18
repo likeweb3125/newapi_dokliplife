@@ -213,6 +213,19 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           additionalPaymentOption:
  *                             type: string
  *                             description: '추가 결제 옵션 (예: 주차비 10만원)'
+ *                           depositEsntlId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 'items 8개 상태일 때, il_room_deposit에서 방·rdp_customer_name·계약기간 내 rdp_completed_dtm 기록이 있으면 해당 rdp_eid'
+ *                           depositCompleteDate:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                             description: 'il_room_deposit.rdp_completed_dtm (입금완료일시)'
+ *                           depositPrice:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 'il_room_deposit.rdp_price (보증금 금액)'
  *                           content:
  *                             type: string
  *                             description: '비활성 상태 표시 내용 (예: 퇴실, 점검중)'

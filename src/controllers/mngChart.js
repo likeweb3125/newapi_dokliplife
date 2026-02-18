@@ -385,7 +385,31 @@ exports.mngChartMain = async (req, res, next) => {
 				RCW.customerGender AS contractorGender,
 				RCW.customerAge AS contractorAge,
 				PL.paymentAmount,
-				PL.pyl_goods_amount
+				PL.pyl_goods_amount,
+				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
+					SELECT D.rdp_eid FROM il_room_deposit D
+					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
+						AND D.rdp_completed_dtm IS NOT NULL
+						AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate
+						AND (D.rdp_customer_name = C.name OR D.rdp_customer_name = RCW.checkinName OR D.rdp_customer_name = RCW.customerName)
+					ORDER BY D.rdp_completed_dtm DESC LIMIT 1
+				) ELSE NULL END AS depositEsntlId,
+				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
+					SELECT D.rdp_completed_dtm FROM il_room_deposit D
+					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
+						AND D.rdp_completed_dtm IS NOT NULL
+						AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate
+						AND (D.rdp_customer_name = C.name OR D.rdp_customer_name = RCW.checkinName OR D.rdp_customer_name = RCW.customerName)
+					ORDER BY D.rdp_completed_dtm DESC LIMIT 1
+				) ELSE NULL END AS depositCompleteDate,
+				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
+					SELECT D.rdp_price FROM il_room_deposit D
+					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
+						AND D.rdp_completed_dtm IS NOT NULL
+						AND DATE(D.rdp_completed_dtm) >= RC.startDate AND DATE(D.rdp_completed_dtm) <= RC.endDate
+						AND (D.rdp_customer_name = C.name OR D.rdp_customer_name = RCW.checkinName OR D.rdp_customer_name = RCW.customerName)
+					ORDER BY D.rdp_completed_dtm DESC LIMIT 1
+				) ELSE NULL END AS depositPrice
 			FROM roomStatus RS
 			JOIN room R ON RS.roomEsntlId = R.esntlId
 			LEFT JOIN roomContract RC ON RS.contractEsntlId = RC.esntlId
@@ -530,6 +554,9 @@ exports.mngChartMain = async (req, res, next) => {
 				accountInfo: null,
 				deposit: null,
 				additionalPaymentOption: null,
+				depositEsntlId: null,
+				depositCompleteDate: null,
+				depositPrice: null,
 				...overrides,
 			});
 
@@ -569,6 +596,9 @@ exports.mngChartMain = async (req, res, next) => {
 				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
 				if (hasContract && (parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
 				if (hasContract && (parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
+				if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') reserveOverrides.depositEsntlId = row.depositEsntlId;
+				if (row.depositCompleteDate != null) reserveOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
+				if (row.depositPrice != null) reserveOverrides.depositPrice = row.depositPrice;
 				items.push(baseItem(reserveOverrides));
 				roomStatusesArray.push({
 					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
@@ -621,6 +651,9 @@ exports.mngChartMain = async (req, res, next) => {
 					contractOverrides.paymentAmount = paymentAmount > 0 ? `${paymentAmount}` : '0';
 					contractOverrides.accountInfo = accountInfo;
 					contractOverrides.deposit = deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원';
+					if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') contractOverrides.depositEsntlId = row.depositEsntlId;
+					if (row.depositCompleteDate != null) contractOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
+					if (row.depositPrice != null) contractOverrides.depositPrice = row.depositPrice;
 				}
 
 				const contractItem = baseItem(contractOverrides);
@@ -661,6 +694,9 @@ exports.mngChartMain = async (req, res, next) => {
 					checkoutOverrides.paymentAmount = (parseInt(row.paymentAmount) || 0) > 0 ? `${parseInt(row.paymentAmount) || 0}` : '0';
 					checkoutOverrides.accountInfo = row.customerBank && row.customerBankAccount ? `${row.customerBank} ${row.customerBankAccount} ${contractorName}` : '-';
 					checkoutOverrides.deposit = (parseInt(row.roomDeposit) || 0) > 0 ? `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원` : '0 원';
+					if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') checkoutOverrides.depositEsntlId = row.depositEsntlId;
+					if (row.depositCompleteDate != null) checkoutOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
+					if (row.depositPrice != null) checkoutOverrides.depositPrice = row.depositPrice;
 				}
 				items.push(baseItem(checkoutOverrides));
 				roomStatusesArray.push({
