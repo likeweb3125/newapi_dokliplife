@@ -718,6 +718,7 @@ exports.mngChartMain = async (req, res, next) => {
 			SELECT 
 				RS.esntlId AS id,
 				RS.roomEsntlId,
+				RS.contractEsntlId,
 				RS.status,
 				RS.statusMemo,
 				RS.statusStartDate,
@@ -769,7 +770,8 @@ exports.mngChartMain = async (req, res, next) => {
 			const formattedEnd = endDate ? formatDateTime(endDate + ' 23:59:59') : formatDateTime(startDate + ' 23:59:59');
 			const period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
 
-			// items에 roomStatus 전체 값 추가 (계약서 없음 → 계약 관련 null). statusMemo 항상 리턴
+			// items에 roomStatus 전체 값 추가. contractEsntlId 있으면 반드시 리턴 (CHECKOUT_CONFIRMED 등)
+			const contractEsntlIdVal = status.contractEsntlId ?? null;
 			items.push({
 				id: itemIdCounter++,
 				group: status.roomEsntlId,
@@ -789,7 +791,8 @@ exports.mngChartMain = async (req, res, next) => {
 				checkinGender: null,
 				checkinAge: null,
 				className: 'timeline-item',
-				contractNumber: null,
+				contractNumber: contractEsntlIdVal,
+				contractEsntlId: contractEsntlIdVal,
 				guest: null,
 				contractPerson: null,
 				periodType: null,
