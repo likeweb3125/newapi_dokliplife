@@ -198,10 +198,14 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                             type: string
  *                             description: '결제 유형 (checkInPay: 입실료, extraPay: 추가결제)'
  *                             example: checkInPay
- *                           isExtra:
+ *                           extrapayEsntlId:
  *                             type: string
  *                             nullable: true
  *                             description: '추가 결제 시 extraPayment.esntlId (EXTR 접두어), 일반 연장 결제 시 null'
+ *                           extendWithPayment:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 'extrapayEsntlId 있을 때만 extraPayment.extendWithPayment (0: 미사용, 1: 연장시 함께 결제)'
  *                           contractEsntlId:
  *                             type: string
  *                             example: RCTT0000000001
@@ -298,6 +302,62 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.post('/realTimeList', isAuthMiddleware.isAuthAdmin, statController.getRealTimeList);
+
+/**
+ * @swagger
+ * /v1/stats/cancelAutoExtend:
+ *   post:
+ *     summary: 자동갱신 취소
+ *     description: extrapayEsntlId(extraPayment.esntlId)를 입력받아 해당 추가 결제의 extendWithPayment 값을 0으로 수정합니다.
+ *     tags: [실시간 결제]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - extrapayEsntlId
+ *             properties:
+ *               extrapayEsntlId:
+ *                 type: string
+ *                 description: '추가 결제 고유아이디 (extraPayment.esntlId, EXTR 접두어)'
+ *                 example: EXTR0000000001
+ *     responses:
+ *       200:
+ *         description: 자동갱신 취소 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 자동갱신 취소 완료
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     extrapayEsntlId:
+ *                       type: string
+ *                       example: EXTR0000000001
+ *                     extendWithPayment:
+ *                       type: integer
+ *                       example: 0
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         description: 해당 extrapayEsntlId의 추가 결제 건을 찾을 수 없음
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/cancelAutoExtend', isAuthMiddleware.isAuthAdmin, statController.cancelAutoExtend);
 
 /**
  * @swagger

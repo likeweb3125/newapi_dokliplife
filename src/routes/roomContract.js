@@ -372,7 +372,7 @@ router.get('/list', roomContractController.getContractList);
  *                           example: CONTRACT
  *                         paymentStatus:
  *                           type: string
- *                           description: '메인 결제 상태 (paymentLog isExtra 값 없음 기준 최신 건의 calculateStatus, 예: SUCCESS, REQUEST)'
+ *                           description: '메인 결제 상태 (paymentLog extrapayEsntlId 값 없음 기준 최신 건의 calculateStatus, 예: SUCCESS, REQUEST)'
  *                           example: SUCCESS
  *                         isRoomMoveScheduled:
  *                           type: boolean
@@ -385,7 +385,7 @@ router.get('/list', roomContractController.getContractList);
  *                           example: '2025-11-15T00:00:00'
  *                     paymentLogList:
  *                       type: array
- *                       description: '연동 결제 내역 (paymentLog, isExtra 값 없음인 일반 연장 결제)'
+ *                       description: '연동 결제 내역 (paymentLog, extrapayEsntlId 값 없음인 일반 연장 결제)'
  *                       items:
  *                         type: object
  *                         properties:
@@ -416,7 +416,7 @@ router.get('/list', roomContractController.getContractList);
  *                           withdrawalStatus:
  *                             type: string
  *                             description: 결제 취소 여부
- *                           isExtra:
+ *                           extrapayEsntlId:
  *                             type: string
  *                             nullable: true
  *                             description: '일반 연장 결제 시 null, 추가 결제 시 extraPayment.esntlId (EXTR 접두어)'
@@ -453,7 +453,7 @@ router.get('/list', roomContractController.getContractList);
  *                           extraCostName:
  *                             type: string
  *                             description: 추가비용명칭
- *                           isExtra:
+ *                           extrapayEsntlId:
  *                             type: string
  *                             description: '추가 결제 시 extraPayment.esntlId (EXTR 접두어)'
  *                             example: EXTR0000000001

@@ -7,6 +7,7 @@ const {
 	i_board_comment,
 	i_member,
 	mariaDBSequelize,
+	extraPayment,
 } = require('../models');
 const errorHandler = require('../middleware/error');
 const enumConfig = require('../middleware/enum');
@@ -649,14 +650,15 @@ exports.getRealTimeList = async (req, res, next) => {
 		const limitNum = parseInt(limit) || parseInt(length) || 10;
 		const offset = (pageNum - 1) * limitNum;
 
-		// 메인 쿼리
+		// 메인 쿼리 (extrapayEsntlId 있으면 extraPayment.extendWithPayment 함께 조회)
 		const mainQuery = `
 			SELECT 
 				pl.esntlId,
 				pl.pDate,
 				pl.pTime,
 				pl.paymentType,
-				pl.isExtra,
+				pl.extrapayEsntlId,
+				ep.extendWithPayment AS extendWithPayment,
 				pl.contractEsntlId AS contractEsntlId,
 				pl.gosiwonEsntlId,
 				(SELECT name FROM gosiwon WHERE esntlId = pl.gosiwonEsntlId) AS gosiwonName,
@@ -690,6 +692,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				END AS contractType
 			FROM paymentLog pl
 			LEFT JOIN customer c ON pl.customerEsntlId = c.esntlId
+			LEFT JOIN extraPayment ep ON pl.extrapayEsntlId = ep.esntlId
 			JOIN room r ON pl.roomEsntlId = r.esntlId
 			JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
 			JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
@@ -760,7 +763,8 @@ exports.getRealTimeList = async (req, res, next) => {
 				pDate,
 				pTime,
 				paymentType,
-				isExtra,
+				extrapayEsntlId,
+				extendWithPayment,
 				contractEsntlId,
 				gosiwonEsntlId,
 				gosiwonName,
@@ -787,9 +791,9 @@ exports.getRealTimeList = async (req, res, next) => {
 				contractType,
 			} = ele;
 
-			// isExtra 값 유무로 payType 구분 (값 있으면 extraPay, 없으면 checkInPay)
+			// extrapayEsntlId 값 유무로 payType 구분 (값 있으면 extraPay, 없으면 checkInPay)
 			let payType = null;
-			if (isExtra != null && String(isExtra).trim() !== '') {
+			if (extrapayEsntlId != null && String(extrapayEsntlId).trim() !== '') {
 				payType = 'extraPay';
 			} else {
 				payType = 'checkInPay';
@@ -802,7 +806,8 @@ exports.getRealTimeList = async (req, res, next) => {
 				pTime,
 				payMethod: paymentType || null,
 				payType: payType,
-				isExtra: isExtra,
+				extrapayEsntlId: extrapayEsntlId ?? null,
+				extendWithPayment: extrapayEsntlId != null && String(extrapayEsntlId).trim() !== '' ? (extendWithPayment ?? null) : null, // extrapayEsntlId 있을 때만 extraPayment.extendWithPayment
 				contractEsntlId,
 				gosiwonEsntlId,
 				gosiwonName,
@@ -840,6 +845,30 @@ exports.getRealTimeList = async (req, res, next) => {
 		};
 
 		errorHandler.successThrow(res, '실시간 매출 현황 상세 목록 조회 성공', result);
+	} catch (err) {
+		next(err);
+	}
+};
+
+// 자동갱신 취소 (extraPayment.extendWithPayment → 0)
+exports.cancelAutoExtend = async (req, res, next) => {
+	try {
+		const { extrapayEsntlId } = req.body;
+
+		if (!extrapayEsntlId || String(extrapayEsntlId).trim() === '') {
+			errorHandler.errorThrow(400, 'extrapayEsntlId는 필수입니다.');
+		}
+
+		const [affectedRows] = await extraPayment.update(
+			{ extendWithPayment: 0 },
+			{ where: { esntlId: String(extrapayEsntlId).trim() } }
+		);
+
+		if (affectedRows === 0) {
+			errorHandler.errorThrow(404, '해당 extrapayEsntlId의 추가 결제 건을 찾을 수 없습니다.');
+		}
+
+		errorHandler.successThrow(res, '자동갱신 취소 완료', { extrapayEsntlId: String(extrapayEsntlId).trim(), extendWithPayment: 0 });
 	} catch (err) {
 		next(err);
 	}

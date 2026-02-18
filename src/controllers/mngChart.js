@@ -398,7 +398,7 @@ exports.mngChartMain = async (req, res, next) => {
 					SUM(pyl_goods_amount) AS pyl_goods_amount
 				FROM paymentLog
 				WHERE withdrawalStatus != 'WITHDRAWAL'
-					AND (isExtra IS NULL OR isExtra = '')
+					AND (extrapayEsntlId IS NULL OR extrapayEsntlId = '')
 				GROUP BY contractEsntlId
 			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE RS.gosiwonEsntlId = ?

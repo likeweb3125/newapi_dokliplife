@@ -58,6 +58,13 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'customerEsntlId',
 				comment: '고객 고유아이디',
 			},
+			extrapayEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				defaultValue: null,
+				field: 'extrapayEsntlId',
+				comment: '추가 결제 고유아이디 (extraPayment.esntlId 참조, 값 있으면 추가결제)',
+			},
 			paymentAmount: {
 				type: DataTypes.STRING(50),
 				allowNull: false,
@@ -203,13 +210,6 @@ module.exports = (sequelize, DataTypes) => {
 				defaultValue: 0,
 				field: 'extendWithPayment',
 				comment: '연장시 함께 결제 여부 (0: 미사용, 1: 사용)',
-			},
-			isExtra: {
-				type: DataTypes.STRING(50),
-				allowNull: true,
-				defaultValue: null,
-				field: 'isExtra',
-				comment: '추가 결제 시 extraPayment.esntlId (EXTR 접두어), 미해당 시 NULL',
 			},
 		},
 		{

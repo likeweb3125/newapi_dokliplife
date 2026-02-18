@@ -369,7 +369,7 @@ exports.getContractDetail = async (req, res, next) => {
 		// 나이: 생년월일 기준 계산 (formatAge), 없으면 RCW 저장값 사용
 		contractInfo.contractCustomerAge = formatAge(contractInfo.customerBirth) ?? contractInfo.contractCustomerAge ?? null;
 
-		// 연동 결제 내역 조회 (paymentLog, isExtra 값 없음 = 일반 연장 결제)
+		// 연동 결제 내역 조회 (paymentLog, extrapayEsntlId 값 없음 = 일반 연장 결제)
 		const paymentLogQuery = `
 			SELECT 
 				PL.esntlId,
@@ -383,10 +383,10 @@ exports.getContractDetail = async (req, res, next) => {
 				PL.code,
 				PL.reason,
 				PL.withdrawalStatus,
-				PL.isExtra AS isExtra
+				PL.extrapayEsntlId AS extrapayEsntlId
 			FROM paymentLog PL
 			WHERE PL.contractEsntlId = ?
-				AND (PL.isExtra IS NULL OR PL.isExtra = '')
+				AND (PL.extrapayEsntlId IS NULL OR PL.extrapayEsntlId = '')
 			ORDER BY PL.pDate DESC, PL.pTime DESC
 		`;
 
@@ -395,7 +395,7 @@ exports.getContractDetail = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 메인 결제 상태 (isExtra 값 없는 paymentLog 기준, 최신 건의 calculateStatus)
+		// 메인 결제 상태 (extrapayEsntlId 값 없는 paymentLog 기준, 최신 건의 calculateStatus)
 		contractInfo.paymentStatus =
 			paymentLogList && paymentLogList.length > 0
 				? (paymentLogList[0].calculateStatus ?? paymentLogList[0].calculatestatus ?? null)
@@ -407,7 +407,7 @@ exports.getContractDetail = async (req, res, next) => {
 				? (paymentLogList[0].rawPaymentAmount ?? paymentLogList[0].paymentAmount ?? null)
 				: null;
 
-		// 추가 결제 내역 조회 (extraPayment, isExtra로 extraPayment.esntlId 반환)
+		// 추가 결제 내역 조회 (extraPayment, extrapayEsntlId로 extraPayment.esntlId 반환)
 		const paymentQuery = `
 			SELECT 
 				ep.pDate,
@@ -419,7 +419,7 @@ exports.getContractDetail = async (req, res, next) => {
 				NULL AS couponName,
 				ep.paymentType,
 				ep.extraCostName,
-				ep.esntlId AS isExtra,
+				ep.esntlId AS extrapayEsntlId,
 				ep.extendWithPayment
 			FROM extraPayment ep
 			WHERE ep.contractEsntlId = ?
