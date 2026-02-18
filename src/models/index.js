@@ -1,4 +1,5 @@
 const Sequelize = require('sequelize');
+const path = require('path');
 
 // MariaDB
 const mariaDBConfig = require(__dirname + '/../config/config.js')[

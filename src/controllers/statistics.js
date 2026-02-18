@@ -787,12 +787,12 @@ exports.getRealTimeList = async (req, res, next) => {
 				contractType,
 			} = ele;
 
-			// isExtra 값을 payType으로 변환 (0: checkInPay, 1: extraPay)
+			// isExtra 값 유무로 payType 구분 (값 있으면 extraPay, 없으면 checkInPay)
 			let payType = null;
-			if (isExtra === 0 || isExtra === '0' || isExtra === false) {
-				payType = 'checkInPay';
-			} else if (isExtra === 1 || isExtra === '1' || isExtra === true) {
+			if (isExtra != null && String(isExtra).trim() !== '') {
 				payType = 'extraPay';
+			} else {
+				payType = 'checkInPay';
 			}
 
 			return {

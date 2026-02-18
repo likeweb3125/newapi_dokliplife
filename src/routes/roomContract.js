@@ -372,7 +372,7 @@ router.get('/list', roomContractController.getContractList);
  *                           example: CONTRACT
  *                         paymentStatus:
  *                           type: string
- *                           description: '메인 결제 상태 (paymentLog isExtra=0 기준 최신 건의 calculateStatus, 예: SUCCESS, REQUEST)'
+ *                           description: '메인 결제 상태 (paymentLog isExtra 값 없음 기준 최신 건의 calculateStatus, 예: SUCCESS, REQUEST)'
  *                           example: SUCCESS
  *                         isRoomMoveScheduled:
  *                           type: boolean
@@ -385,7 +385,7 @@ router.get('/list', roomContractController.getContractList);
  *                           example: '2025-11-15T00:00:00'
  *                     paymentLogList:
  *                       type: array
- *                       description: '연동 결제 내역 (paymentLog, isExtra=0인 일반 연장 결제)'
+ *                       description: '연동 결제 내역 (paymentLog, isExtra 값 없음인 일반 연장 결제)'
  *                       items:
  *                         type: object
  *                         properties:
@@ -417,9 +417,9 @@ router.get('/list', roomContractController.getContractList);
  *                             type: string
  *                             description: 결제 취소 여부
  *                           isExtra:
- *                             type: integer
- *                             description: '0 (일반 연장 결제)'
- *                             example: 0
+ *                             type: string
+ *                             nullable: true
+ *                             description: '일반 연장 결제 시 null, 추가 결제 시 extraPayment.esntlId (EXTR 접두어)'
  *                     paymentList:
  *                       type: array
  *                       description: 추가 결제 내역 목록 (extraPayment)
@@ -454,8 +454,9 @@ router.get('/list', roomContractController.getContractList);
  *                             type: string
  *                             description: 추가비용명칭
  *                           isExtra:
- *                             type: integer
- *                             description: '추가 결제 여부 (0: 일반 연장 결제, 1: 옵션에서 발생한 추가 결제)'
+ *                             type: string
+ *                             description: '추가 결제 시 extraPayment.esntlId (EXTR 접두어)'
+ *                             example: EXTR0000000001
  *                           extendWithPayment:
  *                             type: integer
  *                             description: '연장시 함께 결제 여부 (0: 미사용, 1: 사용)'

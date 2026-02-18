@@ -1,5 +1,5 @@
-# Node 18 (MSAL 엔진 요구사항 충족) 기반
-FROM node:18-alpine
+# Node 20 LTS 기반
+FROM node:20-alpine
 
 # 필요한 패키지 설치
 RUN apk update && apk add --no-cache tzdata cronie vim zsh git curl

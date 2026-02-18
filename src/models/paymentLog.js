@@ -205,11 +205,11 @@ module.exports = (sequelize, DataTypes) => {
 				comment: '연장시 함께 결제 여부 (0: 미사용, 1: 사용)',
 			},
 			isExtra: {
-				type: DataTypes.TINYINT(1),
-				allowNull: false,
-				defaultValue: 0,
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				defaultValue: null,
 				field: 'isExtra',
-				comment: '추가 결제 여부 (0: 일반 연장 결제, 1: 옵션에서 발생한 추가 결제)',
+				comment: '추가 결제 시 extraPayment.esntlId (EXTR 접두어), 미해당 시 NULL',
 			},
 		},
 		{

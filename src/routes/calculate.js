@@ -860,6 +860,55 @@ router.post('/daily/detail', calculateController.selectListCalculateCompleteByTy
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
+
+/**
+ * @swagger
+ * /v1/calculate/daily/closing/run:
+ *   post:
+ *     summary: 일일 매출 마감 1회 실행
+ *     description: "일일 매출 마감 잡을 1회 수동 실행합니다. 전일 PAYMENT/REFUND 건을 il_daily_selling_closing에 INSERT하며, 매일 자정 스케줄러와 동일 로직입니다. 테스트·재실행용."
+ *     tags: [일일 정산관리]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: 일일 매출 마감 1회 실행 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 message:
+ *                   type: string
+ *                   example: "일일 매출 마감 1회 실행 완료"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sel_target_cnt:
+ *                       type: integer
+ *                       description: "처리 대상 건수 (PAYMENT + REFUND INSERT 행 수)"
+ *                     sel_success_cnt:
+ *                       type: integer
+ *                       description: "성공 건수"
+ *                     sel_skip_cnt:
+ *                       type: integer
+ *                       description: "스킵 건수"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/daily/closing/run', calculateController.runDailySellingClosing);
+
 router.post('/daily/payment/detail', calculateController.selectListToPaymentLog);
 
 module.exports = router;

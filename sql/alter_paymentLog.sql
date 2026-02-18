@@ -38,3 +38,21 @@ CREATE INDEX IF NOT EXISTS `idx_paymentLog_contract_isExtra` ON `paymentLog` (`c
 -- ---------------------------------------------
 CREATE INDEX IF NOT EXISTS `idx_paymentLog_contractEsntlId` ON `paymentLog` (`contractEsntlId`);
 CREATE INDEX IF NOT EXISTS `idx_paymentLog_contract_pTime` ON `paymentLog` (`contractEsntlId`, `pTime`);
+
+-- ---------------------------------------------
+-- 5. isExtra 컬럼 타입 변경 (0/1 → extraPayment.esntlId, EXTR 접두어)
+-- ---------------------------------------------
+-- 5-1. isExtra 관련 인덱스 제거 (컬럼 타입 변경 전)
+DROP INDEX IF EXISTS `idx_paymentLog_isExtra` ON `paymentLog`;
+DROP INDEX IF EXISTS `idx_paymentLog_contract_isExtra` ON `paymentLog`;
+
+-- 5-2. isExtra 컬럼을 TINYINT(0/1) → VARCHAR(50) NULL 로 변경 (값: extraPayment.esntlId, 미해당 시 NULL)
+ALTER TABLE `paymentLog`
+MODIFY COLUMN `isExtra` VARCHAR(50) NULL DEFAULT NULL COMMENT '추가 결제 시 extraPayment.esntlId (EXTR 접두어), 미해당 시 NULL';
+
+-- 5-3. 기존 0/1 데이터 정리 (신규 스키마에서는 EXTR id만 저장하므로 과거 데이터는 NULL 처리)
+UPDATE `paymentLog` SET `isExtra` = NULL WHERE `isExtra` IN ('0', '1', 0, 1);
+
+-- 5-4. isExtra 관련 인덱스 재생성
+CREATE INDEX IF NOT EXISTS `idx_paymentLog_isExtra` ON `paymentLog` (`isExtra`);
+CREATE INDEX IF NOT EXISTS `idx_paymentLog_contract_isExtra` ON `paymentLog` (`contractEsntlId`, `isExtra`, `withdrawalStatus`);

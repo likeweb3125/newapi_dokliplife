@@ -198,6 +198,10 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                             type: string
  *                             description: '결제 유형 (checkInPay: 입실료, extraPay: 추가결제)'
  *                             example: checkInPay
+ *                           isExtra:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '추가 결제 시 extraPayment.esntlId (EXTR 접두어), 일반 연장 결제 시 null'
  *                           contractEsntlId:
  *                             type: string
  *                             example: RCTT0000000001

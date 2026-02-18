@@ -2,6 +2,7 @@ const express = require('express');
 const { mariaDBSequelize } = require('../models');
 const errorHandler = require('../middleware/error');
 const { QueryTypes } = require('sequelize');
+const dailySellingClosing = require('../jobs/dailySellingClosing');
 
 // TODO: GosiwonCalculate 모듈 import 필요
 // const GosiwonCalculate = require('../models/gosiwonCalculate');
@@ -444,6 +445,21 @@ exports.selectListToPaymentLog = async (req, res, next) => {
 
 		res.json(result);
 	} catch (err) {
+		next(err);
+	}
+};
+
+/**
+ * 일일 매출 마감 1회 실행 (스케줄러와 동일 로직, 수동 테스트/재실행용)
+ */
+exports.runDailySellingClosing = async (req, res, next) => {
+	try {
+		console.log('[calculate] POST /daily/closing/run 요청 수신');
+		const result = await dailySellingClosing.run();
+		console.log('[calculate] POST /daily/closing/run 완료', result);
+		errorHandler.successThrow(res, '일일 매출 마감 1회 실행 완료', result);
+	} catch (err) {
+		console.error('[calculate] POST /daily/closing/run 실패', err.message);
 		next(err);
 	}
 };

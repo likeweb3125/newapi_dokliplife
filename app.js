@@ -185,3 +185,7 @@ app.use(errorHandler.routesStatusCode);
 app.use(errorHandler.statusCodeReturn);
 
 app.listen(5001);
+
+// 매일 자정 일일 매출 마감 스케줄러 기동
+const scheduler = require('./src/jobs/scheduler');
+scheduler.start();
