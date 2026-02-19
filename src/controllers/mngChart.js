@@ -386,6 +386,7 @@ exports.mngChartMain = async (req, res, next) => {
 				RCW.customerAge AS contractorAge,
 				PL.paymentAmount,
 				PL.pyl_goods_amount,
+				GA.ceo AS adminName,
 				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
 					SELECT D.rdp_eid FROM il_room_deposit D
 					WHERE D.rom_eid = RS.roomEsntlId AND D.gsw_eid = RS.gosiwonEsntlId AND D.rdp_delete_dtm IS NULL
@@ -427,6 +428,8 @@ exports.mngChartMain = async (req, res, next) => {
 				) ELSE NULL END AS depositPrice
 			FROM roomStatus RS
 			JOIN room R ON RS.roomEsntlId = R.esntlId
+			LEFT JOIN gosiwon G ON RS.gosiwonEsntlId = G.esntlId
+			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			LEFT JOIN roomContract RC ON RS.contractEsntlId = RC.esntlId
 			LEFT JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
@@ -504,9 +507,22 @@ exports.mngChartMain = async (req, res, next) => {
 
 		// 4. Items 데이터 변환 (roomStatus 기준: start/end=roomStatus, contractStart/contractEnd=roomContract)
 		const items = [];
-		const roomStatusesArray = [];
+		const statusLinesByRoom = {}; // roomEsntlId -> [{ typeName, datetime, color, adminName, dateStr }] (roomStatuses용 content 수집)
 		let itemIdCounter = 0;
-		let statusItemIdCounter = 0;
+
+		const pushStatusLine = (roomEsntlId, rowOrStatus, createdAtField = 'roomStatusCreatedAt') => {
+			if (!roomEsntlId) return;
+			const raw = rowOrStatus[createdAtField] ?? rowOrStatus.createdAt;
+			if (!raw) return;
+			const status = rowOrStatus.status;
+			const typeName = getTypeName(status, rowOrStatus.statusMemo ?? null);
+			const datetime = formatDateTime(raw);
+			const dateStr = formatDateOnly(raw);
+			const color = (STATUS_MAP[status] && STATUS_MAP[status].color) ? STATUS_MAP[status].color : '#9B9B9B';
+			const adminName = rowOrStatus.adminName ?? null;
+			if (!statusLinesByRoom[roomEsntlId]) statusLinesByRoom[roomEsntlId] = [];
+			statusLinesByRoom[roomEsntlId].push({ typeName, datetime, color, adminName, dateStr });
+		};
 
 		// roomStatus 기준 Items 추가 (CONTRACT/OVERDUE/ROOM_MOVE → contract, CHECKOUT_REQUESTED → disabled)
 		roomStatusItems.forEach((row) => {
@@ -615,13 +631,7 @@ exports.mngChartMain = async (req, res, next) => {
 				if (row.depositCompleteDate != null) reserveOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
 				if (row.depositPrice != null) reserveOverrides.depositPrice = row.depositPrice;
 				items.push(baseItem(reserveOverrides));
-				roomStatusesArray.push({
-					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
-					group: row.roomEsntlId,
-					itemType: 'system',
-					className: 'room-statuses',
-					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
-				});
+				pushStatusLine(row.roomEsntlId, row);
 			} else if (row.status !== 'CHECKOUT_REQUESTED') {
 				// CONTRACT, OVERDUE, ROOM_MOVE → contract (계약 있으면 정보 포함, 없으면 null, className은 timeline-item 고정)
 				const contractOverrides = {};
@@ -676,13 +686,7 @@ exports.mngChartMain = async (req, res, next) => {
 					contractItem._moveSubStatus = row.subStatus;
 				}
 				items.push(contractItem);
-				roomStatusesArray.push({
-					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
-					group: row.roomEsntlId,
-					itemType: 'system',
-					className: 'room-statuses',
-					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
-				});
+				pushStatusLine(row.roomEsntlId, row);
 			} else {
 				// CHECKOUT_REQUESTED → contract 형식 (계약 있으면 포함, 없으면 null, className은 timeline-item 고정)
 				const checkoutOverrides = {};
@@ -714,13 +718,7 @@ exports.mngChartMain = async (req, res, next) => {
 					if (row.depositPrice != null) checkoutOverrides.depositPrice = row.depositPrice;
 				}
 				items.push(baseItem(checkoutOverrides));
-				roomStatusesArray.push({
-					id: `room-${row.roomEsntlId}-statuses-${statusItemIdCounter++}`,
-					group: row.roomEsntlId,
-					itemType: 'system',
-					className: 'room-statuses',
-					createdAt: row.roomStatusCreatedAt ? formatDateTime(row.roomStatusCreatedAt) : null,
-				});
+				pushStatusLine(row.roomEsntlId, row);
 			}
 		});
 
@@ -855,13 +853,68 @@ exports.mngChartMain = async (req, res, next) => {
 				additionalPaymentOption: null,
 			});
 
-			// roomStatuses: 등록일(createdAt), className "room-statuses" 고정, itemType "system"
+			pushStatusLine(status.roomEsntlId, status, 'createdAt');
+		});
+
+		// history 테이블: roomEsntlId·createdAt 기준 조회 후 roomStatuses content에 추가, start/end는 createdAt 반영
+		const roomIds = groups.map((g) => g.id || g.roomEsntlId).filter(Boolean);
+		if (roomIds.length > 0) {
+			const historyPlaceholders = roomIds.map(() => '?').join(',');
+			const historyQuery = `
+				SELECT roomEsntlId, content, createdAt
+				FROM history
+				WHERE gosiwonEsntlId = ?
+					AND roomEsntlId IN (${historyPlaceholders})
+					AND DATE(createdAt) >= ? AND DATE(createdAt) < ?
+					AND deleteYN = 'N'
+				ORDER BY createdAt ASC
+			`;
+			const historyRows = await mariaDBSequelize.query(historyQuery, {
+				replacements: [gosiwonEsntlId, ...roomIds, startDateStr, endDateStr],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			});
+			historyRows.forEach((row) => {
+				if (!row.roomEsntlId) return;
+				if (!statusLinesByRoom[row.roomEsntlId]) statusLinesByRoom[row.roomEsntlId] = [];
+				const datetime = formatDateTime(row.createdAt);
+				const dateStr = formatDateOnly(row.createdAt);
+				const typeName = (row.content && String(row.content).trim()) || '(내역)';
+				statusLinesByRoom[row.roomEsntlId].push({
+					typeName,
+					datetime,
+					color: '#9B9B9B',
+					adminName: null,
+					dateStr,
+				});
+			});
+		}
+
+		// roomStatuses: 방별로 content[], start, end(createdAt 기준) colors 형식으로 집계 (groups 순서 유지)
+		const roomStatusesArray = [];
+		let statusBlockIdx = 0;
+		groups.forEach((g, groupIndex) => {
+			const roomEsntlId = g.id || g.roomEsntlId;
+			const lines = statusLinesByRoom[roomEsntlId];
+			if (!lines || lines.length === 0) return;
+			// datetime 오름차순 정렬 (오래된 것 먼저)
+			lines.sort((a, b) => (a.datetime || '').localeCompare(b.datetime || ''));
+			const content = lines.map((l) => {
+				const dtShort = l.datetime && l.datetime.length >= 19 ? l.datetime.slice(2, 19) : l.datetime; // YY-MM-DD HH:mm:ss
+				const adminPart = l.adminName ? `${l.adminName}(관리자)` : '(관리자)';
+				return `${l.typeName} ${dtShort} ${adminPart}`.trim();
+			});
+			const startDate = lines[0].dateStr || null;
+			const endDate = lines[lines.length - 1].dateStr || null;
+			const colors = lines.map((l) => l.color);
 			roomStatusesArray.push({
-				id: `room-${status.roomEsntlId}-statuses-${statusItemIdCounter++}`,
-				group: status.roomEsntlId,
+				id: `room-${groupIndex}-statuses-${statusBlockIdx++}`,
+				group: groupIndex,
 				itemType: 'system',
+				content,
+				start: startDate || '',
+				end: endDate || startDate || '',
 				className: 'room-statuses',
-				createdAt: formatDateTime(status.createdAt),
+				colors,
 			});
 		});
 

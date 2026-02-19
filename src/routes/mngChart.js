@@ -242,26 +242,38 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: 상태 색상 배열 (system 타입일 때)
  *                     roomStatuses:
  *                       type: array
- *                       description: "items에 표시되는 값들의 등록일(createdAt). className은 room-statuses 고정"
+ *                       description: "방별 상태 이력. 방(group index)당 1건, content 배열에 '상태명 YY-MM-DD HH:mm:ss 관리자명(관리자)' 형식 문자열"
  *                       items:
  *                         type: object
  *                         properties:
  *                           id:
  *                             type: string
- *                             description: 상태 아이템 ID
+ *                             description: 상태 블록 ID (예: room-0-statuses-0)
  *                           group:
- *                             type: string
- *                             description: 방 고유 아이디 (roomEsntlId)
+ *                             type: integer
+ *                             description: 그룹 인덱스 (groups 순서와 동일)
  *                           itemType:
  *                             type: string
  *                             description: "아이템 타입 (고정값: system)"
+ *                           content:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                             description: "상태 이력 문자열 배열 (예: '판매신청 20-10-01 10:40:08 김소연(관리자)')"
+ *                           start:
+ *                             type: string
+ *                             description: 해당 방 상태 이력의 시작일 (YYYY-MM-DD)
+ *                           end:
+ *                             type: string
+ *                             description: 해당 방 상태 이력의 종료일 (YYYY-MM-DD)
  *                           className:
  *                             type: string
  *                             description: "CSS 클래스명 (고정값: room-statuses)"
- *                           createdAt:
- *                             type: string
- *                             format: date-time
- *                             description: 등록일
+ *                           colors:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                             description: "각 상태별 색상 코드 배열"
  *                     statusLabels:
  *                       type: object
  *                       description: "상태 코드 → 한글 명칭 맵 (STATUS_MAP 기반, 관리 편의)"
