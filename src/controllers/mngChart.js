@@ -234,25 +234,6 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// checkInName 디버그: 이용중/예약중인데 checkInName 비어 있으면 로그 (원인 추적용)
-		rooms.forEach((r) => {
-			const status = r.status || '';
-			const checkInName = r.checkInName || '';
-			const isContractOrReserved = status === 'CONTRACT' || status === 'RESERVED';
-			if (isContractOrReserved && !checkInName) {
-				console.log('[mngChart/groups checkInName 빈값]', {
-					roomEsntlId: r.id,
-					roomNumber: r.roomNumber,
-					status,
-					'RS.customerEsntlId': r._dbg_rsCustomerEsntlId ?? '(null)',
-					'RS.contractEsntlId': r._dbg_rsContractEsntlId ?? '(null)',
-					'customer.name (C)': r._dbg_customerName ?? '(null)',
-					'RCW.checkinName': r._dbg_rcwCheckinName ?? '(null)',
-					'RS.customerName': r._dbg_rsCustomerName ?? '(null)',
-				});
-			}
-		});
-
 		// 방별 계약 ID로 parkStatus 조회 (주차 정보)
 		const contractIds = [...new Set(rooms.map((r) => r.contractEsntlId).filter(Boolean))];
 		let parkStatusByContract = {};
@@ -867,6 +848,7 @@ exports.mngChartMain = async (req, res, next) => {
 					AND roomEsntlId IN (${historyPlaceholders})
 					AND DATE(createdAt) >= ? AND DATE(createdAt) < ?
 					AND deleteYN = 'N'
+					AND (category IS NULL OR category != 'ROOM')
 				ORDER BY createdAt ASC
 			`;
 			const historyRows = await mariaDBSequelize.query(historyQuery, {
@@ -889,32 +871,45 @@ exports.mngChartMain = async (req, res, next) => {
 			});
 		}
 
-		// roomStatuses: 방별로 content[], start, end(createdAt 기준) colors 형식으로 집계 (groups 순서 유지)
+		// roomStatuses: 방·날짜별로 1건씩, 당일만 표시 (start = end = 해당 날짜), content는 해당 날짜 라인만
 		const roomStatusesArray = [];
 		let statusBlockIdx = 0;
-		groups.forEach((g, groupIndex) => {
+		groups.forEach((g) => {
 			const roomEsntlId = g.id || g.roomEsntlId;
 			const lines = statusLinesByRoom[roomEsntlId];
 			if (!lines || lines.length === 0) return;
-			// datetime 오름차순 정렬 (오래된 것 먼저)
+			// datetime 오름차순 정렬
 			lines.sort((a, b) => (a.datetime || '').localeCompare(b.datetime || ''));
-			const content = lines.map((l) => {
-				const dtShort = l.datetime && l.datetime.length >= 19 ? l.datetime.slice(2, 19) : l.datetime; // YY-MM-DD HH:mm:ss
-				const adminPart = l.adminName ? `${l.adminName}(관리자)` : '(관리자)';
-				return `${l.typeName} ${dtShort} ${adminPart}`.trim();
+			// 날짜별로 묶기 (dateStr 기준)
+			const linesByDate = {};
+			lines.forEach((l) => {
+				const d = l.dateStr || '';
+				if (!linesByDate[d]) linesByDate[d] = [];
+				linesByDate[d].push(l);
 			});
-			const startDate = lines[0].dateStr || null;
-			const endDate = lines[lines.length - 1].dateStr || null;
-			const colors = lines.map((l) => l.color);
-			roomStatusesArray.push({
-				id: `room-${groupIndex}-statuses-${statusBlockIdx++}`,
-				group: groupIndex,
-				itemType: 'system',
-				content,
-				start: startDate || '',
-				end: endDate || startDate || '',
-				className: 'room-statuses',
-				colors,
+			const dates = Object.keys(linesByDate).filter(Boolean).sort();
+			dates.forEach((dateStr) => {
+				const dayLines = linesByDate[dateStr];
+				if (!dayLines || dayLines.length === 0) return;
+				const content = dayLines.map((l) => {
+					const dtShort = l.datetime && l.datetime.length >= 19 ? l.datetime.slice(2, 19) : l.datetime; // YY-MM-DD HH:mm:ss
+					const adminPart = l.adminName ? `${l.adminName}(관리자)` : '(관리자)';
+					return `${l.typeName} ${dtShort} ${adminPart}`.trim();
+				});
+				const colors = dayLines.map((l) => l.color);
+				const nextDay = new Date(dateStr + 'T12:00:00');
+				nextDay.setDate(nextDay.getDate() + 1);
+				const endStr = formatDateOnly(nextDay);
+				roomStatusesArray.push({
+					id: `room-${roomEsntlId}-statuses-${dateStr}-${statusBlockIdx++}`,
+					group: roomEsntlId,
+					itemType: 'system',
+					content,
+					start: dateStr,
+					end: endStr,
+					className: 'room-statuses',
+					colors,
+				});
 			});
 		});
 

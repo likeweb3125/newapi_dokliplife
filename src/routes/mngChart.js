@@ -250,8 +250,8 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             type: string
  *                             description: "상태 블록 ID (예: room-0-statuses-0)"
  *                           group:
- *                             type: integer
- *                             description: "그룹 인덱스 (groups 순서와 동일)"
+ *                             type: string
+ *                             description: "매칭되는 groups 항목의 id (roomEsntlId)"
  *                           itemType:
  *                             type: string
  *                             description: "아이템 타입 (고정값: system)"
