@@ -225,8 +225,8 @@ const roomAfterUse = async (
 		const sellEndDate = new Date(sellStartDate);
 		sellEndDate.setDate(sellEndDate.getDate() + sellAblePeriod);
 
-		// 무한대 날짜 (9999-12-31)
-		const infiniteDate = new Date('9999-12-31 23:59:59');
+		// CAN_CHECKIN 종료일: baseDate + checkin_able 일수 + sell_able 일수 (입실가능 종료 = 판매가능 종료와 동일)
+		const canCheckinEndDate = new Date(sellEndDate);
 
 		// CAN_CHECKIN 상태 레코드 생성
 		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
@@ -252,9 +252,9 @@ const roomAfterUse = async (
 					roomEsntlId,
 					gosiwonEsntlId,
 					checkinStartDate,
-					infiniteDate,
+					canCheckinEndDate,
 					checkinStartDate, // etcStartDate: statusStartDate와 동일
-					infiniteDate, // etcEndDate: statusEndDate와 동일
+					canCheckinEndDate, // etcEndDate: statusEndDate와 동일
 				],
 				type: mariaDBSequelize.QueryTypes.INSERT,
 				transaction,

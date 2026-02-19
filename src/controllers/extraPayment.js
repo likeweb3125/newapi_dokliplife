@@ -219,8 +219,8 @@ exports.roomExtraPayment = async (req, res, next) => {
 			// uniqueId 생성
 			const uniqueId = generateUniqueId(pDate, esntlId);
 
-			// extraPayment 생성 (extraCostName 또는 optionName이 '기타 비용'이면 자동차로 저장)
-			const savedOptionName = (extraCostName === '기타 비용' || optionName === '기타 비용') ? '자동차' : (optionName || null);
+			// extraPayment 생성 시 optionName은 요청값 그대로 저장
+			const savedOptionName = (optionName != null && String(optionName).trim() !== '') ? String(optionName).trim() : null;
 			const extraPaymentRecord = await extraPayment.create(
 				{
 					esntlId: esntlId,
@@ -256,8 +256,8 @@ exports.roomExtraPayment = async (req, res, next) => {
 
 			totalAmount += Math.abs(parseInt(cost, 10));
 
-			// 주차 로직: optionName이 '자동차'/'오토바이'일 때, '기타 비용'(extraCostName 또는 optionName)은 임시로 자동차로 인식
-			const parkingOptionName = (extraCostName === '기타 비용' || optionName === '기타 비용') ? '자동차' : optionName;
+			// 주차 로직: optionName이 '자동차'/'오토바이'일 때만 주차 대상으로 처리 (들어오는 값 그대로 사용)
+			const parkingOptionName = (optionName != null && String(optionName).trim() !== '') ? String(optionName).trim() : null;
 			const isParkingTarget = parkingOptionName === '자동차' || parkingOptionName === '오토바이';
 
 			if (isParkingTarget) {
@@ -303,7 +303,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 							status: 'PENDING', // 추가결제 등록 시 대기 상태, 결제 완료 후 CONTRACT 등으로 변경
 							useStartDate: useStartDate || pDate,
 							useEndDate: contract.endDate || null,
-							parkType: parkingOptionName, // 자동차 / 오토바이 (기타 비용은 자동차로 처리)
+							parkType: parkingOptionName, // 요청 optionName 그대로 (자동차/오토바이)
 							parkNumber: parkStatusMemo, // 차량번호 등
 							memo: parkStatusMemo,
 							deleteYN: 'N',
