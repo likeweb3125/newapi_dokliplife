@@ -123,17 +123,23 @@ exports.mngChartMain = async (req, res, next) => {
 		const gosiwonCeo = gosiwonRow?.gosiwonCeo ?? null;
 		const gosiwonCeoHp = gosiwonRow?.gosiwonCeoHp ?? null;
 
-		// 페이징 처리: 오늘 기준 1개월 간격 (로컬 날짜 사용)
-		// page=1: 오늘 ~ 1개월 전 (과거), page=0: 오늘 ~ 1개월 후 (미래), page=-1: 1개월후~2개월후...
+		// 페이징 처리 (로컬 날짜 사용)
+		// page=1: 오늘 기준 앞뒤 45일 (총 90일), page>=2: 1달씩 과거, page<=0: 1달씩 미래
 		const parsed = parseInt(page);
 		const pageNum = (page !== undefined && page !== '' && !isNaN(parsed)) ? parsed : 1;
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
-		
+
 		let startDate;
 		let endDate;
-		if (pageNum >= 1) {
-			// 과거: page=1 → 오늘~1개월전, page=2 → 1개월전~2개월전
+		if (pageNum === 1) {
+			// page=1: 오늘 기준 앞뒤 45일 (총 90일)
+			startDate = new Date(today);
+			startDate.setDate(startDate.getDate() - 45);
+			endDate = new Date(today);
+			endDate.setDate(endDate.getDate() + 45);
+		} else if (pageNum >= 2) {
+			// page>=2: 원래처럼 1달씩 과거 (page 2 = 1개월전~2개월전, page 3 = 2개월전~3개월전...)
 			endDate = new Date(today);
 			endDate.setMonth(endDate.getMonth() - (pageNum - 1));
 			startDate = new Date(today);
@@ -146,7 +152,7 @@ exports.mngChartMain = async (req, res, next) => {
 			endDate = new Date(today);
 			endDate.setMonth(endDate.getMonth() + absPage + 1);
 		}
-		
+
 		const pad2 = (n) => String(n).padStart(2, '0');
 		const toYmd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 		const endDateStr = toYmd(endDate);
