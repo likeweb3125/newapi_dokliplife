@@ -3,6 +3,7 @@ const { history, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const { next: idsNext } = require('../utils/idsNext');
 
 // 필수 연관 ID 검증
 const validateHistoryLinkage = ({
@@ -65,31 +66,9 @@ const verifyAdminToken = (req) => {
 	return decodedToken;
 };
 
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
+// 히스토리 ID 생성 (IDS 테이블 기반, 접두어 HIST)
 const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
+	return await idsNext('history', 'HIST', transaction);
 };
 
 // 히스토리 목록 조회
