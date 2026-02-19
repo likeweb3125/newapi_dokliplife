@@ -3,7 +3,6 @@ const {
 	ilRoomDeposit,
 	ilRoomDepositHistory,
 	depositDeduction,
-	depositRefund,
 	room,
 	gosiwon,
 	customer,
@@ -41,8 +40,6 @@ const verifyAdminToken = (req) => {
 
 const DEPOSITDEDUCTION_PREFIX = 'DEDU';
 const DEPOSITDEDUCTION_PADDING = 10;
-const DEPOSITREFUND_PREFIX = 'DERF';
-const DEPOSITREFUND_PADDING = 10;
 
 // ID 생성: IDS 테이블 사용 (il_room_deposit prefix RDP, il_room_deposit_history prefix RDPH)
 const generateIlRoomDepositId = (transaction) =>
@@ -114,32 +111,6 @@ const generateDepositDeductionId = async (transaction) => {
 	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
 	return `${DEPOSITDEDUCTION_PREFIX}${String(nextNumber).padStart(
 		DEPOSITDEDUCTION_PADDING,
-		'0'
-	)}`;
-};
-
-const generateDepositRefundId = async (transaction) => {
-	const latest = await depositRefund.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${DEPOSITREFUND_PREFIX}${String(1).padStart(
-			DEPOSITREFUND_PADDING,
-			'0'
-		)}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(DEPOSITREFUND_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${DEPOSITREFUND_PREFIX}${String(nextNumber).padStart(
-		DEPOSITREFUND_PADDING,
 		'0'
 	)}`;
 };
@@ -876,7 +847,7 @@ exports.getDepositHistoryDepositList = async (req, res, next) => {
 	return exports.getDepositHistory(req, res, next);
 };
 
-// 반환 이력 목록 (depositRefund 테이블 사용)
+// 반환 이력 목록 (il_room_deposit_history type=RETURN 기준)
 exports.getDepositHistoryReturnList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
@@ -888,7 +859,7 @@ exports.getDepositHistoryReturnList = async (req, res, next) => {
 		}
 
 		const whereCondition = {
-			deleteYN: 'N',
+			type: 'RETURN',
 		};
 
 		if (contractEsntlId) {
@@ -901,11 +872,12 @@ exports.getDepositHistoryReturnList = async (req, res, next) => {
 
 		const offset = (parseInt(page) - 1) * parseInt(limit);
 
-		const { count, rows } = await depositRefund.findAndCountAll({
+		const { count, rows } = await ilRoomDepositHistory.findAndCountAll({
 			where: whereCondition,
-			order: [['createdAt', 'DESC']],
+			order: [['refundDate', 'DESC'], ['createdAt', 'DESC']],
 			limit: parseInt(limit),
 			offset: offset,
+			raw: true,
 		});
 
 		// 날짜·시간은 DB/로컬 기준 그대로 표시 (UTC 변환·+9 적용 금지, cursorrules 준수)
@@ -920,18 +892,15 @@ exports.getDepositHistoryReturnList = async (req, res, next) => {
 			return `${year}-${month}-${day} ${hours}:${minutes}`;
 		};
 
-		const formattedRows = rows.map((row) => {
-			const rowData = row.toJSON();
-			if (rowData.createdAt) {
-				rowData.createdAt = formatDateTimeLocal(rowData.createdAt);
+		const formattedRows = (rows || []).map((row) => {
+			const out = { ...row };
+			if (out.refundDate) {
+				out.refundDate = formatDateTimeLocal(out.refundDate);
 			}
-			if (rowData.updatedAt) {
-				rowData.updatedAt = formatDateTimeLocal(rowData.updatedAt);
+			if (out.createdAt) {
+				out.createdAt = formatDateTimeLocal(out.createdAt);
 			}
-			if (rowData.deletedAt) {
-				rowData.deletedAt = formatDateTimeLocal(rowData.deletedAt);
-			}
-			return rowData;
+			return out;
 		});
 
 		return errorHandler.successThrow(res, '반환 이력 목록 조회 성공', {
@@ -1200,25 +1169,8 @@ exports.getContractCouponInfo = async (req, res, next) => {
 			}
 		}
 
-		// depositRefund 테이블에서 제일 최근 값 조회 후, status가 PARTIAL이면 remainAmount 반환
-		const depositRefundQuery = `
-			SELECT remainAmount, status
-			FROM depositRefund
-			WHERE contractEsntlId = ?
-				AND (deleteYN IS NULL OR deleteYN = 'N')
-			ORDER BY createdAt DESC
-			LIMIT 1
-		`;
-
-		const [depositRefundResult] = await mariaDBSequelize.query(depositRefundQuery, {
-			replacements: [contractEsntlId],
-			type: mariaDBSequelize.QueryTypes.SELECT,
-		});
-
-		// 최신 값이 있고 status가 PARTIAL이면 remainAmount 반환, 아니면 0
-		const remainAmount = depositRefundResult && depositRefundResult.status === 'PARTIAL' && depositRefundResult.remainAmount !== null && depositRefundResult.remainAmount !== undefined
-			? parseInt(depositRefundResult.remainAmount) || 0
-			: 0;
+		// depositRefund 테이블 제거에 따라 잔액은 0으로 반환 (필요 시 il_room_deposit_history 기반 계산 가능)
+		const remainAmount = 0;
 
 		const result = {
 			contractEsntlId: contractEsntlId,
@@ -1693,20 +1645,16 @@ exports.getDepositList = async (req, res, next) => {
 				DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i') as depositLastestTime,
 				D.rdp_regist_dtm as depositCreatedAt,
 				(
-					SELECT DR.status
-					FROM depositRefund DR
-					WHERE DR.contractEsntlId = COALESCE(RS.contractEsntlId, RC.esntlId)
-						AND (DR.deleteYN IS NULL OR DR.deleteYN = 'N')
-					ORDER BY DR.createdAt DESC
+					SELECT H_ret.status
+					FROM il_room_deposit_history H_ret
+					WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN'
+					ORDER BY COALESCE(H_ret.refundDate, H_ret.createdAt) DESC, H_ret.createdAt DESC
 					LIMIT 1
 				) as refundStatus,
 				(
-					SELECT DATE_FORMAT(DR.createdAt, '%Y-%m-%d %H:%i')
-					FROM depositRefund DR
-					WHERE DR.contractEsntlId = COALESCE(RS.contractEsntlId, RC.esntlId)
-						AND (DR.deleteYN IS NULL OR DR.deleteYN = 'N')
-					ORDER BY DR.createdAt DESC
-					LIMIT 1
+					SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i')
+					FROM il_room_deposit_history H_ret
+					WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN'
 				) as refundCreatedAt,
 				(
 					SELECT H_ret.status
@@ -1860,7 +1808,7 @@ exports.getDepositList = async (req, res, next) => {
 	}
 };
 
-// 보증금 환불 등록 (depositRefundRegist) - depositEsntlId 기준 il_room_deposit_history에 type=RETURN 이력만 INSERT. depositRefund 테이블 미사용
+// 보증금 환불 등록 (depositRefundRegist) - depositEsntlId 기준 il_room_deposit_history에 type=RETURN 이력만 INSERT
 exports.createDepositRefund = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {

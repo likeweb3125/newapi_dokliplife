@@ -73,7 +73,6 @@ db.depositHistory = require('./depositHistory')(mariaDBSequelize, Sequelize);
 db.ilRoomDeposit = require('./ilRoomDeposit')(mariaDBSequelize, Sequelize);
 db.ilRoomDepositHistory = require('./ilRoomDepositHistory')(mariaDBSequelize, Sequelize);
 db.depositDeduction = require('./depositDeduction')(mariaDBSequelize, Sequelize);
-db.depositRefund = require('./depositRefund')(mariaDBSequelize, Sequelize);
 db.memo = require('./memo')(mariaDBSequelize, Sequelize);
 db.history = require('./history')(mariaDBSequelize, Sequelize);
 db.parkStatus = require('./parkStatus')(mariaDBSequelize, Sequelize);

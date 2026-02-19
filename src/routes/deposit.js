@@ -696,12 +696,12 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                           refundStatus:
  *                             type: string
  *                             nullable: true
- *                             description: '보증금 환불 상태 (depositRefund.status - 해당 계약서 기준 제일 최근의 마지막 status값)'
+ *                             description: "il_room_deposit_history type=RETURN 기준 최신 이력의 status"
  *                             example: 'PARTIAL'
  *                           refundCreatedAt:
  *                             type: string
  *                             nullable: true
- *                             description: '보증금 환불 등록일자 (depositRefund.createdAt, 형식: YYYY-MM-DD HH:MM)'
+ *                             description: "il_room_deposit_history type=RETURN 기준 최근 반환일시 (형식: YYYY-MM-DD HH:MM)"
  *                             example: '2026-01-01 14:00'
  *                           returnStatus:
  *                             type: string
@@ -819,8 +819,8 @@ router.get('/depositList', depositController.getDepositList);
  *                       example: '110-123-456789'
  *                     remainAmount:
  *                       type: integer
- *                       description: '잔액 (depositRefund 테이블에서 해당 contractEsntlId의 최신 값의 status가 PARTIAL이면 remainAmount, 아니면 0)'
- *                       example: 50000
+ *                       description: "잔액 (depositRefund 테이블 제거로 0 반환)"
+ *                       example: 0
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -954,7 +954,7 @@ router.post('/depositRefundRegist', depositController.createDepositRefund);
  * /v1/deposit/depositReturn/list:
  *   get:
  *     summary: 보증금 반환 이력 목록
- *     description: 계약서 ID 또는 방 ID 기준으로 보증금 환불 이력을 조회합니다. (depositRefund 테이블 사용)
+ *     description: "계약서 ID 또는 방 ID 기준으로 보증금 반환 이력을 조회합니다. (il_room_deposit_history type=RETURN)"
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
