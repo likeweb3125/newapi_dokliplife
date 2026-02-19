@@ -1197,8 +1197,7 @@ exports.getGosiwonList = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		// status가 'OPERATE'인 고시원 목록과 COMPLETED 상태가 없는 계약서 개수를 함께 조회
-		// 하나라도 카운트가 있으면 상단으로 정렬
+		// status가 'OPERATE'인 고시원 목록과 예약금 미완료(rdp_completed_dtm IS NULL) 방 개수. reservationList의 reservationStatus=true와 동일(삭제된 건 포함)
 		const gosiwonList = await mariaDBSequelize.query(
 			`
 			SELECT 
@@ -1212,7 +1211,6 @@ exports.getGosiwonList = async (req, res, next) => {
 					COUNT(DISTINCT CASE 
 						WHEN d.rom_eid IS NOT NULL 
 						AND d.rdp_completed_dtm IS NULL
-						AND d.rdp_delete_dtm IS NULL
 						THEN d.rom_eid 
 					END) as pendingCount
 			FROM gosiwon g
@@ -1303,16 +1301,18 @@ exports.getReservationList = async (req, res, next) => {
 			)`);
 		}
 		
-		// reservationStatus 필터: D_latest(이미 조인된 방별 최신 예약금) 사용으로 상관 서브쿼리 제거
+		// reservationStatus 필터: 미완료(rdp_completed_dtm IS NULL) 예약금이 하나라도 있는 방만. 삭제된 건도 포함(EXISTS 사용)
 		const useReservationStatusFilter = reservationStatus === 'true' || reservationStatus === true;
 		if (useReservationStatusFilter) {
-			whereConditions.push('D_latest.rdp_completed_dtm IS NULL');
+			whereConditions.push(
+				"EXISTS (SELECT 1 FROM il_room_deposit D2 WHERE D2.rom_eid = R.esntlId AND D2.rdp_completed_dtm IS NULL)"
+			);
 		}
 
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 		const countWhereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-		// 방별 il_room_deposit 최신 1건만 조인. roomStatus는 room 테이블 상태(R.status) 사용. reservationName/contractorName 등은 room.customerEsntlId+방id로 roomContract·roomContractWho 참고
+		// 방별 il_room_deposit 최신 1건만 조인. roomStatus는 방당 1건만(동일 updatedAt 시 esntlId DESC로 타이브레이크). reservationName/contractorName 등은 roomContract·roomContractWho 참고
 		const query = `
 			SELECT
 				CASE 
@@ -1348,6 +1348,7 @@ exports.getReservationList = async (req, res, next) => {
 					FROM roomStatus
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
+				WHERE RS1.esntlId = (SELECT r3.esntlId FROM roomStatus r3 WHERE r3.roomEsntlId = RS1.roomEsntlId AND r3.updatedAt = RS1.updatedAt ORDER BY r3.esntlId DESC LIMIT 1)
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
 				SELECT RC1.*
@@ -1392,6 +1393,7 @@ exports.getReservationList = async (req, res, next) => {
 					FROM roomStatus
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.updatedAt = RS2.maxUpdatedAt
+				WHERE RS1.esntlId = (SELECT r3.esntlId FROM roomStatus r3 WHERE r3.roomEsntlId = RS1.roomEsntlId AND r3.updatedAt = RS1.updatedAt ORDER BY r3.esntlId DESC LIMIT 1)
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN (
 				SELECT RC1.*

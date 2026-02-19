@@ -45,6 +45,21 @@ const GOSIWON_PADDING = 10;
 const HISTORY_PREFIX = 'HISTORY';
 const HISTORY_PADDING = 10;
 
+/** gosiwonBuilding.parking, elevator를 DB 저장 형식(^T^, ^F^)으로 변환 */
+const normalizeGosiwonBuildingBoolean = (building) => {
+	if (!building || typeof building !== 'object') return building;
+	const out = { ...building };
+	const toCaret = (v) => {
+		if (v === '^T^' || v === '^F^') return v;
+		const s = v == null ? '' : String(v).trim().toUpperCase();
+		if (s === 'T' || s === 'TRUE' || s === '1' || s === 'Y') return '^T^';
+		return '^F^';
+	};
+	if (Object.prototype.hasOwnProperty.call(out, 'parking')) out.parking = toCaret(out.parking);
+	if (Object.prototype.hasOwnProperty.call(out, 'elevator')) out.elevator = toCaret(out.elevator);
+	return out;
+};
+
 // 히스토리 ID 생성 함수
 const generateHistoryId = async (transaction) => {
 	const latest = await history.findOne({
@@ -600,15 +615,16 @@ exports.createGosiwon = async (req, res, next) => {
 			);
 		}
 
-		// gosiwonBuilding 테이블에 데이터 삽입 (데이터가 있는 경우)
+		// gosiwonBuilding 테이블에 데이터 삽입 (데이터가 있는 경우). parking/elevator는 ^T^/^F^ 형식으로 저장
 		if (gosiwonBuilding) {
-			const buildingColumns = Object.keys(gosiwonBuilding)
+			const building = normalizeGosiwonBuildingBoolean(gosiwonBuilding);
+			const buildingColumns = Object.keys(building)
 				.map((key) => `\`${key}\``)
 				.join(', ');
-			const buildingValues = Object.keys(gosiwonBuilding)
+			const buildingValues = Object.keys(building)
 				.map(() => '?')
 				.join(', ');
-			const buildingParams = [esntlId, ...Object.values(gosiwonBuilding)];
+			const buildingParams = [esntlId, ...Object.values(building)];
 
 			await mariaDBSequelize.query(
 				`INSERT INTO gosiwonBuilding (esntlId, ${buildingColumns}) VALUES (?, ${buildingValues})`,
@@ -919,12 +935,13 @@ exports.updateGosiwon = async (req, res, next) => {
 			}
 		}
 
-		// gosiwonBuilding 테이블 업데이트 (데이터가 있는 경우)
+		// gosiwonBuilding 테이블 업데이트 (데이터가 있는 경우). parking/elevator는 ^T^/^F^ 형식으로 저장
 		if (gosiwonBuilding) {
-			const buildingSetClause = Object.keys(gosiwonBuilding)
+			const building = normalizeGosiwonBuildingBoolean(gosiwonBuilding);
+			const buildingSetClause = Object.keys(building)
 				.map((key) => `\`${key}\` = ?`)
 				.join(', ');
-			const buildingParams = [...Object.values(gosiwonBuilding), esntlId];
+			const buildingParams = [...Object.values(building), esntlId];
 
 			const [existingBuilding] = await mariaDBSequelize.query(
 				`SELECT esntlId FROM gosiwonBuilding WHERE esntlId = ?`,
@@ -945,13 +962,13 @@ exports.updateGosiwon = async (req, res, next) => {
 					}
 				);
 			} else {
-				const buildingColumns = Object.keys(gosiwonBuilding)
+				const buildingColumns = Object.keys(building)
 					.map((key) => `\`${key}\``)
 					.join(', ');
-				const buildingValues = Object.keys(gosiwonBuilding)
+				const buildingValues = Object.keys(building)
 					.map(() => '?')
 					.join(', ');
-				const insertParams = [esntlId, ...Object.values(gosiwonBuilding)];
+				const insertParams = [esntlId, ...Object.values(building)];
 
 				await mariaDBSequelize.query(
 					`INSERT INTO gosiwonBuilding (esntlId, ${buildingColumns}) VALUES (?, ${buildingValues})`,
