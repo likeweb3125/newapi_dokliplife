@@ -685,10 +685,18 @@ router.put('/detail', roomContractController.updateContract);
  *                       example: ROOM0000019357
  *                     extraData:
  *                       type: array
- *                       description: 추가 결제 내역 목록
+ *                       description: "추가 결제 내역 목록 (contractEsntlId에 해당하는 roomContract.monthlyRent, 정산상태 settlementStatus 포함)"
  *                       items:
  *                         type: object
  *                         properties:
+ *                           monthlyRent:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약(roomContract) 월세(monthlyRent)"
+ *                           settlementStatus:
+ *                             type: string
+ *                             enum: [PENDING, COMPLETE]
+ *                             description: "정산상태. paymentLog(extrapayEsntlId)의 pyl_expected_settlement_date 미경과 시 PENDING, 경과 후 il_daily_selling_closing(gsw_eid 해당 고시원, dsc_complete_dtm 현재 이전) 존재 시 COMPLETE."
  *                           esntlId:
  *                             type: string
  *                             description: 추가 결제 고유 아이디

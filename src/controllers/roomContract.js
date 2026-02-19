@@ -1,4 +1,4 @@
-const { mariaDBSequelize, room, customer, history, deposit, extraPayment } = require('../models');
+const { mariaDBSequelize, room, customer, history, deposit, extraPayment, paymentLog } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
@@ -946,12 +946,13 @@ exports.getDepositAndExtra = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id)
+		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id, monthlyRent)
 		const contractQuery = `
 			SELECT 
 				RC.esntlId AS contractEsntlId,
 				RC.gosiwonEsntlId,
-				RC.roomEsntlId
+				RC.roomEsntlId,
+				RC.monthlyRent AS monthlyRent
 			FROM roomContract RC
 			WHERE RC.esntlId = ?
 			LIMIT 1
@@ -976,6 +977,67 @@ exports.getDepositAndExtra = async (req, res, next) => {
 			raw: true,
 		});
 
+		// extraData에 monthlyRent·정산상태(settlementStatus) 추가
+		const extraEsntlIds = extraPaymentList.map((ep) => ep.esntlId);
+		let paymentLogByExtra = [];
+		if (extraEsntlIds.length > 0) {
+			paymentLogByExtra = await paymentLog.findAll({
+				where: {
+					extrapayEsntlId: extraEsntlIds,
+				},
+				attributes: ['extrapayEsntlId', 'pyl_expected_settlement_date'],
+				raw: true,
+			});
+		}
+		const paymentLogMap = paymentLogByExtra.reduce((acc, row) => {
+			if (row.extrapayEsntlId) {
+				acc[row.extrapayEsntlId] = row;
+			}
+			return acc;
+		}, {});
+
+		// 오늘 날짜 (YYYY-MM-DD, 서버 로컬 기준)
+		const now = new Date();
+		const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+		// 정산예정일이 지난 건에 대해 해당 고시원의 il_daily_selling_closing 정산 완료 여부 1회 조회
+		let closingComplete = false;
+		const hasSettlementDatePassed = paymentLogByExtra.some(
+			(row) => row.pyl_expected_settlement_date && row.pyl_expected_settlement_date <= todayStr
+		);
+		if (hasSettlementDatePassed && contractInfo.gosiwonEsntlId) {
+			const closingCheckSql = `
+				SELECT 1 AS ok
+				FROM il_daily_selling_closing
+				WHERE gsw_eid = ?
+					AND dsc_complete_dtm IS NOT NULL
+					AND dsc_complete_dtm <= NOW()
+				LIMIT 1
+			`;
+			const [closingRow] = await mariaDBSequelize.query(closingCheckSql, {
+				replacements: [contractInfo.gosiwonEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			});
+			closingComplete = !!closingRow;
+		}
+		const extraData = extraPaymentList.map((item) => {
+			const pl = paymentLogMap[item.esntlId];
+			const expectedDate = pl?.pyl_expected_settlement_date || null;
+			let settlementStatus = 'PENDING';
+			if (expectedDate) {
+				if (todayStr < expectedDate) {
+					settlementStatus = 'PENDING';
+				} else {
+					settlementStatus = closingComplete ? 'COMPLETE' : 'PENDING';
+				}
+			}
+			return {
+				...item,
+				monthlyRent: contractInfo.monthlyRent ?? null,
+				settlementStatus,
+			};
+		});
+
 		// deposit 테이블에서 해당 계약의 보증금 정보 조회
 		const depositList = await deposit.findAll({
 			where: {
@@ -989,7 +1051,7 @@ exports.getDepositAndExtra = async (req, res, next) => {
 			contractEsntlId: contractInfo.contractEsntlId,
 			gosiwonEsntlId: contractInfo.gosiwonEsntlId,
 			roomEsntlId: contractInfo.roomEsntlId,
-			extraData: extraPaymentList,
+			extraData,
 			depositData: depositList,
 		});
 	} catch (err) {
