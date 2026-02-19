@@ -897,16 +897,13 @@ exports.mngChartMain = async (req, res, next) => {
 					return `${l.typeName} ${dtShort} ${adminPart}`.trim();
 				});
 				const colors = dayLines.map((l) => l.color);
-				const nextDay = new Date(dateStr + 'T12:00:00');
-				nextDay.setDate(nextDay.getDate() + 1);
-				const endStr = formatDateOnly(nextDay);
 				roomStatusesArray.push({
 					id: `room-${roomEsntlId}-statuses-${dateStr}-${statusBlockIdx++}`,
 					group: roomEsntlId,
 					itemType: 'system',
 					content,
 					start: dateStr,
-					end: endStr,
+					end: dateStr,
 					className: 'room-statuses',
 					colors,
 				});
