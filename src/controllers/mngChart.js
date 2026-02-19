@@ -546,6 +546,7 @@ exports.mngChartMain = async (req, res, next) => {
 			const baseItem = (overrides = {}) => ({
 				id: itemIdCounter++,
 				group: row.roomEsntlId,
+				roomStatusEsntlId: row.id,
 				itemType: 'contract',
 				itemStatus: row.status,
 				typeName: getTypeName(row.status, row.statusMemo),
@@ -811,6 +812,7 @@ exports.mngChartMain = async (req, res, next) => {
 			items.push({
 				id: itemIdCounter++,
 				group: status.roomEsntlId,
+				roomStatusEsntlId: status.id,
 				itemType: 'contract',
 				itemStatus: status.status ?? null,
 				typeName: getTypeName(status.status, status.statusMemo),

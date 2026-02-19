@@ -3,6 +3,7 @@ const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { roomAfterUse } = require('./refund');
 const { next: idsNext } = require('../utils/idsNext');
+const { closeOpenStatusesForRoom } = require('../utils/roomStatusHelper');
 
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
@@ -386,8 +387,9 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
-		// 4. 새로운 roomStatus 레코드 생성 (이동할 방용, 새로운 계약서 연결)
+		// 4. 새로운 roomStatus 레코드 생성 (이동할 방용, 새로운 계약서 연결) (기존 미종료 상태는 신규 시작일로 종료 처리)
 		// statusStartDate는 moveDate, statusEndDate는 새 계약서의 endDate로 설정
+		await closeOpenStatusesForRoom(targetRoomEsntlId, moveDateStr, transaction);
 		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);
 		await mariaDBSequelize.query(
 			`
@@ -667,12 +669,13 @@ exports.processRoomMove = async (req, res, next) => {
 			transaction
 		);
 
-		// roomAfterUse가 상태를 생성하지 않은 경우: 나간 방에 BEFORE_SALES 무기한(9999년) INSERT
+		// roomAfterUse가 상태를 생성하지 않은 경우: 나간 방에 BEFORE_SALES 무기한(9999년) INSERT (기존 미종료 상태는 신규 시작일로 종료 처리)
 		if (createdRoomStatusIds.length === 0) {
-			const beforeSalesStatusId = await idsNext('roomStatus', undefined, transaction);
-			createdRoomStatusIds.push(beforeSalesStatusId);
 			const beforeSalesStartDate = moveDateStr; // 이동일 기준
 			const beforeSalesEndDate = '9999-12-31 23:59:59';
+			await closeOpenStatusesForRoom(originalRoomEsntlId, beforeSalesStartDate, transaction);
+			const beforeSalesStatusId = await idsNext('roomStatus', undefined, transaction);
+			createdRoomStatusIds.push(beforeSalesStatusId);
 			await mariaDBSequelize.query(
 				`
 				INSERT INTO roomStatus (

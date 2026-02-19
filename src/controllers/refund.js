@@ -9,6 +9,7 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const { closeOpenStatusesForRoom } = require('../utils/roomStatusHelper');
 const formatAge = require('../utils/formatAge');
 
 const HISTORY_PREFIX = 'HISTORY';
@@ -124,7 +125,8 @@ const roomAfterUse = async (
 			);
 		}
 
-		// ON_SALE 상태 레코드 생성
+		// ON_SALE 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
+		await closeOpenStatusesForRoom(roomEsntlId, sell_able_start_date, transaction);
 		const onSaleId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(onSaleId);
 		const onSaleStartDate = new Date(sell_able_start_date);
@@ -159,7 +161,8 @@ const roomAfterUse = async (
 			}
 		);
 
-		// CAN_CHECKIN 상태 레코드 생성
+		// CAN_CHECKIN 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
+		await closeOpenStatusesForRoom(roomEsntlId, can_checkin_start_date, transaction);
 		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(canCheckinId);
 		const canCheckinStartDate = new Date(can_checkin_start_date);
@@ -228,7 +231,8 @@ const roomAfterUse = async (
 		// CAN_CHECKIN 종료일: baseDate + checkin_able 일수 + sell_able 일수 (입실가능 종료 = 판매가능 종료와 동일)
 		const canCheckinEndDate = new Date(sellEndDate);
 
-		// CAN_CHECKIN 상태 레코드 생성
+		// CAN_CHECKIN 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
+		await closeOpenStatusesForRoom(roomEsntlId, checkinStartDate, transaction);
 		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(canCheckinId);
 		await mariaDBSequelize.query(
@@ -261,7 +265,8 @@ const roomAfterUse = async (
 			}
 		);
 
-		// ON_SALE 상태 레코드 생성
+		// ON_SALE 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
+		await closeOpenStatusesForRoom(roomEsntlId, sellStartDate, transaction);
 		const onSaleId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(onSaleId);
 		await mariaDBSequelize.query(
@@ -295,11 +300,12 @@ const roomAfterUse = async (
 		);
 	} else if (check_basic_sell === false) {
 		if (unableCheckInReason) {
-			// unableCheckInReason이 있는 경우: BEFORE_SALES 상태 생성
-			const beforeSalesId = await idsNext('roomStatus', undefined, transaction);
-			createdStatusIds.push(beforeSalesId);
+			// unableCheckInReason이 있는 경우: BEFORE_SALES 상태 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
 			const now = new Date();
 			const infiniteDate = new Date('9999-12-31 23:59:59');
+			await closeOpenStatusesForRoom(roomEsntlId, now, transaction);
+			const beforeSalesId = await idsNext('roomStatus', undefined, transaction);
+			createdStatusIds.push(beforeSalesId);
 
 			await mariaDBSequelize.query(
 				`

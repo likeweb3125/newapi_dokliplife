@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const { closeOpenStatusesForRoom } = require('../utils/roomStatusHelper');
 const aligoSMS = require('../module/aligo/sms');
 
 // 공통 토큰 검증 함수
@@ -1432,7 +1433,8 @@ exports.roomReserve = async (req, res, next) => {
 			}
 		);
 
-		// 3. roomStatus 테이블: RESERVE_PENDING(예약금 입금대기중) 레코드 추가
+		// 3. roomStatus 테이블: RESERVE_PENDING(예약금 입금대기중) 레코드 추가 (기존 미종료 상태는 신규 시작일로 종료 처리)
+		await closeOpenStatusesForRoom(roomEsntlId, checkInDate || rorContractEndDate, transaction);
 		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);
 		await mariaDBSequelize.query(
 			`INSERT INTO roomStatus (
@@ -1739,6 +1741,15 @@ exports.startRoomSell = async (req, res, next) => {
 							transaction,
 						}
 					);
+					// room 테이블 status를 OPEN으로 변경 (날짜는 변경하지 않음)
+					await mariaDBSequelize.query(
+						`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
+						{
+							replacements: [singleRoomId],
+							type: mariaDBSequelize.QueryTypes.UPDATE,
+							transaction,
+						}
+					);
 					// CAN_CHECKIN: 입실가능 기간(기존 etc)으로 업데이트 또는 삽입
 					const [existingCanCheckin] = await mariaDBSequelize.query(
 						`SELECT esntlId FROM roomStatus WHERE roomEsntlId = ? AND status = 'CAN_CHECKIN' LIMIT 1`,
@@ -1772,6 +1783,7 @@ exports.startRoomSell = async (req, res, next) => {
 							}
 						);
 					} else {
+						await closeOpenStatusesForRoom(singleRoomId, finalEtcStartDate, transaction);
 						const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 						await mariaDBSequelize.query(
 							`INSERT INTO roomStatus (
@@ -1801,15 +1813,6 @@ exports.startRoomSell = async (req, res, next) => {
 							}
 						);
 					}
-					// room 테이블 status를 OPEN으로 변경
-					await mariaDBSequelize.query(
-						`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
-						{
-							replacements: [singleRoomId],
-							type: mariaDBSequelize.QueryTypes.UPDATE,
-							transaction,
-						}
-					);
 					results.push({
 						roomId: singleRoomId,
 						action: 'updated',
@@ -1828,7 +1831,8 @@ exports.startRoomSell = async (req, res, next) => {
 					if (anyStatus) {
 						errorHandler.errorThrow(400, `해당 방의 상태가 'ON_SALE'이 아니어서 판매 시작을 할 수 없습니다. (현재 상태: ${anyStatus.status}, roomId: ${singleRoomId})`);
 					}
-					// roomStatus가 아무 것도 없을 때: ON_SALE + CAN_CHECKIN 새로 생성
+					// roomStatus가 아무 것도 없을 때: ON_SALE + CAN_CHECKIN 새로 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
+					await closeOpenStatusesForRoom(singleRoomId, statusStartDate, transaction);
 					const newStatusId = await idsNext('roomStatus', undefined, transaction);
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (
@@ -1857,6 +1861,7 @@ exports.startRoomSell = async (req, res, next) => {
 							transaction,
 						}
 					);
+					await closeOpenStatusesForRoom(singleRoomId, finalEtcStartDate, transaction);
 					const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (
@@ -1885,7 +1890,7 @@ exports.startRoomSell = async (req, res, next) => {
 							transaction,
 						}
 					);
-					// room 테이블 status를 OPEN으로 변경
+					// room 테이블 status를 OPEN으로 변경 (날짜는 변경하지 않음)
 					await mariaDBSequelize.query(
 						`UPDATE room SET status = 'OPEN' WHERE esntlId = ? AND deleteYN = 'N'`,
 						{
@@ -2111,6 +2116,7 @@ exports.addEventDirectly = async (req, res, next) => {
 		const startDtm = String(startDate).trim().length === 10 ? `${startDate} 00:00:00` : startDate;
 		const endDtm = String(endDate).trim().length === 10 ? `${endDate} 23:59:59` : endDate;
 
+		await closeOpenStatusesForRoom(roomEsntlId, startDtm, transaction);
 		const statusId = await idsNext('roomStatus', undefined, transaction);
 		await mariaDBSequelize.query(
 			`
@@ -2167,6 +2173,203 @@ exports.addEventDirectly = async (req, res, next) => {
 			statusEndDate: endDtm,
 			statusMemo: status === 'ETC' ? (statusMemo != null ? String(statusMemo).trim() : null) : null,
 			roomEmptyUpdated: !!(setRoomEmpty === true || setRoomEmpty === 'true'),
+		});
+	} catch (err) {
+		await transaction.rollback();
+		next(err);
+	}
+};
+
+// 판매중인 방 판매취소 및 상태 재정리
+exports.cancelSales = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		verifyAdminToken(req);
+
+		const {
+			gosiwonEsntlId,
+			roomEsntlId,
+			roomStatusEsntlId,
+			salesEndDate,
+			unableCheckinStartDate,
+			unableCheckinEndDate,
+			unableCheckinReason,
+			unableCheckinReasonDetail,
+			setInfinity,
+		} = req.body;
+
+		// 필수 필드 검증
+		if (!gosiwonEsntlId) {
+			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
+		}
+		if (!roomEsntlId) {
+			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
+		}
+		if (!roomStatusEsntlId) {
+			errorHandler.errorThrow(400, 'roomStatusEsntlId를 입력해주세요.');
+		}
+		if (!salesEndDate) {
+			errorHandler.errorThrow(400, 'salesEndDate를 입력해주세요.');
+		}
+		if (setInfinity === undefined || setInfinity === null) {
+			errorHandler.errorThrow(400, 'setInfinity를 입력해주세요.');
+		}
+
+		// setInfinity가 false인 경우 필수 필드 검증
+		if (setInfinity === false) {
+			if (!unableCheckinStartDate) {
+				errorHandler.errorThrow(400, 'setInfinity가 false인 경우 unableCheckinStartDate를 입력해주세요.');
+			}
+			if (!unableCheckinEndDate) {
+				errorHandler.errorThrow(400, 'setInfinity가 false인 경우 unableCheckinEndDate를 입력해주세요.');
+			}
+			if (!unableCheckinReason) {
+				errorHandler.errorThrow(400, 'setInfinity가 false인 경우 unableCheckinReason을 입력해주세요.');
+			}
+			if (!unableCheckinReasonDetail) {
+				errorHandler.errorThrow(400, 'setInfinity가 false인 경우 unableCheckinReasonDetail을 입력해주세요.');
+			}
+		}
+
+		// 방 정보 조회 (gosiwonEsntlId 확인)
+		const [roomRow] = await mariaDBSequelize.query(
+			`SELECT esntlId, gosiwonEsntlId FROM room WHERE esntlId = ? AND deleteYN = 'N' LIMIT 1`,
+			{
+				replacements: [roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (!roomRow) {
+			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
+		}
+		if (roomRow.gosiwonEsntlId !== gosiwonEsntlId) {
+			errorHandler.errorThrow(400, '방의 고시원 ID가 일치하지 않습니다.');
+		}
+
+		// roomStatusEsntlId 존재 확인
+		const [existingStatus] = await mariaDBSequelize.query(
+			`SELECT esntlId, roomEsntlId, status FROM roomStatus WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [roomStatusEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (!existingStatus) {
+			errorHandler.errorThrow(404, '방상태 정보를 찾을 수 없습니다.');
+		}
+		if (existingStatus.roomEsntlId !== roomEsntlId) {
+			errorHandler.errorThrow(400, '방상태의 방 ID가 일치하지 않습니다.');
+		}
+
+		// 1. roomStatusEsntlId의 statusEndDate를 salesEndDate로 수정
+		const salesEndDtm = String(salesEndDate).trim().length === 10 ? `${salesEndDate} 23:59:59` : salesEndDate;
+		await mariaDBSequelize.query(
+			`UPDATE roomStatus SET statusEndDate = ?, updatedAt = NOW() WHERE esntlId = ?`,
+			{
+				replacements: [salesEndDtm, roomStatusEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		let newRoomStatusEsntlId = null;
+
+		// 2. setInfinity에 따라 신규 roomStatus 추가 (기존 미종료 상태는 신규 시작일로 종료 처리)
+		if (setInfinity === true) {
+			// 무기한 판매중지
+			const today = new Date();
+			const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+			const startDtm = `${todayStr} 00:00:00`;
+			const endDtm = '9999-12-31 23:59:59';
+
+			await closeOpenStatusesForRoom(roomEsntlId, startDtm, transaction);
+			newRoomStatusEsntlId = await idsNext('roomStatus', undefined, transaction);
+			await mariaDBSequelize.query(
+				`INSERT INTO roomStatus (
+					esntlId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					status,
+					statusMemo,
+					statusStartDate,
+					statusEndDate,
+					etcStartDate,
+					etcEndDate,
+					createdAt,
+					updatedAt
+				) VALUES (?, ?, ?, 'ETC', ?, ?, ?, ?, ?, NOW(), NOW())`,
+				{
+					replacements: [
+						newRoomStatusEsntlId,
+						roomEsntlId,
+						gosiwonEsntlId,
+						'무기한 판매중지',
+						startDtm,
+						endDtm,
+						startDtm,
+						endDtm,
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
+					transaction,
+				}
+			);
+		} else {
+			// 기간 판매중지
+			const startDtm = String(unableCheckinStartDate).trim().length === 10 ? `${unableCheckinStartDate} 00:00:00` : unableCheckinStartDate;
+			const endDtm = String(unableCheckinEndDate).trim().length === 10 ? `${unableCheckinEndDate} 23:59:59` : unableCheckinEndDate;
+			const statusMemo = `${unableCheckinReason} : ${unableCheckinReasonDetail}`;
+
+			await closeOpenStatusesForRoom(roomEsntlId, startDtm, transaction);
+			newRoomStatusEsntlId = await idsNext('roomStatus', undefined, transaction);
+			await mariaDBSequelize.query(
+				`INSERT INTO roomStatus (
+					esntlId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					status,
+					statusMemo,
+					statusStartDate,
+					statusEndDate,
+					etcStartDate,
+					etcEndDate,
+					createdAt,
+					updatedAt
+				) VALUES (?, ?, ?, 'ETC', ?, ?, ?, ?, ?, NOW(), NOW())`,
+				{
+					replacements: [
+						newRoomStatusEsntlId,
+						roomEsntlId,
+						gosiwonEsntlId,
+						statusMemo,
+						startDtm,
+						endDtm,
+						startDtm,
+						endDtm,
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
+					transaction,
+				}
+			);
+		}
+
+		// room 테이블 status를 EMPTY로 변경 (날짜는 변경하지 않음)
+		await mariaDBSequelize.query(
+			`UPDATE room SET status = 'EMPTY' WHERE esntlId = ? AND deleteYN = 'N'`,
+			{
+				replacements: [roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		await transaction.commit();
+
+		errorHandler.successThrow(res, '판매취소 및 상태 재정리가 완료되었습니다.', {
+			roomStatusEsntlId,
+			newRoomStatusEsntlId,
+			statusEndDate: salesEndDtm,
 		});
 	} catch (err) {
 		await transaction.rollback();

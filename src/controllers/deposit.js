@@ -1614,38 +1614,39 @@ exports.getDepositList = async (req, res, next) => {
 		const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
 		// il_room_deposit 주테이블. R.customerEsntlId + 방id(D.rom_eid)로 roomContract.esntlId 확정 후 roomContractWho에서 checkinName/checkinPhone/contractorName/contractorPhone 표시
+		// GROUP BY D.rdp_eid로 중복 제거 (여러 JOIN으로 인한 중복 방지)
 		const query = `
 			SELECT
 				D.rdp_eid as depositEsntlId,
-				R.esntlId as roomEsntlId,
-				R.roomNumber,
-				R.gosiwonEsntlId,
-				G.name as gosiwonName,
-				C.name as currentOccupantName,
-				R.customerEsntlId as currentOccupantID,
-				ICR.cre_bank_name as customerBank,
-				ICR.cre_account_number as customerBankAccount,
-				TRIM(CONCAT(IFNULL(ICR.cre_bank_name,''), ' ', IFNULL(ICR.cre_account_number,''))) as refundBankAccount,
-				COALESCE(RCW.checkinName, RCW_RS.checkinName) AS checkinName,
-				COALESCE(RCW.checkinPhone, RCW_RS.checkinPhone) AS checkinPhone,
-				COALESCE(RCW.customerName, RCW_RS.customerName) as contractorName,
-				COALESCE(RCW.customerPhone, RCW_RS.customerPhone) as contractorPhone,
-				D.rdp_price as depositAmount,
-				COALESCE(RS.contractEsntlId, RC.esntlId) as contractEsntlId,
-				DATE(COALESCE(RC_RS.startDate, RC.startDate)) as moveInDate,
-				DATE(COALESCE(RC_RS.endDate, RC.endDate)) as moveOutDate,
-				COALESCE(RC_RS.status, RC.status) as contractStatus,
-				CASE
+				MAX(R.esntlId) as roomEsntlId,
+				MAX(R.roomNumber) as roomNumber,
+				MAX(R.gosiwonEsntlId) as gosiwonEsntlId,
+				MAX(G.name) as gosiwonName,
+				MAX(C.name) as currentOccupantName,
+				MAX(R.customerEsntlId) as currentOccupantID,
+				MAX(ICR.cre_bank_name) as customerBank,
+				MAX(ICR.cre_account_number) as customerBankAccount,
+				MAX(TRIM(CONCAT(IFNULL(ICR.cre_bank_name,''), ' ', IFNULL(ICR.cre_account_number,'')))) as refundBankAccount,
+				MAX(COALESCE(RCW.checkinName, RCW_RS.checkinName)) AS checkinName,
+				MAX(COALESCE(RCW.checkinPhone, RCW_RS.checkinPhone)) AS checkinPhone,
+				MAX(COALESCE(RCW.customerName, RCW_RS.customerName)) as contractorName,
+				MAX(COALESCE(RCW.customerPhone, RCW_RS.customerPhone)) as contractorPhone,
+				MAX(D.rdp_price) as depositAmount,
+				MAX(COALESCE(RS.contractEsntlId, RC.esntlId)) as contractEsntlId,
+				MAX(DATE(COALESCE(RC_RS.startDate, RC.startDate))) as moveInDate,
+				MAX(DATE(COALESCE(RC_RS.endDate, RC.endDate))) as moveOutDate,
+				MAX(COALESCE(RC_RS.status, RC.status)) as contractStatus,
+				MAX(CASE
 					WHEN DH.status IS NULL THEN NULL
 					WHEN DH.status = 'PENDING' THEN 'PENDING'
 					WHEN DH.status = 'PARTIAL' THEN 'PARTIAL'
 					WHEN DH.status = 'DELETED' THEN 'DELETED'
 					WHEN DH.status IN ('COMPLETED', 'RETURN_COMPLETED') THEN 'COMPLETE'
 					ELSE DH.status
-				END as depositStatus,
+				END) as depositStatus,
 				(SELECT COALESCE(SUM(H_sum.amount), 0) FROM il_room_deposit_history H_sum WHERE H_sum.depositEsntlId = D.rdp_eid) as depositLastestAmount,
-				DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i') as depositLastestTime,
-				D.rdp_regist_dtm as depositCreatedAt,
+				MAX(DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i')) as depositLastestTime,
+				MAX(D.rdp_regist_dtm) as depositCreatedAt,
 				(
 					SELECT H_ret.status
 					FROM il_room_deposit_history H_ret
@@ -1714,9 +1715,10 @@ exports.getDepositList = async (req, res, next) => {
 				) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt
 			) DH ON D.rdp_eid = DH.depositEsntlId
 			${whereClause}
+			GROUP BY D.rdp_eid
 			ORDER BY 
-				COALESCE(D.rdp_regist_dtm, '1970-01-01') DESC,
-				R.roomNumber ASC
+				MAX(COALESCE(D.rdp_regist_dtm, '1970-01-01')) DESC,
+				MAX(R.roomNumber) ASC
 			LIMIT ? OFFSET ?
 		`;
 

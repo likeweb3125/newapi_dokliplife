@@ -128,6 +128,9 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           group:
  *                             type: string
  *                             description: 방 고유 아이디 (roomEsntlId)
+ *                           roomStatusEsntlId:
+ *                             type: string
+ *                             description: "roomStatus 고유 아이디 (roomStatus.esntlId)"
  *                           itemType:
  *                             type: string
  *                             enum: [contract, disabled, system]

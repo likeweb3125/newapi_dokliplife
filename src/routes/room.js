@@ -1696,5 +1696,104 @@ router.post('/roomSell/start', roomController.startRoomSell);
  */
 router.get('/free/list', roomController.getFreeRoomList);
 
+/**
+ * @swagger
+ * /v1/room/roomSell/end:
+ *   post:
+ *     summary: 판매중인 방 판매취소 및 상태 재정리
+ *     description: "판매중인 방을 판매취소하고 상태값을 재정리합니다. roomStatusEsntlId의 statusEndDate를 판매종료일로 수정하고, setInfinity에 따라 무기한 또는 기간 판매중지 상태를 추가합니다."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - gosiwonEsntlId
+ *               - roomEsntlId
+ *               - roomStatusEsntlId
+ *               - salesEndDate
+ *               - setInfinity
+ *             properties:
+ *               gosiwonEsntlId:
+ *                 type: string
+ *                 description: 고시원 고유 아이디
+ *                 example: GOSI0000000199
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 고유 아이디
+ *                 example: ROOM0000019357
+ *               roomStatusEsntlId:
+ *                 type: string
+ *                 description: 방상태 고유 아이디 (판매중 상태의 roomStatus.esntlId)
+ *                 example: RSTA0000000001
+ *               salesEndDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 판매종료일 (YYYY-MM-DD)
+ *                 example: 2025-12-31
+ *               unableCheckinStartDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 입실불가시작일 (setInfinity가 false인 경우 필수, YYYY-MM-DD)
+ *                 example: 2026-01-01
+ *               unableCheckinEndDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 입실불가종료일 (setInfinity가 false인 경우 필수, YYYY-MM-DD)
+ *                 example: 2026-01-31
+ *               unableCheckinReason:
+ *                 type: string
+ *                 description: 입실불가이유 (setInfinity가 false인 경우 필수)
+ *                 example: 리모델링
+ *               unableCheckinReasonDetail:
+ *                 type: string
+ *                 description: 입실불가이유상세 (setInfinity가 false인 경우 필수)
+ *                 example: 방 전체 리모델링 진행
+ *               setInfinity:
+ *                 type: boolean
+ *                 description: "무기한 판매중지 여부 (true: 무기한 판매중지, false: 기간 판매중지)"
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: 판매취소 및 상태 재정리 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 판매취소 및 상태 재정리가 완료되었습니다.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     roomStatusEsntlId:
+ *                       type: string
+ *                       description: 수정된 방상태 고유 아이디
+ *                     newRoomStatusEsntlId:
+ *                       type: string
+ *                       description: 새로 생성된 방상태 고유 아이디 (ETC 상태)
+ *                     statusEndDate:
+ *                       type: string
+ *                       format: date
+ *                       description: 수정된 판매종료일
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/roomSell/end', roomController.cancelSales);
+
 module.exports = router;
 
