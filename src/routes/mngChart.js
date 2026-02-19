@@ -248,10 +248,10 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                         properties:
  *                           id:
  *                             type: string
- *                             description: 상태 블록 ID (예: room-0-statuses-0)
+ *                             description: "상태 블록 ID (예: room-0-statuses-0)"
  *                           group:
  *                             type: integer
- *                             description: 그룹 인덱스 (groups 순서와 동일)
+ *                             description: "그룹 인덱스 (groups 순서와 동일)"
  *                           itemType:
  *                             type: string
  *                             description: "아이템 타입 (고정값: system)"
@@ -262,10 +262,10 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: "상태 이력 문자열 배열 (예: '판매신청 20-10-01 10:40:08 김소연(관리자)')"
  *                           start:
  *                             type: string
- *                             description: 해당 방 상태 이력의 시작일 (YYYY-MM-DD)
+ *                             description: "해당 방 상태 이력의 시작일 (YYYY-MM-DD)"
  *                           end:
  *                             type: string
- *                             description: 해당 방 상태 이력의 종료일 (YYYY-MM-DD)
+ *                             description: "해당 방 상태 이력의 종료일 (YYYY-MM-DD)"
  *                           className:
  *                             type: string
  *                             description: "CSS 클래스명 (고정값: room-statuses)"
