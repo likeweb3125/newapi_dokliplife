@@ -9,7 +9,7 @@ const {
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
-const { closeOpenStatusesForRoom } = require('../utils/roomStatusHelper');
+const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
 const formatAge = require('../utils/formatAge');
 
 const HISTORY_PREFIX = 'HISTORY';
@@ -160,6 +160,7 @@ const roomAfterUse = async (
 				transaction,
 			}
 		);
+		await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
 
 		// CAN_CHECKIN 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
 		await closeOpenStatusesForRoom(roomEsntlId, can_checkin_start_date, transaction);
@@ -196,6 +197,7 @@ const roomAfterUse = async (
 				transaction,
 			}
 		);
+		await syncRoomFromRoomStatus(roomEsntlId, 'CAN_CHECKIN', {}, transaction);
 	} else if (check_basic_sell === true) {
 		// il_gosiwon_config에서 설정값 조회
 		const [config] = await mariaDBSequelize.query(
@@ -264,6 +266,7 @@ const roomAfterUse = async (
 				transaction,
 			}
 		);
+		await syncRoomFromRoomStatus(roomEsntlId, 'CAN_CHECKIN', {}, transaction);
 
 		// ON_SALE 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
 		await closeOpenStatusesForRoom(roomEsntlId, sellStartDate, transaction);
@@ -298,6 +301,7 @@ const roomAfterUse = async (
 				transaction,
 			}
 		);
+		await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
 	} else if (check_basic_sell === false) {
 		if (unableCheckInReason) {
 			// unableCheckInReason이 있는 경우: BEFORE_SALES 상태 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
@@ -340,6 +344,7 @@ const roomAfterUse = async (
 					transaction,
 				}
 			);
+			await syncRoomFromRoomStatus(roomEsntlId, 'BEFORE_SALES', {}, transaction);
 		}
 	}
 	

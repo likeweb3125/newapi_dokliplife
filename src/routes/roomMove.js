@@ -15,7 +15,7 @@ const roomMoveController = require('../controllers/roomMove');
  * /v1/roomMove/process:
  *   post:
  *     summary: 방이동 처리
- *     description: '계약된 방을 다른 방으로 이동 처리합니다. roomStatus를 업데이트하고, roomMoveStatus에 기록을 남기며, 원래 방에 대해 roomAfterUse 함수를 호출합니다.'
+ *     description: "계약된 방을 다른 방으로 이동 처리합니다. 계약은 유지하며(신규 계약서 생성 없음) roomContract.roomEsntlId/startDate/endDate만 갱신하고 memo2에 '방이동: [원래방]에서 → [타겟방]로 이동'을 추가합니다. 원래 방 roomStatus는 ROOM_MOVE_OUT, statusEndDate=이동일-1일. 이동할 방에는 CONTRACT+ROOM_MOVE_IN roomStatus를 기존 계약 ID로 추가합니다. roomMoveStatus 기록 및 원래 방 roomAfterUse 호출."
  *     tags: [방이동]
  *     security:
  *       - bearerAuth: []
@@ -133,8 +133,12 @@ const roomMoveController = require('../controllers/roomMove');
  *                       example: RSTA0000000001
  *                     newRoomStatusId:
  *                       type: string
- *                       description: 새로운 방 상태 고유아이디
+ *                       description: "이동할 방에 생성된 방상태 고유아이디 (CONTRACT+ROOM_MOVE_IN)"
  *                       example: RSTA0000000002
+ *                     contractEsntlId:
+ *                       type: string
+ *                       description: "계약 고유아이디 (계약 유지 방식으로 동일 계약)"
+ *                       example: RCO0000000001
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

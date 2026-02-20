@@ -158,7 +158,8 @@ exports.mngChartMain = async (req, res, next) => {
 		const endDateStr = toYmd(endDate);
 		const startDateStr = toYmd(startDate);
 
-		// 1. Groups 데이터 조회 (활성 방 목록) - roomStatus 우선, statusStartDate 기준 최신 상태 사용 (esntlId/updatedAt 아님)
+		// 1. Groups 데이터 조회 (활성 방 목록) - 오늘 날짜가 해당하는 roomStatus 기준, 없으면 판매신청전
+		const todayStr = toYmd(today);
 		const groupsQuery = `
 			SELECT DISTINCT
 				R.esntlId AS id,
@@ -175,16 +176,7 @@ exports.mngChartMain = async (req, res, next) => {
 				R.useRoomRentFee,
 				RS.contractEsntlId,
 				RS.subStatus AS roomSubStatus,
-				COALESCE(
-					RS.status,
-					CASE 
-						WHEN R.status = 'CONTRACT' THEN 'CONTRACT'
-						WHEN R.status = 'RESERVE' THEN 'RESERVE_PENDING'
-						WHEN R.status = 'VBANK' THEN 'VBANK_PENDING'
-						WHEN R.status = 'EMPTY' OR R.status = '' OR R.status IS NULL THEN 'BEFORE_SALES'
-						ELSE 'BEFORE_SALES'
-					END
-				) AS status,
+				COALESCE(RS.status, 'BEFORE_SALES') AS status,
 				COALESCE(RS.customerName, '') AS currentGuest,
 				COALESCE(RCW.checkinName, C.name, RS.customerName, '') AS checkInName,
 				C.gender AS customerGender,
@@ -210,25 +202,14 @@ exports.mngChartMain = async (req, res, next) => {
 				SELECT RS1.*
 				FROM roomStatus RS1
 				INNER JOIN (
-					SELECT roomEsntlId, MAX(COALESCE(statusStartDate, etcStartDate, createdAt)) AS maxStartDate
+					SELECT roomEsntlId, MAX(esntlId) AS esntlId
 					FROM roomStatus
-					WHERE status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
-						AND (deleteYN IS NULL OR deleteYN = 'N')
+					WHERE (deleteYN IS NULL OR deleteYN = 'N')
+						AND DATE(?) >= DATE(statusStartDate)
+						AND (statusEndDate IS NULL OR DATE(?) <= DATE(statusEndDate))
 					GROUP BY roomEsntlId
-				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId
-					AND COALESCE(RS1.statusStartDate, RS1.etcStartDate, RS1.createdAt) = RS2.maxStartDate
-					AND RS1.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
-				AND (RS1.deleteYN IS NULL OR RS1.deleteYN = 'N')
-				WHERE RS1.esntlId = (
-					SELECT esntlId
-					FROM roomStatus RS3
-					WHERE RS3.roomEsntlId = RS1.roomEsntlId
-						AND COALESCE(RS3.statusStartDate, RS3.etcStartDate, RS3.createdAt) = RS2.maxStartDate
-						AND RS3.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
-						AND (RS3.deleteYN IS NULL OR RS3.deleteYN = 'N')
-					ORDER BY RS3.esntlId DESC
-					LIMIT 1
-				)
+				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.esntlId = RS2.esntlId
+				WHERE (RS1.deleteYN IS NULL OR RS1.deleteYN = 'N')
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN customer C ON RS.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RS.contractEsntlId = RCW.contractEsntlId
@@ -239,7 +220,7 @@ exports.mngChartMain = async (req, res, next) => {
 		`;
 
 		const rooms = await mariaDBSequelize.query(groupsQuery, {
-			replacements: [gosiwonEsntlId],
+			replacements: [todayStr, todayStr, gosiwonEsntlId],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
