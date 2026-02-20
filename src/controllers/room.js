@@ -2446,7 +2446,15 @@ exports.modifyStatus = async (req, res, next) => {
 			});
 		}
 
-		// update
+		// update: ISO datetime(2026-02-20T00:00:00.000Z) → MySQL DATETIME(2026-02-20 00:00:00) 형식으로 정규화
+		const toMysqlDatetime = (v) => {
+			if (v == null || v === '') return v;
+			const s = String(v).trim();
+			// T 제거, .000Z 등 제거 후 공백 하나로
+			const normalized = s.replace('T', ' ').replace(/\.\d+Z?$/i, '').replace(/Z$/i, '').trim();
+			return normalized;
+		};
+
 		if (statusStartDate === undefined && statusEndDate === undefined && statusMemo === undefined) {
 			errorHandler.errorThrow(400, '수정할 값(statusStartDate, statusEndDate, statusMemo) 중 하나 이상 입력해주세요.');
 		}
@@ -2454,11 +2462,11 @@ exports.modifyStatus = async (req, res, next) => {
 		const replacements = [];
 		if (statusStartDate !== undefined) {
 			updates.push('statusStartDate = ?');
-			replacements.push(statusStartDate);
+			replacements.push(toMysqlDatetime(statusStartDate));
 		}
 		if (statusEndDate !== undefined) {
 			updates.push('statusEndDate = ?');
-			replacements.push(statusEndDate);
+			replacements.push(toMysqlDatetime(statusEndDate));
 		}
 		if (statusMemo !== undefined) {
 			updates.push('statusMemo = ?');
