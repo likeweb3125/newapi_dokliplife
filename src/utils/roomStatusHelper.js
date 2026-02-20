@@ -49,6 +49,8 @@ function getRoomStatusFromRoomStatus(roomStatusStatus) {
  */
 async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {}, transaction = null) {
 	if (!roomEsntlId || !roomStatusStatus) return;
+	// CAN_CHECKIN 입력/수정 시에는 room 테이블 동기화하지 않음 (판매 기간 등만 반영, room.status는 유지)
+	if (roomStatusStatus === 'CAN_CHECKIN') return;
 	const roomStatus = getRoomStatusFromRoomStatus(roomStatusStatus);
 	const keepDates = roomStatus === 'CONTRACT' || roomStatus === 'RESERVE';
 	const startDate = options.startDate != null ? options.startDate : null;
