@@ -831,6 +831,45 @@ exports.mngChartMain = async (req, res, next) => {
 			pushStatusLine(status.roomEsntlId, status, 'createdAt');
 		});
 
+		// 5-1. 해당 그룹(방)에 item이 하나도 없으면 BEFORE_SALES 더미 아이템 추가 (2022-01-01 ~ 9999-12-31)
+		const groupIdsWithItems = new Set(items.map((it) => it.group).filter(Boolean));
+		groups.forEach((g) => {
+			const groupId = g.id || g.roomEsntlId;
+			if (!groupId || groupIdsWithItems.has(groupId)) return;
+			items.push({
+				id: itemIdCounter++,
+				group: groupId,
+				roomStatusEsntlId: null,
+				itemType: 'contract',
+				itemStatus: 'BEFORE_SALES',
+				typeName: getTypeName('BEFORE_SALES', null),
+				statusMemo: null,
+				start: formatDateTime('2022-01-01'),
+				end: formatDateTime('9999-12-31 23:59:59'),
+				contractStart: null,
+				contractEnd: null,
+				period: '01-01 ~ 12-31',
+				currentGuest: null,
+				guestPhone: null,
+				customerGender: null,
+				customerAge: null,
+				checkinGender: null,
+				checkinAge: null,
+				className: 'timeline-item',
+				contractNumber: null,
+				contractEsntlId: null,
+				guest: null,
+				contractPerson: null,
+				periodType: null,
+				contractType: null,
+				entryFee: null,
+				paymentAmount: null,
+				accountInfo: null,
+				deposit: null,
+				additionalPaymentOption: null,
+			});
+		});
+
 		// history 테이블: roomEsntlId·createdAt 기준 조회 후 roomStatuses content에 추가, start/end는 createdAt 반영
 		const roomIds = groups.map((g) => g.id || g.roomEsntlId).filter(Boolean);
 		if (roomIds.length > 0) {
