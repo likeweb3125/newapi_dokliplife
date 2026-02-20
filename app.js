@@ -69,6 +69,7 @@ const extraPaymentRoutes = require('./src/routes/extraPayment');
 const parkingManagementRoutes = require('./src/routes/parkingManagement');
 const calculateRoutes = require('./src/routes/calculate');
 const mngChartRoutes = require('./src/routes/mngChart');
+const dashboardRoutes = require('./src/routes/dashboard');
 const paymentRoutes = require('./src/routes/payment');
 
 const errorHandler = require('./src/middleware/error');
@@ -172,6 +173,9 @@ app.use('/v1/calculate', calculateRoutes);
 
 // 관리객실현황 Routes
 app.use('/v1/mngChart', mngChartRoutes);
+
+// 대시보드 Routes
+app.use('/v1/dashboard', dashboardRoutes);
 
 // 결제 Routes
 app.use('/v1/payment', paymentRoutes);
