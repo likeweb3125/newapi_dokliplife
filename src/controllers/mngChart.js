@@ -782,17 +782,22 @@ exports.mngChartMain = async (req, res, next) => {
 		});
 
 		// 4-1. roomStatus.subStatus ROOM_MOVE_IN/OUT인 CONTRACT items에 moveID·moveFrom·moveTo·moveRole 설정 (별도 room_move 아이템 없이, 이동은 하나의 유니크 moveID로 연결)
+		// roomMove 시 원래 방의 statusEndDate는 이동일-1로 저장되므로 OUT 아이템은 end일이 이동일-1과 매칭
 		let moveIDCounter = 1;
 		roomMoves.forEach((move) => {
 			const moveDateStr = formatDateOnly(move.moveDate);
 			if (!moveDateStr) return;
+			const moveDateParts = moveDateStr.split('-').map(Number);
+			const moveDatePrev = new Date(moveDateParts[0], moveDateParts[1] - 1, moveDateParts[2]);
+			moveDatePrev.setDate(moveDatePrev.getDate() - 1);
+			const moveDatePrevStr = `${moveDatePrev.getFullYear()}-${pad2(moveDatePrev.getMonth() + 1)}-${pad2(moveDatePrev.getDate())}`;
 
 			const outItem = items.find(
 				(it) =>
 					it.itemType === 'contract' &&
 					it._moveSubStatus === 'ROOM_MOVE_OUT' &&
 					it.group === move.originalRoomEsntlId &&
-					formatDateOnly(it.end) === moveDateStr
+					formatDateOnly(it.end) === moveDatePrevStr
 			);
 			const inItem = items.find(
 				(it) =>

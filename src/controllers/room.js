@@ -1637,6 +1637,8 @@ exports.startRoomSell = async (req, res, next) => {
 				etcEndDate,
 			} = roomData;
 
+			console.log('[roomSell/start] 요청 roomData:', { roomId, statusStartDate, statusEndDate, sameAsCheckinInfo });
+
 			// 필수 필드 검증
 			if (!roomId) {
 				errorHandler.errorThrow(400, 'roomId를 입력해주세요.');
@@ -1685,7 +1687,10 @@ exports.startRoomSell = async (req, res, next) => {
 					finalEtcEndDate = statusEndDate;
 					// statusEndDate = etcEndDate (동일하게 설정)
 					finalStatusEndDate = finalEtcEndDate;
-				} else {
+				}
+				console.log('[roomSell/start] 계산된 날짜:', { finalStatusEndDate, finalEtcStartDate, finalEtcEndDate });
+
+				if (!sameAsCheckinInfo) {
 					// sameAsCheckinInfo가 false인 경우
 					if (!etcStartDate) {
 						errorHandler.errorThrow(400, 'sameAsCheckinInfo가 false인 경우 etcStartDate를 입력해주세요.');
@@ -1734,6 +1739,7 @@ exports.startRoomSell = async (req, res, next) => {
 					);
 					// roomStatus(ON_SALE) 반영 → room.status = OPEN, startDate/endDate null
 					await syncRoomFromRoomStatus(singleRoomId, 'ON_SALE', {}, transaction);
+					console.log('[roomSell/start] ON_SALE UPDATE 완료, statusEndDate=', finalStatusEndDate);
 					// CAN_CHECKIN: 입실가능 기간(기존 etc)으로 업데이트 또는 삽입
 					const [existingCanCheckin] = await mariaDBSequelize.query(
 						`SELECT esntlId FROM roomStatus WHERE roomEsntlId = ? AND status = 'CAN_CHECKIN' LIMIT 1`,
@@ -1767,6 +1773,7 @@ exports.startRoomSell = async (req, res, next) => {
 							}
 						);
 					} else {
+						console.log('[roomSell/start] CAN_CHECKIN INSERT 직전 closeOpenStatusesForRoom 호출, newStatusStartDate=', finalEtcStartDate, '(이 호출이 ON_SALE의 statusEndDate를 덮어쓸 수 있음)');
 						await closeOpenStatusesForRoom(singleRoomId, finalEtcStartDate, transaction);
 						const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 						await mariaDBSequelize.query(
@@ -1816,6 +1823,7 @@ exports.startRoomSell = async (req, res, next) => {
 						errorHandler.errorThrow(400, `해당 방의 상태가 'ON_SALE'이 아니어서 판매 시작을 할 수 없습니다. (현재 상태: ${anyStatus.status}, roomId: ${singleRoomId})`);
 					}
 					// roomStatus가 아무 것도 없을 때: ON_SALE + CAN_CHECKIN 새로 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
+					// 기존 미종료 상태를 신규 시작일 전일로 종료 (한 번만 호출; sameAsCheckinInfo면 statusStartDate === finalEtcStartDate)
 					await closeOpenStatusesForRoom(singleRoomId, statusStartDate, transaction);
 					const newStatusId = await idsNext('roomStatus', undefined, transaction);
 					await mariaDBSequelize.query(
@@ -1845,7 +1853,7 @@ exports.startRoomSell = async (req, res, next) => {
 							transaction,
 						}
 					);
-					await closeOpenStatusesForRoom(singleRoomId, finalEtcStartDate, transaction);
+					// CAN_CHECKIN INSERT 직전 closeOpenStatusesForRoom은 생략 (이미 위에서 동일 날짜로 처리됨; 재호출 시 방금 넣은 ON_SALE의 statusEndDate가 덮어씌워질 수 있음)
 					const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 					await mariaDBSequelize.query(
 						`INSERT INTO roomStatus (

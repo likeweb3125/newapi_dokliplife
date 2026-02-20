@@ -51,6 +51,8 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
 	if (!roomEsntlId || !roomStatusStatus) return;
 	// CAN_CHECKIN 입력/수정 시에는 room 테이블 동기화하지 않음 (판매 기간 등만 반영, room.status는 유지)
 	if (roomStatusStatus === 'CAN_CHECKIN') return;
+	// ROOM_MOVE는 방이동 전용 상태이므로 room 테이블 동기화하지 않음
+	if (roomStatusStatus === 'ROOM_MOVE') return;
 	const roomStatus = getRoomStatusFromRoomStatus(roomStatusStatus);
 	const keepDates = roomStatus === 'CONTRACT' || roomStatus === 'RESERVE';
 	const startDate = options.startDate != null ? options.startDate : null;
@@ -122,6 +124,7 @@ async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transac
 	if (!roomEsntlId || newStatusStartDate == null) return;
 	// 종료일 = 신규 상태 시작일 - 1일. 단 행의 statusStartDate보다 이전이면 statusStartDate 사용 (GREATEST)
 	const endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
+	console.log('[closeOpenStatusesForRoom] roomEsntlId=', roomEsntlId, 'newStatusStartDate=', newStatusStartDate, '→ endDtm=', endDtm, '(statusEndDate IS NULL OR statusEndDate > endDtm 인 행을 이 날짜로 종료)');
 
 	await mariaDBSequelize.query(
 		`UPDATE roomStatus 
