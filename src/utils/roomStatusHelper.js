@@ -89,6 +89,7 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
 /**
  * 해당 방에 아직 종료기간이 남아있는 roomStatus가 있으면,
  * statusEndDate를 (신규 상태 시작일 - 1일)로 업데이트하여 기간을 종료 처리한다.
+ * 단, (신규 시작일 - 1일)이 해당 roomStatus의 statusStartDate보다 이전이면 -1일을 적용하지 않고 statusStartDate를 종료일로 둔다.
  * roomStatus INSERT 직전에 호출한다.
  *
  * @param {string} roomEsntlId - 방 고유 아이디
@@ -117,16 +118,16 @@ function addDaysToDateStr(dateStr, days) {
 
 async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transaction = null) {
 	if (!roomEsntlId || newStatusStartDate == null) return;
-	// 종료일 = 신규 상태 시작일 - 1일
+	// 종료일 = 신규 상태 시작일 - 1일. 단 행의 statusStartDate보다 이전이면 statusStartDate 사용 (GREATEST)
 	const endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
 
 	await mariaDBSequelize.query(
 		`UPDATE roomStatus 
-		 SET statusEndDate = ?, updatedAt = NOW() 
+		 SET statusEndDate = GREATEST(?, COALESCE(statusStartDate, ?)), updatedAt = NOW() 
 		 WHERE roomEsntlId = ? 
 		   AND (statusEndDate IS NULL OR statusEndDate > ?)`,
 		{
-			replacements: [endDtm, roomEsntlId, endDtm],
+			replacements: [endDtm, endDtm, roomEsntlId, endDtm],
 			type: mariaDBSequelize.QueryTypes.UPDATE,
 			transaction,
 		}
