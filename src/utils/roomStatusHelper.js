@@ -55,9 +55,10 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
 	const endDate = options.endDate != null ? options.endDate : null;
 	const setDates = keepDates && startDate != null && endDate != null;
 
+	// room 테이블에는 updatedAt 컬럼이 없으므로 SET에서 제외
 	if (setDates) {
 		await mariaDBSequelize.query(
-			`UPDATE room SET status = ?, startDate = ?, endDate = ?, updatedAt = NOW() WHERE esntlId = ?`,
+			`UPDATE room SET status = ?, startDate = ?, endDate = ? WHERE esntlId = ?`,
 			{
 				replacements: [roomStatus, startDate, endDate, roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
@@ -66,7 +67,7 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
 		);
 	} else if (keepDates) {
 		await mariaDBSequelize.query(
-			`UPDATE room SET status = ?, updatedAt = NOW() WHERE esntlId = ?`,
+			`UPDATE room SET status = ? WHERE esntlId = ?`,
 			{
 				replacements: [roomStatus, roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
@@ -75,7 +76,7 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
 		);
 	} else {
 		await mariaDBSequelize.query(
-			`UPDATE room SET status = ?, startDate = NULL, endDate = NULL, updatedAt = NOW() WHERE esntlId = ?`,
+			`UPDATE room SET status = ?, startDate = NULL, endDate = NULL WHERE esntlId = ?`,
 			{
 				replacements: [roomStatus, roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
