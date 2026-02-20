@@ -213,16 +213,19 @@ exports.mngChartMain = async (req, res, next) => {
 					SELECT roomEsntlId, MAX(COALESCE(statusStartDate, etcStartDate, createdAt)) AS maxStartDate
 					FROM roomStatus
 					WHERE status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
+						AND (deleteYN IS NULL OR deleteYN = 'N')
 					GROUP BY roomEsntlId
 				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId
 					AND COALESCE(RS1.statusStartDate, RS1.etcStartDate, RS1.createdAt) = RS2.maxStartDate
 					AND RS1.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
+				AND (RS1.deleteYN IS NULL OR RS1.deleteYN = 'N')
 				WHERE RS1.esntlId = (
 					SELECT esntlId
 					FROM roomStatus RS3
 					WHERE RS3.roomEsntlId = RS1.roomEsntlId
 						AND COALESCE(RS3.statusStartDate, RS3.etcStartDate, RS3.createdAt) = RS2.maxStartDate
 						AND RS3.status IN ('CONTRACT', 'RESERVED', 'RESERVE_PENDING', 'VBANK_PENDING', 'PENDING', 'ON_SALE', 'ETC')
+						AND (RS3.deleteYN IS NULL OR RS3.deleteYN = 'N')
 					ORDER BY RS3.esntlId DESC
 					LIMIT 1
 				)
@@ -432,6 +435,7 @@ exports.mngChartMain = async (req, res, next) => {
 			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
+				AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N')
 				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE', 'RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING')
 				AND (
 					(RS.status IN ('CONTRACT', 'OVERDUE', 'ROOM_MOVE')
@@ -773,6 +777,7 @@ exports.mngChartMain = async (req, res, next) => {
 			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
+				AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N')
 				AND RS.status IN (
 					'ON_SALE', 'CHECKOUT_ONSALE', 'END_DEPOSIT', 'END', 'ETC', 'BEFORE_SALES', 'CHECKOUT_CONFIRMED'
 				)
