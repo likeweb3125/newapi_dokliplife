@@ -1,4 +1,6 @@
 node_modules/
-src/config/
+# config.js 등은 제외, config.example.js만 저장소에 포함
+src/config/*
+!src/config/config.example.js
 upload/
 .env
