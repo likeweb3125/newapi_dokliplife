@@ -97,6 +97,92 @@ const getTypeName = (status, statusMemo) => {
 	return info.label;
 };
 
+// 관리객실현황 요약 통계 (별도 API로 분리하여 페이징 시 매번 조회하지 않도록 부하 완화)
+exports.mngChartStats = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+
+		const { gosiwonEsntlId } = req.query;
+
+		if (!gosiwonEsntlId) {
+			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
+		}
+
+		const [gosiwonRow] = await mariaDBSequelize.query(
+			`SELECT G.name, GA.ceo AS gosiwonCeo, GA.hp AS gosiwonCeoHp
+			 FROM gosiwon G
+			 LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
+			 WHERE G.esntlId = ? LIMIT 1`,
+			{
+				replacements: [gosiwonEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+		const gosiwonName = gosiwonRow?.name ?? null;
+		const gosiwonCeo = gosiwonRow?.gosiwonCeo ?? null;
+		const gosiwonCeoHp = gosiwonRow?.gosiwonCeoHp ?? null;
+
+		const nowForStats = new Date();
+		const todayStrForStats = `${nowForStats.getFullYear()}-${String(nowForStats.getMonth() + 1).padStart(2, '0')}-${String(nowForStats.getDate()).padStart(2, '0')}`;
+		const [statsResult, parkingResult] = await Promise.all([
+			mariaDBSequelize.query(
+				`SELECT
+					(SELECT COUNT(*) FROM room WHERE gosiwonEsntlId = ? AND deleteYN = 'N') AS totalRoom,
+					(SELECT COUNT(DISTINCT roomEsntlId) FROM roomStatus WHERE gosiwonEsntlId = ? AND status = 'CONTRACT' AND (deleteYN IS NULL OR deleteYN = 'N')
+						AND DATE(?) >= DATE(statusStartDate) AND (statusEndDate IS NULL OR DATE(?) <= DATE(statusEndDate))) AS checkinRoom,
+					(SELECT COUNT(DISTINCT roomEsntlId) FROM roomStatus WHERE gosiwonEsntlId = ? AND status = 'ON_SALE' AND (deleteYN IS NULL OR deleteYN = 'N')
+						AND DATE(?) >= DATE(statusStartDate) AND (statusEndDate IS NULL OR DATE(?) <= DATE(statusEndDate))) AS sellRoom,
+					(SELECT COUNT(*) FROM room WHERE gosiwonEsntlId = ? AND status = 'EMPTY' AND deleteYN = 'N') AS sellStopRoom,
+					(SELECT COUNT(*) FROM roomStatus WHERE gosiwonEsntlId = ? AND status IN ('END_DEPOSIT', 'END') AND (deleteYN IS NULL OR deleteYN = 'N')
+						AND (DATE(statusEndDate) = DATE(?) OR DATE(updatedAt) = DATE(?))) AS todayCheckout`,
+				{
+					replacements: [
+						gosiwonEsntlId,
+						gosiwonEsntlId, todayStrForStats, todayStrForStats,
+						gosiwonEsntlId, todayStrForStats, todayStrForStats,
+						gosiwonEsntlId,
+						gosiwonEsntlId, todayStrForStats, todayStrForStats,
+					],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				}
+			),
+			mariaDBSequelize.query(
+				`SELECT COALESCE(SUM(autoUse), 0) + COALESCE(SUM(bikeUse), 0) AS used, COALESCE(SUM(auto), 0) + COALESCE(SUM(bike), 0) AS total
+				 FROM gosiwonParking WHERE gosiwonEsntlId = ?`,
+				{
+					replacements: [gosiwonEsntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				}
+			),
+		]);
+		const stats = statsResult[0] || {};
+		const totalRoom = stats.totalRoom != null ? Number(stats.totalRoom) : 0;
+		const checkinRoom = stats.checkinRoom != null ? Number(stats.checkinRoom) : 0;
+		const sellRoom = stats.sellRoom != null ? Number(stats.sellRoom) : 0;
+		const sellStopRoom = stats.sellStopRoom != null ? Number(stats.sellStopRoom) : 0;
+		const todayCheckout = stats.todayCheckout != null ? Number(stats.todayCheckout) : 0;
+		const parkingRow = parkingResult[0] || {};
+		const parkingUsed = Number(parkingRow.used) || 0;
+		const parkingTotal = Number(parkingRow.total) || 0;
+		const parkingCount = `${parkingUsed} / ${parkingTotal}`;
+
+		errorHandler.successThrow(res, '관리객실현황 요약 통계 조회 성공', {
+			gosiwonEsntlId,
+			gosiwonName,
+			gosiwonCeo,
+			gosiwonCeoHp,
+			totalRoom,
+			checkinRoom,
+			sellRoom,
+			sellStopRoom,
+			todayCheckout,
+			parkingCount,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
 // 관리객실현황 차트 데이터 조회
 exports.mngChartMain = async (req, res, next) => {
 	try {

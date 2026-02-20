@@ -307,6 +307,78 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
+
+/**
+ * @swagger
+ * /v1/mngChart/stats:
+ *   get:
+ *     summary: 관리객실현황 요약 통계 조회
+ *     description: "고시원 ID를 입력받아 전체 객실 수, 입실/판매중/판매중지 수, 금일 퇴실 수, 주차 대수 등을 조회합니다. 페이징 시 매번 호출하지 않고 별도로 호출하여 부하를 줄일 수 있습니다."
+ *     tags: [관리객실현황]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: gosiwonEsntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유 아이디
+ *         example: GOSI0000000199
+ *     responses:
+ *       200:
+ *         description: 관리객실현황 요약 통계 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 관리객실현황 요약 통계 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     gosiwonEsntlId:
+ *                       type: string
+ *                     gosiwonName:
+ *                       type: string
+ *                       nullable: true
+ *                     gosiwonCeo:
+ *                       type: string
+ *                       nullable: true
+ *                     gosiwonCeoHp:
+ *                       type: string
+ *                       nullable: true
+ *                     totalRoom:
+ *                       type: integer
+ *                       description: "전체 객실 수 (room, deleteYN='N')"
+ *                     checkinRoom:
+ *                       type: integer
+ *                       description: "입실 수 (roomStatus status=CONTRACT, 오늘 포함)"
+ *                     sellRoom:
+ *                       type: integer
+ *                       description: "판매중 수 (roomStatus status=ON_SALE, 오늘 포함)"
+ *                     sellStopRoom:
+ *                       type: integer
+ *                       description: "판매중지 수 (room status=EMPTY)"
+ *                     todayCheckout:
+ *                       type: integer
+ *                       description: "금일 퇴실 수 (roomStatus status=END_DEPOSIT/END, 금일)"
+ *                     parkingCount:
+ *                       type: string
+ *                       description: "주차 대수 '사용대수 / 총대수' (gosiwonParking)"
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/stats', isAuthMiddleware.isAuthAdmin, mngChartController.mngChartStats);
 router.get('/main', isAuthMiddleware.isAuthAdmin, mngChartController.mngChartMain);
 
 module.exports = router;
