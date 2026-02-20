@@ -22,7 +22,8 @@ roomStatus 테이블의 **status** 값을 설정하는 모든 위치를 파일·
 | **startRoomSell** | INSERT | `CAN_CHECKIN` | 위와 동일 타이밍. ON_SALE 생성 직후 같은 방에 CAN_CHECKIN 생성. |
 | **startRoomSell** | INSERT | `CAN_CHECKIN` | 기존 ON_SALE만 있고 CAN_CHECKIN이 없을 때: CAN_CHECKIN만 신규 생성. |
 | **addEventDirectly** (POST `/v1/room/addEventDirectly`) | INSERT | `ETC` 또는 `BEFORE_SALES` | 요청 body의 status. 룸투어·입실 불가 기간 등 이벤트 직접 입력. ETC일 때 statusMemo 필수. |
-| **cancelSales** (POST `/v1/room/roomSell/end`) | UPDATE | (변경 없음) | roomStatusEsntlId의 **statusEndDate**만 salesEndDate로 수정. status는 변경하지 않음. |
+| **cancelSales** (POST `/v1/room/roomSell/end`) | - | - | 방 ID만 입력(콤마 구분 복수). 각 방의 ON_SALE roomStatus를 조회해 statusEndDate를 salesEndDate로 수정 후 ETC 추가, room.status=EMPTY. (고시원 ID·roomStatusEsntlId 미사용) |
+| **cancelSales** | UPDATE | (유지) | 해당 방 ON_SALE 1건의 **statusEndDate**만 salesEndDate로 수정. |
 | **cancelSales** | INSERT | `ETC` | setInfinity=true: "무기한 판매중지", 오늘~9999-12-31. |
 | **cancelSales** | INSERT | `ETC` | setInfinity=false: statusMemo = unableCheckinReason + " : " + unableCheckinReasonDetail, 기간 = unableCheckinStartDate~unableCheckinEndDate. |
 

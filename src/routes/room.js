@@ -1701,7 +1701,7 @@ router.get('/free/list', roomController.getFreeRoomList);
  * /v1/room/roomSell/end:
  *   post:
  *     summary: 판매중인 방 판매취소 및 상태 재정리
- *     description: "판매중인 방을 판매취소하고 상태값을 재정리합니다. roomStatusEsntlId의 statusEndDate를 판매종료일로 수정하고, setInfinity에 따라 무기한 또는 기간 판매중지 상태를 추가합니다."
+ *     description: "판매중인 방을 판매취소하고 상태값을 재정리합니다. 방 ID만 입력하며 콤마로 구분해 여러 개 입력 가능합니다. 각 방의 ON_SALE roomStatus를 조회해 statusEndDate를 판매종료일로 수정하고, setInfinity에 따라 무기한 또는 기간 판매중지(ETC) 상태를 추가한 뒤 room.status를 EMPTY로 변경합니다."
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -1712,24 +1712,14 @@ router.get('/free/list', roomController.getFreeRoomList);
  *           schema:
  *             type: object
  *             required:
- *               - gosiwonEsntlId
  *               - roomEsntlId
- *               - roomStatusEsntlId
  *               - salesEndDate
  *               - setInfinity
  *             properties:
- *               gosiwonEsntlId:
- *                 type: string
- *                 description: 고시원 고유 아이디
- *                 example: GOSI0000000199
  *               roomEsntlId:
  *                 type: string
- *                 description: 방 고유 아이디
- *                 example: ROOM0000019357
- *               roomStatusEsntlId:
- *                 type: string
- *                 description: 방상태 고유 아이디 (판매중 상태의 roomStatus.esntlId)
- *                 example: RSTA0000000001
+ *                 description: "방 고유 아이디. 콤마로 구분하여 여러 개 입력 가능 (예: ROOM0000019357, ROOM0000019358)"
+ *                 example: "ROOM0000019357, ROOM0000019358"
  *               salesEndDate:
  *                 type: string
  *                 format: date
@@ -1774,16 +1764,39 @@ router.get('/free/list', roomController.getFreeRoomList);
  *                 data:
  *                   type: object
  *                   properties:
- *                     roomStatusEsntlId:
- *                       type: string
- *                       description: 수정된 방상태 고유 아이디
- *                     newRoomStatusEsntlId:
- *                       type: string
- *                       description: 새로 생성된 방상태 고유 아이디 (ETC 상태)
+ *                     results:
+ *                       type: array
+ *                       description: "방별 처리 결과 (성공한 방만 포함)"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
+ *                           roomStatusEsntlId:
+ *                             type: string
+ *                             description: 수정된 방상태 고유 아이디 (ON_SALE이었던 레코드)
+ *                           newRoomStatusEsntlId:
+ *                             type: string
+ *                             description: 새로 생성된 방상태 고유 아이디 (ETC 상태)
+ *                           statusEndDate:
+ *                             type: string
+ *                             format: date
+ *                             description: 수정된 판매종료일
  *                     statusEndDate:
  *                       type: string
  *                       format: date
- *                       description: 수정된 판매종료일
+ *                       description: 요청한 판매종료일
+ *                     errors:
+ *                       type: array
+ *                       description: "방 조회 실패 또는 ON_SALE 없음 등으로 처리되지 않은 방 목록 (있을 때만)"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomEsntlId:
+ *                             type: string
+ *                           error:
+ *                             type: string
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -1793,6 +1806,96 @@ router.get('/free/list', roomController.getFreeRoomList);
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
+
+/**
+ * @swagger
+ * /v1/room/modifyStatus:
+ *   post:
+ *     summary: 방상태 수정 또는 취소 (관리객실현황)
+ *     description: "roomStatusEsntlId로 방상태 레코드를 조회하여 수정(cancel/update)합니다. cancel 시 deleteYN='Y', deletedBy, deletedAt 설정 및 statusMemo 갱신. update 시 statusStartDate, statusEndDate, statusMemo 갱신."
+ *     tags: [관리객실현황]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roomStatusEsntlId
+ *               - modifyType
+ *             properties:
+ *               roomStatusEsntlId:
+ *                 type: string
+ *                 description: 방상태 고유 아이디
+ *                 example: RSTA0000000001
+ *               modifyType:
+ *                 type: string
+ *                 enum:
+ *                   - cancel
+ *                   - update
+ *                 example: update
+ *                 description: "cancel: 소프트 삭제(deleteYN Y, deletedBy/deletedAt 설정). update: 기간·메모만 수정"
+ *               statusStartDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "상태 시작일 (update 시 사용)"
+ *               statusEndDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "상태 종료일 (update 시 사용)"
+ *               statusMemo:
+ *                 type: string
+ *                 description: "상태 메모 (cancel/update 시 모두 사용)"
+ *           examples:
+ *             cancel:
+ *               summary: 취소 (cancel)
+ *               value:
+ *                 roomStatusEsntlId: RSTA0000000001
+ *                 modifyType: cancel
+ *                 statusMemo: 취소 사유 입력
+ *             update:
+ *               summary: 수정 (update)
+ *               value:
+ *                 roomStatusEsntlId: RSTA0000000001
+ *                 modifyType: update
+ *                 statusStartDate: "2026-02-20T00:00:00.000Z"
+ *                 statusEndDate: "2026-03-20T23:59:59.000Z"
+ *                 statusMemo: 수정 메모
+ *     responses:
+ *       200:
+ *         description: 수정 또는 취소 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 방상태가 수정되었습니다.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     roomStatusEsntlId:
+ *                       type: string
+ *                     modifyType:
+ *                       type: string
+ *                       enum: [cancel, update]
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.post('/modifyStatus', roomController.modifyStatus);
+
 router.post('/roomSell/end', roomController.cancelSales);
 
 module.exports = router;

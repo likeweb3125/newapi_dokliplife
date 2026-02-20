@@ -23,3 +23,13 @@ ALTER TABLE `roomStatus` MODIFY COLUMN `gosiwonEsntlId` VARCHAR(50) NOT NULL COM
 CREATE INDEX `idx_roomStatus_gosiwonEsntlId` ON `roomStatus` (`gosiwonEsntlId`);
 CREATE INDEX `idx_roomStatus_gosiwon_status` ON `roomStatus` (`gosiwonEsntlId`, `status`);
 -- ALTER TABLE `roomStatus` ADD CONSTRAINT `fk_roomStatus_gosiwon` FOREIGN KEY (`gosiwonEsntlId`) REFERENCES `gosiwon` (`esntlId`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ---------------------------------------------
+-- 4. deleteYN, deletedAt, deletedBy 컬럼 및 인덱스 (소프트 삭제)
+-- ---------------------------------------------
+ALTER TABLE `roomStatus` ADD COLUMN `deleteYN` CHAR(1) NOT NULL DEFAULT 'N' COMMENT '삭제여부' AFTER `updatedAt`;
+ALTER TABLE `roomStatus` ADD COLUMN `deletedBy` VARCHAR(50) NULL COMMENT '삭제한 관리자 ID' AFTER `deleteYN`;
+ALTER TABLE `roomStatus` ADD COLUMN `deletedAt` DATETIME NULL COMMENT '삭제 시간' AFTER `deletedBy`;
+CREATE INDEX `idx_roomStatus_deleteYN` ON `roomStatus` (`deleteYN`);
+CREATE INDEX `idx_roomStatus_deletedBy` ON `roomStatus` (`deletedBy`);
+CREATE INDEX `idx_roomStatus_deletedAt` ON `roomStatus` (`deletedAt`);
