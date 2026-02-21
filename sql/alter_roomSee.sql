@@ -4,3 +4,6 @@
 -- =============================================
 
 CREATE INDEX IF NOT EXISTS `idx_roomSee_roomEsntlId` ON `roomSee` (`roomEsntlId`);
+
+-- 주간 랭킹(weeklyRanking) 쿼리: rse_regist_dtm 기간 필터 후 roomEsntlId별 집계용
+CREATE INDEX IF NOT EXISTS `idx_roomSee_regist_room` ON `roomSee` (`rse_regist_dtm`, `roomEsntlId`);

@@ -29,13 +29,29 @@ const getDateStringDaysAgo = (daysAgo) => {
 };
 
 /**
+ * 기준일(YYYY-MM-DD)에서 N일 전 날짜 문자열 (YYYY-MM-DD)
+ * @param {string} dateStr YYYY-MM-DD
+ * @param {number} daysAgo 양수
+ * @returns {string} YYYY-MM-DD
+ */
+const getDateStringDaysFrom = (dateStr, daysAgo) => {
+	const d = new Date(dateStr + 'T00:00:00');
+	d.setDate(d.getDate() - daysAgo);
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+};
+
+/**
  * GET /v1/dashboard/stats
- * 오늘 기준 최근 30일간 일별: 회원 방문자 수, 계약 건수, 매출을 반환
+ * 기준일 포함 최근 30일간 일별: 회원 방문자 수, 계약 건수, 매출을 반환.
+ * query.date(YYYY-MM-DD) 미입력 시 오늘을 기준일로 사용.
  */
 exports.getStats = async (req, res, next) => {
 	try {
-		const todayStr = getTodayDateString();
-		const startStr = getDateStringDaysAgo(29); // 오늘 포함 30일
+		const endStr = isValidDateString(req.query.date) ? req.query.date : getTodayDateString();
+		const startStr = getDateStringDaysFrom(endStr, 29); // 기준일 포함 30일
 
 		// 1) 회원 방문자 수 - yn_access_log, asl_regist_dtm 기준 일별, asl_user_id DISTINCT (NULL 제외)
 		const visitorQuery = `
@@ -51,7 +67,7 @@ exports.getStats = async (req, res, next) => {
 			ORDER BY date ASC
 		`;
 		const visitorRows = await mariaDBSequelize.query(visitorQuery, {
-			replacements: [startStr + ' 00:00:00', todayStr + ' 00:00:00'],
+			replacements: [startStr + ' 00:00:00', endStr + ' 00:00:00'],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -68,7 +84,7 @@ exports.getStats = async (req, res, next) => {
 			ORDER BY date ASC
 		`;
 		const contractRows = await mariaDBSequelize.query(contractQuery, {
-			replacements: [startStr, todayStr],
+			replacements: [startStr, endStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -87,19 +103,14 @@ exports.getStats = async (req, res, next) => {
 			ORDER BY date ASC
 		`;
 		const salesRows = await mariaDBSequelize.query(salesQuery, {
-			replacements: [startStr, todayStr],
+			replacements: [startStr, endStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 날짜별 객체로 채우기 (빈 날은 0으로)
+		// 날짜별 객체로 채우기 (기준일 포함 30일, 빈 날은 0으로)
 		const dateMap = {};
 		for (let i = 0; i < 30; i++) {
-			const d = new Date();
-			d.setDate(d.getDate() - (29 - i));
-			const y = d.getFullYear();
-			const m = String(d.getMonth() + 1).padStart(2, '0');
-			const day = String(d.getDate()).padStart(2, '0');
-			const key = `${y}-${m}-${day}`;
+			const key = getDateStringDaysFrom(endStr, 29 - i);
 			dateMap[key] = {
 				date: key,
 				visitorCount: 0,
@@ -137,7 +148,7 @@ exports.getStats = async (req, res, next) => {
 			message: '대시보드 통계 조회 성공',
 			data: {
 				from: startStr,
-				to: todayStr,
+				to: endStr,
 				daily,
 				summary: {
 					totalVisitorCount: daily.reduce((s, row) => s + row.visitorCount, 0),
@@ -160,6 +171,19 @@ const getTodayDayName = () => {
 	return days[new Date().getDay()];
 };
 
+/**
+ * YYYY-MM-DD 문자열에 해당하는 요일 한글 (일~토)
+ * @param {string} dateStr YYYY-MM-DD
+ * @returns {string} '일' | '월' | ... | '토'
+ */
+const getDayNameFromDateString = (dateStr) => {
+	const days = ['일', '월', '화', '수', '목', '금', '토'];
+	const d = new Date(dateStr + 'T00:00:00');
+	const dayIndex = d.getDay();
+	if (Number.isNaN(d.getTime())) return getTodayDayName();
+	return days[dayIndex] ?? getTodayDayName();
+};
+
 /** 일일 스케줄 정렬용 순서 */
 const DAILY_SCHEDULE_ORDER = {
 	판매오픈: 1,
@@ -175,15 +199,26 @@ const DAILY_SCHEDULE_ORDER = {
 	룸투어_예약방문: 11,
 };
 
+/** YYYY-MM-DD 형식 유효 여부 */
+const isValidDateString = (str) => {
+	if (!str || typeof str !== 'string') return false;
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+	const d = new Date(str + 'T00:00:00');
+	return !Number.isNaN(d.getTime());
+};
+
 /**
  * GET /v1/dashboard/dailySchedule
- * roomStatus 등에서 오늘 기준으로 시작(또는 해당)되는 일일 스케줄 목록 반환
+ * roomStatus 등에서 기준일로 시작(또는 해당)되는 일일 스케줄 목록 반환.
+ * query.date(YYYY-MM-DD) 미입력 시 오늘 기준.
  * 응답: 상태값, 고시원이름, 방호수, 상태값에 따른 내용
  */
 exports.getDailySchedule = async (req, res, next) => {
 	try {
-		const todayStr = getTodayDateString();
-		const todayDayName = getTodayDayName();
+		const targetDateStr = isValidDateString(req.query.date)
+			? req.query.date
+			: getTodayDateString();
+		const targetDayName = getDayNameFromDateString(targetDateStr);
 		const items = [];
 
 		// 1) roomStatus: 오늘 시작 또는 오늘 종료 (deleteYN 제외, room.deleteYN 제외)
@@ -213,7 +248,7 @@ exports.getDailySchedule = async (req, res, next) => {
 				)
 		`;
 		const roomStatusRows = await mariaDBSequelize.query(roomStatusQuery, {
-			replacements: [todayStr, todayStr],
+			replacements: [targetDateStr, targetDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -224,7 +259,7 @@ exports.getDailySchedule = async (req, res, next) => {
 			const phone = (row.checkinPhone || row.customerPhone || row.customerHp || '').trim();
 			const guestLabel = guestName ? (phone ? `${guestName}(${phone})` : guestName) : '';
 
-			if (row.status === 'ON_SALE' && row.startDate === todayStr) {
+			if (row.status === 'ON_SALE' && row.startDate === targetDateStr) {
 				items.push({
 					statusValue: '판매오픈',
 					gosiwonName,
@@ -232,7 +267,7 @@ exports.getDailySchedule = async (req, res, next) => {
 					content: `${gosiwonName}의 빈 방 1개 판매가 시작되었습니다.`,
 					sortOrder: DAILY_SCHEDULE_ORDER.판매오픈,
 				});
-			} else if (row.status === 'ON_SALE' && row.endDate === todayStr) {
+			} else if (row.status === 'ON_SALE' && row.endDate === targetDateStr) {
 				items.push({
 					statusValue: '판매종료',
 					gosiwonName,
@@ -240,7 +275,7 @@ exports.getDailySchedule = async (req, res, next) => {
 					content: `${gosiwonName} ${roomNumber}호 방 판매가 종료되었습니다.`,
 					sortOrder: DAILY_SCHEDULE_ORDER.판매종료,
 				});
-			} else if (row.status === 'CONTRACT' && row.startDate === todayStr) {
+			} else if (row.status === 'CONTRACT' && row.startDate === targetDateStr) {
 				items.push({
 					statusValue: '입실일',
 					gosiwonName,
@@ -248,7 +283,7 @@ exports.getDailySchedule = async (req, res, next) => {
 					content: guestLabel ? `${guestLabel} 님의 입실일입니다.` : `${gosiwonName} ${roomNumber}호 입실일입니다.`,
 					sortOrder: DAILY_SCHEDULE_ORDER.입실일,
 				});
-			} else if (row.status === 'CONTRACT' && row.endDate === todayStr) {
+			} else if (row.status === 'CONTRACT' && row.endDate === targetDateStr) {
 				items.push({
 					statusValue: '퇴실일',
 					gosiwonName,
@@ -256,7 +291,7 @@ exports.getDailySchedule = async (req, res, next) => {
 					content: guestLabel ? `${guestLabel} 님의 퇴실일입니다.` : `${gosiwonName} ${roomNumber}호 퇴실일입니다.`,
 					sortOrder: DAILY_SCHEDULE_ORDER.퇴실일,
 				});
-			} else if (row.status === 'OVERDUE' && row.startDate === todayStr) {
+			} else if (row.status === 'OVERDUE' && row.startDate === targetDateStr) {
 				items.push({
 					statusValue: '체납상태',
 					gosiwonName,
@@ -264,7 +299,7 @@ exports.getDailySchedule = async (req, res, next) => {
 					content: guestLabel ? `${guestLabel} 님이 금일부터 체납상태로 전환되었습니다.` : `${gosiwonName} ${roomNumber}호 금일부터 체납상태입니다.`,
 					sortOrder: DAILY_SCHEDULE_ORDER.체납상태,
 				});
-			} else if (row.status === 'CHECKOUT_REQUESTED' && row.startDate === todayStr) {
+			} else if (row.status === 'CHECKOUT_REQUESTED' && row.startDate === targetDateStr) {
 				items.push({
 					statusValue: '퇴실요청',
 					gosiwonName,
@@ -291,7 +326,7 @@ exports.getDailySchedule = async (req, res, next) => {
 				AND DATE(RC.contractDate) = ?
 		`;
 		const contractRows = await mariaDBSequelize.query(contractQuery, {
-			replacements: [todayStr],
+			replacements: [targetDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 		for (const row of contractRows || []) {
@@ -325,7 +360,7 @@ exports.getDailySchedule = async (req, res, next) => {
 			WHERE DATE(RRR.rrr_regist_dtm) = ?
 		`;
 		const refundRows = await mariaDBSequelize.query(refundQuery, {
-			replacements: [todayStr],
+			replacements: [targetDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 		for (const row of refundRows || []) {
@@ -357,14 +392,14 @@ exports.getDailySchedule = async (req, res, next) => {
 			ORDER BY GC.created_at DESC
 		`;
 		const cleaningRows = await mariaDBSequelize.query(cleaningQuery, {
-			replacements: [todayStr, todayStr],
+			replacements: [targetDateStr, targetDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 		const seenGosiwonClean = new Set();
 		for (const row of cleaningRows || []) {
 			const daysStr = (row.cleaning_days || '').replace(/\s/g, '');
 			const daysArr = daysStr.split('/').map((d) => d.trim()).filter(Boolean);
-			if (!daysArr.includes(todayDayName)) continue;
+			if (!daysArr.includes(targetDayName)) continue;
 			if (seenGosiwonClean.has(row.gosiwonName)) continue;
 			seenGosiwonClean.add(row.gosiwonName);
 			const gosiwonName = row.gosiwonName || '';
@@ -403,11 +438,11 @@ exports.getDailySchedule = async (req, res, next) => {
 				AND DATE(RR.ror_check_in_date) = ?
 		`;
 		const tourRequestRows = await mariaDBSequelize.query(roomTourRequestQuery, {
-			replacements: [todayStr],
+			replacements: [targetDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 		const tourVisitRows = await mariaDBSequelize.query(roomTourVisitQuery, {
-			replacements: [todayStr],
+			replacements: [targetDateStr],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 		for (const row of tourRequestRows || []) {
@@ -452,8 +487,110 @@ exports.getDailySchedule = async (req, res, next) => {
 			statusCode: 200,
 			message: '일일 스케줄 조회 성공',
 			data: {
-				date: todayStr,
+				date: targetDateStr,
 				list,
+			},
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+/**
+ * 입력 날짜 기준 7일 구간 시작일 (date - 6일) 00:00:00 ~ date 23:59:59 포함
+ * @param {string} dateStr YYYY-MM-DD
+ * @returns {{ startDtm: string, endDtm: string }} startDtm(포함), endDtm(미포함, 다음날 00:00:00)
+ */
+const getWeekRange = (dateStr) => {
+	const end = new Date(dateStr + 'T00:00:00');
+	end.setDate(end.getDate() + 1);
+	const endY = end.getFullYear();
+	const endM = String(end.getMonth() + 1).padStart(2, '0');
+	const endD = String(end.getDate()).padStart(2, '0');
+	const start = new Date(dateStr + 'T00:00:00');
+	start.setDate(start.getDate() - 6);
+	const startY = start.getFullYear();
+	const startM = String(start.getMonth() + 1).padStart(2, '0');
+	const startD = String(start.getDate()).padStart(2, '0');
+	return {
+		startDtm: `${startY}-${startM}-${startD} 00:00:00`,
+		endDtm: `${endY}-${endM}-${endD} 00:00:00`,
+	};
+};
+
+/**
+ * GET /v1/dashboard/weeklyRanking
+ * 입력 날짜 기준 1주일(7일) 구간에서 roomLike/roomSee 집계 후 roomEsntlId별 상위 5개씩 반환. 방·고시원명 포함.
+ */
+exports.getWeeklyRanking = async (req, res, next) => {
+	try {
+		const dateParam = req.query.date;
+		const dateStr = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(String(dateParam).trim())
+			? String(dateParam).trim()
+			: getTodayDateString();
+		const { startDtm, endDtm } = getWeekRange(dateStr);
+
+		// like/see 순위를 병렬 조회 (응답 시간 단축)
+		const likeQuery = `
+			SELECT
+				RL.roomEsntlId,
+				R.roomNumber,
+				R.gosiwonEsntlId,
+				G.name AS gosiwonName,
+				COUNT(*) AS cnt
+			FROM roomLike RL
+			INNER JOIN room R ON R.esntlId = RL.roomEsntlId AND (R.deleteYN IS NULL OR R.deleteYN = 'N')
+			INNER JOIN gosiwon G ON G.esntlId = R.gosiwonEsntlId
+			WHERE RL.rlk_regist_dtm >= ? AND RL.rlk_regist_dtm < ?
+			GROUP BY RL.roomEsntlId, R.roomNumber, R.gosiwonEsntlId, G.name
+			ORDER BY cnt DESC
+			LIMIT 5
+		`;
+		const seeQuery = `
+			SELECT
+				RS.roomEsntlId,
+				R.roomNumber,
+				R.gosiwonEsntlId,
+				G.name AS gosiwonName,
+				COUNT(*) AS cnt
+			FROM roomSee RS
+			INNER JOIN room R ON R.esntlId = RS.roomEsntlId AND (R.deleteYN IS NULL OR R.deleteYN = 'N')
+			INNER JOIN gosiwon G ON G.esntlId = R.gosiwonEsntlId
+			WHERE RS.rse_regist_dtm >= ? AND RS.rse_regist_dtm < ?
+			GROUP BY RS.roomEsntlId, R.roomNumber, R.gosiwonEsntlId, G.name
+			ORDER BY cnt DESC
+			LIMIT 5
+		`;
+		const replacements = [startDtm, endDtm];
+		const [likeRows, seeRows] = await Promise.all([
+			mariaDBSequelize.query(likeQuery, { replacements: [...replacements], type: mariaDBSequelize.QueryTypes.SELECT }),
+			mariaDBSequelize.query(seeQuery, { replacements: [...replacements], type: mariaDBSequelize.QueryTypes.SELECT }),
+		]);
+
+		const likeData = (likeRows || []).map((r) => ({
+			roomEsntlId: r.roomEsntlId,
+			roomNumber: r.roomNumber != null ? String(r.roomNumber) : '',
+			gosiwonEsntlId: r.gosiwonEsntlId,
+			gosiwonName: r.gosiwonName || '',
+			count: Number(r.cnt) || 0,
+		}));
+		const seeData = (seeRows || []).map((r) => ({
+			roomEsntlId: r.roomEsntlId,
+			roomNumber: r.roomNumber != null ? String(r.roomNumber) : '',
+			gosiwonEsntlId: r.gosiwonEsntlId,
+			gosiwonName: r.gosiwonName || '',
+			count: Number(r.cnt) || 0,
+		}));
+
+		return res.status(200).json({
+			statusCode: 200,
+			message: '주간 랭킹 조회 성공',
+			data: {
+				date: dateStr,
+				from: startDtm.slice(0, 10),
+				to: dateStr,
+				likeData,
+				seeData,
 			},
 		});
 	} catch (err) {
