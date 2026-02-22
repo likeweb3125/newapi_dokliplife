@@ -119,7 +119,9 @@ exports.getContractList = async (req, res, next) => {
 			}
 
 			if (roomStatus) {
-				conditions.push('RS.status = ?');
+				conditions.push(
+					'EXISTS (SELECT 1 FROM roomStatus RS2 WHERE RS2.contractEsntlId = RC.esntlId AND (RS2.deleteYN IS NULL OR RS2.deleteYN = \'N\') AND RS2.status = ?)'
+				);
 				values.push(roomStatus);
 			}
 
@@ -132,7 +134,7 @@ exports.getContractList = async (req, res, next) => {
 		const limitNum = parseInt(limit);
 		const offset = (pageNum - 1) * limitNum;
 
-		// 메인 데이터 조회 쿼리
+		// 메인 데이터 조회 쿼리 (roomStatus는 JOIN 대신 EXISTS로 필터해 계약당 1행만 반환)
 		const mainQuery = `
 			SELECT 
 				RC.esntlId,
@@ -203,7 +205,6 @@ exports.getContractList = async (req, res, next) => {
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
-			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			LEFT JOIN (
 				SELECT 
 					contractEsntlId,
@@ -222,7 +223,7 @@ exports.getContractList = async (req, res, next) => {
 			LIMIT ? OFFSET ?
 		`;
 
-		// 합계 조회 쿼리
+		// 합계 조회 쿼리 (계약당 1행이 되도록 paymentLog는 계약별 집계 후 조인)
 		const summaryQuery = `
 			SELECT 
 				FORMAT(COALESCE(SUM(PL.paymentAmount), 0), 0) AS paymentAmount,
@@ -233,8 +234,17 @@ exports.getContractList = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
-			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
-			LEFT JOIN paymentLog PL ON RC.esntlId = PL.contractEsntlId
+			LEFT JOIN (
+				SELECT 
+					contractEsntlId,
+					SUM(paymentAmount) AS paymentAmount,
+					SUM(paymentPoint) AS paymentPoint,
+					SUM(paymentCoupon) AS paymentCoupon,
+					SUM(cAmount) AS cAmount,
+					AVG(cPercent) AS cPercent
+				FROM paymentLog
+				GROUP BY contractEsntlId
+			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE ${whereClause}
 		`;
 
@@ -256,7 +266,6 @@ exports.getContractList = async (req, res, next) => {
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
-			LEFT JOIN roomStatus RS ON RC.esntlId = RS.contractEsntlId
 			WHERE ${whereClause}
 		`;
 
