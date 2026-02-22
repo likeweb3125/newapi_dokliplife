@@ -459,10 +459,29 @@ exports.postCustomerLogin = async (req, res, next) => {
 	}
 };
 
-// 회원 검색 (memberSearch) - 고시원코드, 이름/연락처 텍스트, 성별(선택)으로 customer 검색
+// 회원 검색 (memberSearch) - 고시원코드, 이름/연락처 텍스트, 성별(선택), 전체/계약자/입실자 필터로 검색. 계약자·입실자 리스트를 각각 반환.
+const MEMBER_TYPE_ALL = 'all';
+const MEMBER_TYPE_CONTRACTOR = 'contractor';
+const MEMBER_TYPE_OCCUPANT = 'occupant';
+
+const mapRowToItem = (row) => {
+	const item = {
+		esntlId: row.esntlId,
+		name: row.name,
+		phone: row.phone,
+		gender: row.gender,
+		age: formatAge(row.birth) ?? '',
+	};
+	if (row.startDate != null && row.endDate != null) {
+		item.startDate = row.startDate;
+		item.endDate = row.endDate;
+	}
+	return item;
+};
+
 exports.getMemberSearch = async (req, res, next) => {
 	try {
-		const { gosiwonEsntlId, searchText, gender } = req.query;
+		const { gosiwonEsntlId, searchText, gender, memberType } = req.query;
 
 		if (!gosiwonEsntlId) {
 			errorHandler.errorThrow(400, '고시원코드(gosiwonEsntlId)를 입력해주세요.');
@@ -471,59 +490,110 @@ exports.getMemberSearch = async (req, res, next) => {
 		const searchPattern = searchText ? `%${searchText.trim()}%` : '%';
 		const hasGender = gender !== undefined && gender !== null && String(gender).trim() !== '';
 
-		const query = `
-			SELECT DISTINCT
-				C.esntlId,
-				C.name,
-				C.phone,
-				C.gender,
-				C.birth,
-				RC_ACTIVE.startDate,
-				RC_ACTIVE.endDate
-			FROM customer C
-			INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.gosiwonEsntlId = :gosiwonEsntlId
-			LEFT JOIN (
-				SELECT customerEsntlId, gosiwonEsntlId, startDate, endDate,
-					ROW_NUMBER() OVER (PARTITION BY customerEsntlId ORDER BY contractDate DESC) AS rn
-				FROM roomContract
-				WHERE gosiwonEsntlId = :gosiwonEsntlId2 AND status = 'USED'
-			) RC_ACTIVE ON RC_ACTIVE.customerEsntlId = C.esntlId AND RC_ACTIVE.gosiwonEsntlId = :gosiwonEsntlId3 AND RC_ACTIVE.rn = 1
-			WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
-			${hasGender ? 'AND C.gender = :gender' : ''}
-			ORDER BY (RC_ACTIVE.startDate IS NOT NULL) DESC, C.name
-		`;
+		// 전체 / 계약자 / 입실자 (영문만: all, contractor, occupant)
+		const rawType = memberType != null ? String(memberType).trim().toLowerCase() : MEMBER_TYPE_ALL;
+		const isAll = !rawType || rawType === '' || rawType === 'all';
+		const isContractor = rawType === 'contractor';
+		const isOccupant = rawType === 'occupant';
+		const needContractorList = isAll || isContractor;
+		const needOccupantList = isAll || isOccupant;
 
 		const replacements = {
 			gosiwonEsntlId,
 			gosiwonEsntlId2: gosiwonEsntlId,
 			gosiwonEsntlId3: gosiwonEsntlId,
+			gosiwonEsntlId4: gosiwonEsntlId,
+			gosiwonEsntlId5: gosiwonEsntlId,
 			searchPattern,
 		};
 		if (hasGender) {
 			replacements.gender = normalizeGender(gender) || String(gender).trim();
 		}
 
-		const rows = await db.mariaDBSequelize.query(query, {
-			replacements,
-			type: db.mariaDBSequelize.QueryTypes.SELECT,
-		});
+		let contractorList = [];
+		let occupantList = [];
 
-		const list = (Array.isArray(rows) ? rows : []).map((row) => {
-			const item = {
-				esntlId: row.esntlId,
-				name: row.name,
-				phone: row.phone,
-				gender: row.gender,
-				age: formatAge(row.birth) ?? '',
-			};
-			if (row.startDate != null && row.endDate != null) {
-				item.startDate = row.startDate;
-				item.endDate = row.endDate;
-			}
-			return item;
-		});
+		// 입실자 목록: roomContract.customerEsntlId 기준
+		if (needOccupantList) {
+			const occupantQuery = `
+				SELECT DISTINCT
+					C.esntlId,
+					C.name,
+					C.phone,
+					C.gender,
+					C.birth,
+					RC_ACTIVE.startDate,
+					RC_ACTIVE.endDate
+				FROM customer C
+				INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.gosiwonEsntlId = :gosiwonEsntlId
+				LEFT JOIN (
+					SELECT customerEsntlId, gosiwonEsntlId, startDate, endDate,
+						ROW_NUMBER() OVER (PARTITION BY customerEsntlId ORDER BY contractDate DESC) AS rn
+					FROM roomContract
+					WHERE gosiwonEsntlId = :gosiwonEsntlId2 AND status = 'USED'
+				) RC_ACTIVE ON RC_ACTIVE.customerEsntlId = C.esntlId AND RC_ACTIVE.gosiwonEsntlId = :gosiwonEsntlId3 AND RC_ACTIVE.rn = 1
+				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
+				${hasGender ? 'AND C.gender = :gender' : ''}
+				ORDER BY (RC_ACTIVE.startDate IS NOT NULL) DESC, C.name
+			`;
+			const occupantRows = await db.mariaDBSequelize.query(occupantQuery, {
+				replacements,
+				type: db.mariaDBSequelize.QueryTypes.SELECT,
+			});
+			occupantList = (Array.isArray(occupantRows) ? occupantRows : []).map(mapRowToItem);
+		}
 
-		errorHandler.successThrow(res, '조회 성공', { list });
+		// 계약자 목록: deposit.contractorEsntlId 우선, 없으면 roomContract.customerEsntlId
+		if (needContractorList) {
+			const contractorQuery = `
+				SELECT DISTINCT
+					C.esntlId,
+					C.name,
+					C.phone,
+					C.gender,
+					C.birth,
+					RC_ACTIVE.startDate,
+					RC_ACTIVE.endDate
+				FROM customer C
+				INNER JOIN (
+					SELECT COALESCE(D.contractorEsntlId, RC.customerEsntlId) AS contractorEsntlId,
+						RC.gosiwonEsntlId,
+						RC.customerEsntlId,
+						RC.esntlId AS contractEsntlId,
+						RC.contractDate,
+						RC.startDate,
+						RC.endDate,
+						RC.status
+					FROM roomContract RC
+					LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
+					WHERE RC.gosiwonEsntlId = :gosiwonEsntlId4
+				) RCX ON RCX.contractorEsntlId = C.esntlId
+				LEFT JOIN (
+					SELECT contractorEsntlId, startDate, endDate,
+						ROW_NUMBER() OVER (PARTITION BY contractorEsntlId ORDER BY contractDate DESC) AS rn
+					FROM (
+						SELECT COALESCE(D2.contractorEsntlId, RC2.customerEsntlId) AS contractorEsntlId,
+							RC2.startDate, RC2.endDate, RC2.contractDate
+						FROM roomContract RC2
+						LEFT JOIN deposit D2 ON D2.contractEsntlId = RC2.esntlId AND D2.deleteYN = 'N'
+						WHERE RC2.gosiwonEsntlId = :gosiwonEsntlId5 AND RC2.status = 'USED'
+					) T
+				) RC_ACTIVE ON RC_ACTIVE.contractorEsntlId = C.esntlId AND RC_ACTIVE.rn = 1
+				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
+				${hasGender ? 'AND C.gender = :gender' : ''}
+				ORDER BY (RC_ACTIVE.startDate IS NOT NULL) DESC, C.name
+			`;
+			const contractorRows = await db.mariaDBSequelize.query(contractorQuery, {
+				replacements,
+				type: db.mariaDBSequelize.QueryTypes.SELECT,
+			});
+			contractorList = (Array.isArray(contractorRows) ? contractorRows : []).map(mapRowToItem);
+		}
+
+		errorHandler.successThrow(res, '조회 성공', {
+			contractorList,
+			occupantList,
+		});
 	} catch (err) {
 		next(err);
 	}

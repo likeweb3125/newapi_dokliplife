@@ -290,7 +290,7 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  * /v1/admin/member/search:
  *   get:
  *     summary: memberSearch
- *     description: 고시원코드, 이름/연락처 텍스트, 성별(선택)으로 customer 테이블을 검색합니다. 해당 고시원에 계약 이력이 있는 회원만 대상이며, 현재 계약이 활성 상태(roomContract.status = 'USED')인 경우 사용기간(startDate, endDate)도 함께 반환합니다.
+ *     description: "고시원코드, 이름/연락처 텍스트, 성별(선택), 전체/계약자/입실자 필터로 회원을 검색합니다. 해당 고시원에 계약 이력이 있는 회원만 대상이며, 계약자·입실자 목록을 각각 반환합니다. 활성 계약(USED)이 있으면 사용기간(startDate, endDate)을 포함합니다."
  *     tags: [Member]
  *     parameters:
  *       - in: query
@@ -298,19 +298,27 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *         required: true
  *         schema:
  *           type: string
+ *           example: GOSI0000000199
  *         description: 고시원코드
  *       - in: query
  *         name: searchText
  *         required: false
  *         schema:
  *           type: string
- *         description: 이름 또는 연락처 검색 텍스트 (부분 일치)
+ *         description: "이름 또는 연락처 검색 텍스트 (부분 일치)"
  *       - in: query
  *         name: gender
  *         required: false
  *         schema:
  *           type: string
  *         description: "성별 (없으면 전부, 예: M / F / 남 / 여)"
+ *       - in: query
+ *         name: memberType
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [all, contractor, occupant]
+ *         description: "검색 대상 구분. all(전체), contractor(계약자), occupant(입실자). 없으면 all."
  *     responses:
  *       200:
  *         description: 조회 성공
@@ -328,8 +336,9 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                 data:
  *                   type: object
  *                   properties:
- *                     list:
+ *                     contractorList:
  *                       type: array
+ *                       description: "계약자 목록 (memberType이 계약자 또는 전체일 때만 채워짐)"
  *                       items:
  *                         type: object
  *                         properties:
@@ -350,10 +359,37 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
  *                           startDate:
  *                             type: string
- *                             description: 사용기간 시작일 (활성 계약이 있을 때만 포함)
+ *                             description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
  *                           endDate:
  *                             type: string
- *                             description: 사용기간 종료일 (활성 계약이 있을 때만 포함)
+ *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
+ *                     occupantList:
+ *                       type: array
+ *                       description: "입실자 목록 (memberType이 입실자 또는 전체일 때만 채워짐)"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 회원 고유 아이디
+ *                           name:
+ *                             type: string
+ *                             description: 이름
+ *                           phone:
+ *                             type: string
+ *                             description: 연락처
+ *                           gender:
+ *                             type: string
+ *                             description: 성별
+ *                           age:
+ *                             type: string
+ *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
+ *                           startDate:
+ *                             type: string
+ *                             description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
+ *                           endDate:
+ *                             type: string
+ *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
  *       400:
  *         description: 고시원코드 누락
  *         content:
