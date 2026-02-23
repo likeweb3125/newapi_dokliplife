@@ -28,6 +28,19 @@ const ROOM_STATUS_TO_ROOM_STATUS = {
 };
 
 /**
+ * room.status → 해당 값으로 매핑되는 roomStatus.status 목록 (역매핑).
+ * /v1/room/list 등에서 room.status 기준으로 동일한 의미의 최신 roomStatus를 찾을 때 사용.
+ */
+const ROOM_STATUS_TO_RS_STATUS_LIST = (() => {
+	const map = {};
+	for (const [rsStatus, roomStatus] of Object.entries(ROOM_STATUS_TO_ROOM_STATUS)) {
+		if (!map[roomStatus]) map[roomStatus] = [];
+		map[roomStatus].push(rsStatus);
+	}
+	return map;
+})();
+
+/**
  * roomStatus.status에 대응하는 room.status 반환.
  * @param {string} roomStatusStatus - roomStatus.status 값
  * @returns {string} room.status 값 (매핑 없으면 'EMPTY')
@@ -159,6 +172,7 @@ async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transac
 module.exports = {
 	closeOpenStatusesForRoom,
 	ROOM_STATUS_TO_ROOM_STATUS,
+	ROOM_STATUS_TO_RS_STATUS_LIST,
 	getRoomStatusFromRoomStatus,
 	syncRoomFromRoomStatus,
 };

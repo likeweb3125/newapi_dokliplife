@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
-const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
+const { closeOpenStatusesForRoom, syncRoomFromRoomStatus, ROOM_STATUS_TO_RS_STATUS_LIST } = require('../utils/roomStatusHelper');
 const aligoSMS = require('../module/aligo/sms');
 
 // 공통 토큰 검증 함수
@@ -151,8 +151,19 @@ exports.getRoomList = async (req, res, next) => {
 			}
 		}
 
+		// room.status 기준으로 동일 의미의 roomStatus만 매칭 (ROOM_STATUS_TO_RS_STATUS_LIST 역매핑 사용)
+		const statusMatchOrConditions = Object.entries(ROOM_STATUS_TO_RS_STATUS_LIST)
+			.map(([roomStatus, rsList]) => {
+				const inList = rsList.map((s) => `'${s}'`).join(',');
+				const roomStatusCond = roomStatus === 'EMPTY'
+					? `(COALESCE(r.status, 'EMPTY') = 'EMPTY' AND rs.status IN (${inList}))`
+					: `(r.status = '${roomStatus}' AND rs.status IN (${inList}))`;
+				return roomStatusCond;
+			})
+			.join('\n					OR ');
+
 		// SQL 쿼리 구성
-		// startDate, endDate, nowStatus는 roomStatus 테이블의 해당 방 최신 레코드에서 조회
+		// status, startDate, endDate: room.status에 매핑되는 roomStatus 중 최신 1건에서 조회
 		const query = `
 			SELECT 
 				R.esntlId,
@@ -182,17 +193,18 @@ exports.getRoomList = async (req, res, next) => {
 				(SELECT IFNULL(ror_sn, '') FROM il_room_reservation AS RR WHERE rom_sn = R.esntlId AND RR.ror_status_cd = 'WAIT' ORDER BY RR.ror_update_dtm DESC LIMIT 1) AS ror_sn
 			FROM room R
 			LEFT OUTER JOIN (
-				SELECT rs1.roomEsntlId, rs1.statusStartDate, rs1.statusEndDate, rs1.status
-				FROM roomStatus rs1
-				INNER JOIN (
-					SELECT roomEsntlId, MAX(createdAt) AS max_createdAt
-					FROM roomStatus
-					GROUP BY roomEsntlId
-				) rs2 ON rs1.roomEsntlId = rs2.roomEsntlId AND rs1.createdAt = rs2.max_createdAt
-				WHERE rs1.esntlId = (
-					SELECT MAX(rs3.esntlId) FROM roomStatus rs3
-					WHERE rs3.roomEsntlId = rs1.roomEsntlId AND rs3.createdAt = rs2.max_createdAt
-				)
+				SELECT t.roomEsntlId, t.statusStartDate, t.statusEndDate, t.status
+				FROM (
+					SELECT rs.roomEsntlId, rs.statusStartDate, rs.statusEndDate, rs.status,
+						ROW_NUMBER() OVER (PARTITION BY rs.roomEsntlId ORDER BY rs.createdAt DESC) AS rn
+					FROM roomStatus rs
+					INNER JOIN room r ON r.esntlId = rs.roomEsntlId AND r.gosiwonEsntlId = :goID AND r.deleteYN = 'N'
+					WHERE (
+						${statusMatchOrConditions}
+					)
+					AND (rs.deleteYN IS NULL OR rs.deleteYN = 'N')
+				) t
+				WHERE t.rn = 1
 			) RS_LATEST ON RS_LATEST.roomEsntlId = R.esntlId
 			LEFT OUTER JOIN roomCategory RCAT
 				ON R.roomCategory = RCAT.esntlId

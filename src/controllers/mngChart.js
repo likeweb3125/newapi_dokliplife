@@ -245,6 +245,8 @@ exports.mngChartMain = async (req, res, next) => {
 		const startDateStr = toYmd(startDate);
 
 		// 1. Groups 데이터 조회 (활성 방 목록) - 오늘 날짜가 해당하는 roomStatus 기준, 없으면 판매신청전
+		// 오늘을 포함하는 roomStatus가 여러 건이면: 상태 우선순위(CONTRACT/ON_SALE 등 > CAN_CHECKIN > BEFORE_SALES) 적용 후 statusStartDate DESC, esntlId DESC
+		// (CAN_CHECKIN은 입실가능 기간용 보조 상태이므로 groups 표시에서는 ON_SALE 등이 우선)
 		const todayStr = toYmd(today);
 		const groupsQuery = `
 			SELECT DISTINCT
@@ -285,17 +287,43 @@ exports.mngChartMain = async (req, res, next) => {
 				RCAT.memo AS roomCategoryMemo
 			FROM room R
 			LEFT JOIN (
-				SELECT RS1.*
-				FROM roomStatus RS1
-				INNER JOIN (
-					SELECT roomEsntlId, MAX(esntlId) AS esntlId
-					FROM roomStatus
-					WHERE (deleteYN IS NULL OR deleteYN = 'N')
-						AND DATE(?) >= DATE(statusStartDate)
-						AND (statusEndDate IS NULL OR DATE(?) <= DATE(statusEndDate))
-					GROUP BY roomEsntlId
-				) RS2 ON RS1.roomEsntlId = RS2.roomEsntlId AND RS1.esntlId = RS2.esntlId
-				WHERE (RS1.deleteYN IS NULL OR RS1.deleteYN = 'N')
+				SELECT T.esntlId, T.roomEsntlId, T.gosiwonEsntlId, T.status, T.subStatus, T.statusMemo,
+					T.statusStartDate, T.statusEndDate, T.etcStartDate, T.etcEndDate,
+					T.contractEsntlId, T.customerEsntlId, T.customerName, T.reservationEsntlId, T.reservationName,
+					T.contractorEsntlId, T.contractorName, T.createdAt, T.updatedAt, T.deleteYN
+				FROM (
+					SELECT RS1.*,
+						ROW_NUMBER() OVER (
+							PARTITION BY RS1.roomEsntlId
+							ORDER BY
+								CASE RS1.status
+									WHEN 'CONTRACT' THEN 1
+									WHEN 'ROOM_MOVE' THEN 2
+									WHEN 'OVERDUE' THEN 3
+									WHEN 'CHECKOUT_REQUESTED' THEN 4
+									WHEN 'ON_SALE' THEN 5
+									WHEN 'RESERVED' THEN 6
+									WHEN 'CHECKOUT_CONFIRMED' THEN 7
+									WHEN 'CHECKOUT_ONSALE' THEN 8
+									WHEN 'END_DEPOSIT' THEN 9
+									WHEN 'END' THEN 10
+									WHEN 'PENDING' THEN 11
+									WHEN 'VBANK_PENDING' THEN 12
+									WHEN 'RESERVE_PENDING' THEN 13
+									WHEN 'CAN_CHECKIN' THEN 14
+									WHEN 'BEFORE_SALES' THEN 15
+									ELSE 16
+								END ASC,
+								RS1.statusStartDate DESC,
+								RS1.esntlId DESC
+						) AS rn
+					FROM roomStatus RS1
+					WHERE (RS1.deleteYN IS NULL OR RS1.deleteYN = 'N')
+						AND RS1.status != 'CAN_CHECKIN'
+						AND DATE(?) >= DATE(RS1.statusStartDate)
+						AND (RS1.statusEndDate IS NULL OR DATE(?) <= DATE(RS1.statusEndDate))
+				) T
+				WHERE T.rn = 1
 			) RS ON R.esntlId = RS.roomEsntlId
 			LEFT JOIN customer C ON RS.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RS.contractEsntlId = RCW.contractEsntlId
@@ -342,7 +370,7 @@ exports.mngChartMain = async (req, res, next) => {
 		}
 
 		// Groups 데이터 변환 - id는 room.esntlId 사용
-		// subStatus가 ROOM_MOVE_OUT이면 '방이동'(ROOM_MOVE)으로 표시. ROOM_MOVE_IN(이동 들어온 방)은 이미 입주 상태이므로 status(예: CONTRACT) 그대로 사용
+		// "방이동" 표시: status가 ROOM_MOVE 또는 CONTRACT일 때만 sub_status(ROOM_MOVE_OUT)와 비교해 ROOM_MOVE로 표시. 그 외 status면 sub_status가 room_move~ 여도 status 기준으로 표시
 		// roomEsntlId -> roomStatus.status(원본) 매핑 (items의 itemStatus용)
 		// roomEsntlId -> roomNumber 매핑 (방이동 content용)
 		const roomIdToStatusRaw = {};
@@ -350,7 +378,7 @@ exports.mngChartMain = async (req, res, next) => {
 		const groups = rooms.map((room) => {
 			roomIdToRoomNumber[room.id] = room.roomNumber || room.id;
 			const baseStatus = room.status || 'BEFORE_SALES';
-			const statusKey = room.roomSubStatus === 'ROOM_MOVE_OUT'
+			const statusKey = (baseStatus === 'ROOM_MOVE' || baseStatus === 'CONTRACT') && room.roomSubStatus === 'ROOM_MOVE_OUT'
 				? 'ROOM_MOVE'
 				: baseStatus;
 			roomIdToStatusRaw[room.id] = statusKey;
