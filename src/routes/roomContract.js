@@ -369,6 +369,38 @@ router.get('/list', roomContractController.getContractList);
  *                           format: date-time
  *                           description: 방이동 예정 날짜 (moveDate, isRoomMoveScheduled가 true일 때만 반환)
  *                           example: '2025-11-15T00:00:00'
+ *                         refundStatus:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "환불 요청 상태 (il_room_refund_request.rrr_process_status_cd, 예: REQUEST, APPROVAL, REJECT, CANCELLATION). 해당 계약에 환불 요청이 없으면 null"
+ *                         refundRequestDate:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "환불 요청 등록일시 (rrr_regist_dtm, YYYY-MM-DD HH:mm:ss). 없으면 null"
+ *                         refundCheckOutDate:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "퇴실일 (rrr_leave_date, 중도 퇴실 시 포함). 없으면 null"
+ *                         refundLeaveType:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "퇴실 유형 (rrr_leave_type_cd, 예: FULL, INTERIM, CANCEL). 없으면 null"
+ *                         refundLeaveReason:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "퇴실 사유 (rrr_leave_reason). 없으면 null"
+ *                         refundRegistrantId:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "환불 요청 등록자 ID (rrr_registrant_id). 없으면 null"
+ *                         refundContactedOwner:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: "사장님 연락 여부 (rrr_contacted_owner, 0 미연락, 1 연락완료). 없으면 null"
+ *                         refundTotalAmount:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: "총 환불 금액 (rrr_refund_total_amt). 없으면 null"
  *                     paymentLogList:
  *                       type: array
  *                       description: '연동 결제 내역 (paymentLog, extrapayEsntlId 값 없음인 일반 연장 결제)'
