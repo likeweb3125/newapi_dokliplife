@@ -310,6 +310,11 @@ exports.roomExtraPayment = async (req, res, next) => {
 						},
 						{ transaction }
 					);
+					// extraPayment에 parkEsntlId 연동
+					await extraPayment.update(
+						{ parkEsntlId: parkStatusId },
+						{ where: { esntlId: extraPaymentRecord.esntlId }, transaction }
+					);
 				}
 			}
 		}

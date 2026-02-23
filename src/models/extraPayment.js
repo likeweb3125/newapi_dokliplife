@@ -70,6 +70,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'optionName',
 				comment: '옵션명 (직접 입력의 경우, 예: 자동차, 오토바이, 기타 비용 등)',
 			},
+			parkEsntlId: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: 'parkEsntlId',
+				comment: '주차 상태 고유아이디 (parkStatus.esntlId, 주차비 건 연동 시 사용)',
+			},
 			extendWithPayment: {
 				type: DataTypes.TINYINT(1),
 				allowNull: false,

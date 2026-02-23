@@ -196,43 +196,10 @@ exports.createParking = async (req, res, next) => {
 
 		const contract = contractInfo[0];
 
-		// 현재 날짜/시간
-		const { pDate, pTime } = getCurrentDateTime();
+		// 현재 날짜/시간 (history 등에서 사용)
+		const { pDate } = getCurrentDateTime();
 
-		// extraPayment 생성 (0원이어도 기록)
-		const paymentId = await generateExtraPaymentId(transaction);
-		
-		// uniqueId 생성
-		const uniqueId = generateUniqueId(pDate, paymentId);
-		
-		await extraPayment.create(
-			{
-				esntlId: paymentId,
-				contractEsntlId: contractEsntlId,
-				gosiwonEsntlId: contract.gosiwonEsntlId,
-				roomEsntlId: contract.roomEsntlId,
-				customerEsntlId: contract.customerEsntlId || '',
-				uniqueId: uniqueId,
-				extraCostName: '주차비',
-				memo: null,
-				optionInfo: optionInfo || null,
-				useStartDate: useStartDate || null,
-				optionName: optionName,
-				extendWithPayment: extendValue ? 1 : 0,
-				pDate: pDate,
-				pTime: pTime,
-				paymentAmount: String(Math.abs(parseInt(cost, 10))),
-				pyl_goods_amount: Math.abs(parseInt(cost, 10)),
-				imp_uid: cost > 0 ? '' : '', // 0원이면 빈 문자열
-				paymentStatus: 'PENDING', // 결제 상태: PENDING(결제대기), COMPLETED(결제완료), CANCELLED(결제취소), FAILED(결제실패)
-				paymentType: cost > 0 ? null : null, // 0원이면 null
-				withdrawalStatus: null,
-				deleteYN: 'N',
-			},
-			{ transaction }
-		);
-
-		// parkStatus 생성 (IDS 테이블 parkStatus PKST)
+		// parkStatus 생성 (IDS 테이블 parkStatus PKST) - /v1/parking에서는 extraPayment 생성 없음
 		const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 		const parkNumber = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
 		const parkStatusMemo = memo && memo.trim() !== '' ? memo.trim() : null;
@@ -284,7 +251,6 @@ exports.createParking = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '주차 등록이 완료되었습니다.', {
 			contractEsntlId: contractEsntlId,
-			paymentLogId: paymentId, // 기존 키 유지
 			parkStatusId: parkStatusId,
 			historyId: historyId,
 		});

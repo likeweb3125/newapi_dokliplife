@@ -14,3 +14,9 @@ CREATE INDEX IF NOT EXISTS `idx_extraPayment_uniqueId` ON `extraPayment` (`uniqu
 ALTER TABLE `extraPayment` ADD COLUMN IF NOT EXISTS `paymentStatus` VARCHAR(50) NOT NULL DEFAULT 'PENDING' COMMENT '결제 상태 (PENDING, COMPLETED, CANCELLED, FAILED)' AFTER `imp_uid`;
 CREATE INDEX IF NOT EXISTS `idx_extraPayment_paymentStatus` ON `extraPayment` (`paymentStatus`);
 CREATE INDEX IF NOT EXISTS `idx_extraPayment_status_type` ON `extraPayment` (`contractEsntlId`, `paymentStatus`, `paymentType`, `deleteYN`);
+
+-- ---------------------------------------------
+-- 3. parkEsntlId 컬럼 (주차비 건과 parkStatus 연동)
+-- ---------------------------------------------
+ALTER TABLE `extraPayment` ADD COLUMN IF NOT EXISTS `parkEsntlId` VARCHAR(50) NULL COMMENT '주차 상태 고유아이디 (parkStatus.esntlId)' AFTER `optionName`;
+CREATE INDEX IF NOT EXISTS `idx_extraPayment_parkEsntlId` ON `extraPayment` (`parkEsntlId`);
