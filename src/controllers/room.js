@@ -343,6 +343,14 @@ exports.getRoomInfo = async (req, res, next) => {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없습니다.');
 		}
 
+		// rom_deposit: monthlyRent처럼 소수점 아래 자리 유지 (parseFloat)
+		if (roomInfo.rom_deposit != null && roomInfo.rom_deposit !== '') {
+			const parsed = parseFloat(roomInfo.rom_deposit);
+			roomInfo.rom_deposit = Number.isNaN(parsed) ? null : parsed;
+		} else {
+			roomInfo.rom_deposit = null;
+		}
+
 		errorHandler.successThrow(res, '방 정보 조회 성공', roomInfo);
 	} catch (err) {
 		next(err);
