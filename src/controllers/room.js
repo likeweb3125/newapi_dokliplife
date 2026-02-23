@@ -240,22 +240,43 @@ exports.getRoomList = async (req, res, next) => {
 	}
 };
 
-// roomStatus 대시보드 집계 (전체/입금대기/예약중/이용중/체납/퇴실확정/보증금미납)
+// roomContract 기준 total, roomStatus는 계약서(contractEsntlId)별 최신 status 기준 집계 (전체/입금대기/예약중/이용중/체납/퇴실확정/보증금미납)
 exports.getDashboardCnt = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
 		const [row] = await mariaDBSequelize.query(
 			`
+			WITH
+			total_ct AS (SELECT COUNT(*) AS total FROM roomContract),
+			latest_per_contract AS (
+				SELECT contractEsntlId, status,
+					ROW_NUMBER() OVER (PARTITION BY contractEsntlId ORDER BY updatedAt DESC, esntlId DESC) AS rn
+				FROM roomStatus
+				WHERE contractEsntlId IS NOT NULL AND contractEsntlId != ''
+					AND (deleteYN = 'N' OR deleteYN IS NULL)
+			),
+			status_counts AS (
+				SELECT
+					SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
+					SUM(CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END) AS reserved,
+					SUM(CASE WHEN status = 'CONTRACT' THEN 1 ELSE 0 END) AS inUse,
+					SUM(CASE WHEN status = 'OVERDUE' THEN 1 ELSE 0 END) AS overdue,
+					SUM(CASE WHEN status = 'CHECKOUT_CONFIRMED' THEN 1 ELSE 0 END) AS checkoutConfirmed,
+					SUM(CASE WHEN status = 'UNPAID' THEN 1 ELSE 0 END) AS unpaid
+				FROM latest_per_contract
+				WHERE rn = 1
+			)
 			SELECT
-				COUNT(*) AS total,
-				SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
-				SUM(CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END) AS reserved,
-				SUM(CASE WHEN status = 'CONTRACT' THEN 1 ELSE 0 END) AS inUse,
-				SUM(CASE WHEN status = 'OVERDUE' THEN 1 ELSE 0 END) AS overdue,
-				SUM(CASE WHEN status = 'CHECKOUT_CONFIRMED' THEN 1 ELSE 0 END) AS checkoutConfirmed,
-				SUM(CASE WHEN status = 'UNPAID' THEN 1 ELSE 0 END) AS unpaid
-			FROM roomStatus
+				T.total,
+				COALESCE(S.pending, 0) AS pending,
+				COALESCE(S.reserved, 0) AS reserved,
+				COALESCE(S.inUse, 0) AS inUse,
+				COALESCE(S.overdue, 0) AS overdue,
+				COALESCE(S.checkoutConfirmed, 0) AS checkoutConfirmed,
+				COALESCE(S.unpaid, 0) AS unpaid
+			FROM total_ct T
+			CROSS JOIN status_counts S
 			`,
 			{ type: mariaDBSequelize.QueryTypes.SELECT }
 		);
