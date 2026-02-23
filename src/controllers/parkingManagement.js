@@ -196,10 +196,40 @@ exports.createParking = async (req, res, next) => {
 
 		const contract = contractInfo[0];
 
-		// 현재 날짜/시간 (history 등에서 사용)
-		const { pDate } = getCurrentDateTime();
+		// 현재 날짜/시간
+		const { pDate, pTime } = getCurrentDateTime();
 
-		// parkStatus 생성 (IDS 테이블 parkStatus PKST) - /v1/parking에서는 extraPayment 생성 없음
+		// extraPayment 생성 (0원으로 기록 - 주차 등록 시 결제 건 연동용)
+		const paymentId = await generateExtraPaymentId(transaction);
+		const uniqueId = generateUniqueId(pDate, paymentId);
+		await extraPayment.create(
+			{
+				esntlId: paymentId,
+				contractEsntlId: contractEsntlId,
+				gosiwonEsntlId: contract.gosiwonEsntlId,
+				roomEsntlId: contract.roomEsntlId,
+				customerEsntlId: contract.customerEsntlId || '',
+				uniqueId: uniqueId,
+				extraCostName: '주차비',
+				memo: null,
+				optionInfo: optionInfo || null,
+				useStartDate: useStartDate || null,
+				optionName: optionName,
+				extendWithPayment: extendValue ? 1 : 0,
+				pDate: pDate,
+				pTime: pTime,
+				paymentAmount: '0',
+				pyl_goods_amount: 0,
+				imp_uid: '',
+				paymentStatus: 'CONTRACT',
+				paymentType: null,
+				withdrawalStatus: null,
+				deleteYN: 'N',
+			},
+			{ transaction }
+		);
+
+		// parkStatus 생성 (IDS 테이블 parkStatus PKST)
 		const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 		const parkNumber = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
 		const parkStatusMemo = memo && memo.trim() !== '' ? memo.trim() : null;
@@ -220,6 +250,12 @@ exports.createParking = async (req, res, next) => {
 				deleteYN: 'N',
 			},
 			{ transaction }
+		);
+
+		// extraPayment에 parkEsntlId 연동
+		await extraPayment.update(
+			{ parkEsntlId: parkStatusId },
+			{ where: { esntlId: paymentId }, transaction }
 		);
 
 		// parkStatus INSERT 후 gosiwonParking.autoUse, bikeUse 동기화 (CONTRACT/RESERVED, deleteYN='N' 기준)
@@ -251,6 +287,7 @@ exports.createParking = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '주차 등록이 완료되었습니다.', {
 			contractEsntlId: contractEsntlId,
+			paymentLogId: paymentId,
 			parkStatusId: parkStatusId,
 			historyId: historyId,
 		});
