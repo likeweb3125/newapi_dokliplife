@@ -849,12 +849,21 @@ exports.getRefundRequestList = async (req, res, next) => {
 				RRR.rrr_process_status_cd,
 				RRR.rrr_process_reason,
 				RRR.ctt_eid,
-				RC.esntlId AS contractId
+				RC.esntlId AS contractId,
+				RCW.checkinName AS checkinName,
+				RCW.checkinPhone AS checkinPhone,
+				RCW.checkinGender AS checkinGender,
+				RCW.checkinAge AS checkinAge,
+				RCW.customerName AS contractCustomerName,
+				RCW.customerPhone AS contractCustomerPhone,
+				RCW.customerGender AS contractCustomerGender,
+				RCW.customerAge AS contractCustomerAge
 			FROM il_room_refund_request RRR
 			LEFT OUTER JOIN gosiwon AS G ON RRR.gsw_eid = G.esntlId
 			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
 			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
 			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
+			LEFT OUTER JOIN roomContractWho AS RCW ON RC.esntlId = RCW.contractEsntlId
 			${whereClause}
 			ORDER BY RRR.rrr_sno DESC
 			LIMIT ? OFFSET ?
