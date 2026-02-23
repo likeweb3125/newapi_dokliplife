@@ -93,7 +93,8 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
 /**
  * 해당 방에 아직 종료기간이 남아있는 roomStatus가 있으면,
  * statusEndDate를 (신규 상태 시작일 - 1일)로 업데이트하여 기간을 종료 처리한다.
- * 단, (신규 시작일 - 1일)이 해당 roomStatus의 statusStartDate보다 이전이면 -1일을 적용하지 않고 statusStartDate를 종료일로 둔다.
+ * -1일 날짜는 계약(상태) 시작일보다 작을 수 없음: 갱신 대상 행들의 최소 statusStartDate보다 작으면 그 날짜와 같게 한다.
+ * 각 행에는 GREATEST(종료일, 해당 행 statusStartDate)를 넣어 행별 시작일보다 이전으로는 설정하지 않는다.
  * roomStatus INSERT 직전에 호출한다.
  *
  * @param {string} roomEsntlId - 방 고유 아이디
@@ -102,11 +103,12 @@ async function syncRoomFromRoomStatus(roomEsntlId, roomStatusStatus, options = {
  * @returns {Promise<void>}
  */
 function toDateStr(val) {
+	if (val == null) return null;
 	if (val instanceof Date) {
 		return `${val.getFullYear()}-${String(val.getMonth() + 1).padStart(2, '0')}-${String(val.getDate()).padStart(2, '0')} 00:00:00`;
 	}
 	const s = String(val).trim();
-	return s.length === 10 ? `${s} 00:00:00` : s;
+	return s.length >= 10 ? `${s.slice(0, 10)} 00:00:00` : null;
 }
 
 /** 날짜 문자열에서 n일을 뺀 날짜 문자열 반환 (로컬 기준, YYYY-MM-DD 00:00:00) */
@@ -122,8 +124,23 @@ function addDaysToDateStr(dateStr, days) {
 
 async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transaction = null) {
 	if (!roomEsntlId || newStatusStartDate == null) return;
-	// 종료일 = 신규 상태 시작일 - 1일. 단 행의 statusStartDate보다 이전이면 statusStartDate 사용 (GREATEST)
-	const endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
+	let endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
+
+	// -1일이 계약(상태) 시작일보다 작으면 안 됨: 갱신 대상 행들 중 최소 statusStartDate보다 작으면 그날과 같게 함
+	const [minRow] = await mariaDBSequelize.query(
+		`SELECT MIN(statusStartDate) AS minStart FROM roomStatus
+		 WHERE roomEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N') AND (statusEndDate IS NULL OR statusEndDate > ?)`,
+		{
+			replacements: [roomEsntlId, endDtm],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+			transaction,
+		}
+	);
+	const minStartStr = minRow?.minStart != null ? toDateStr(minRow.minStart) : null;
+	if (minStartStr && endDtm < minStartStr) {
+		endDtm = minStartStr;
+	}
+
 	console.log('[closeOpenStatusesForRoom] roomEsntlId=', roomEsntlId, 'newStatusStartDate=', newStatusStartDate, '→ endDtm=', endDtm, '(statusEndDate IS NULL OR statusEndDate > endDtm 인 행을 이 날짜로 종료)');
 
 	await mariaDBSequelize.query(
