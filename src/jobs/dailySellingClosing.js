@@ -8,6 +8,7 @@
 
 const { mariaDBSequelize } = require('../models');
 const { QueryTypes } = require('sequelize');
+const { formatDateKST } = require('../middleware/dateJson');
 
 const JOB_NAME = 'DailySellingClosingJob';
 
@@ -19,7 +20,7 @@ const REGISTRANT = process.env.DAILY_CLOSING_REGISTRANT || 'SYSTEM';
  * @returns {Promise<{ sel_target_cnt: number, sel_success_cnt: number, sel_skip_cnt: number }>}
  */
 function log(msg, detail = '') {
-	const ts = new Date().toISOString();
+	const ts = formatDateKST(new Date());
 	console.log(`[${JOB_NAME}] ${ts} ${msg}${detail ? ' ' + detail : ''}`);
 }
 

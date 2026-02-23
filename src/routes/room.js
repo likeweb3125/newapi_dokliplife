@@ -3,6 +3,8 @@ const router = express.Router();
 
 const roomController = require('../controllers/room');
 const roomCategoryController = require('../controllers/roomCategory');
+const roomMoveController = require('../controllers/roomMove');
+const isAuthMiddleware = require('../middleware/is-auth');
 
 /**
  * @swagger
@@ -17,6 +19,62 @@ const roomCategoryController = require('../controllers/roomCategory');
  *   name: 계약현황
  *   description: 계약현황 관리 API
  */
+
+/**
+ * @swagger
+ * /v1/room/daily/roomMove:
+ *   get:
+ *     summary: 방이동 수동 실행 (당일 또는 지정일)
+ *     description: "roomMoveStatus에서 moveDate가 지정일(또는 당일)이고 status가 PENDING인 건을 조회한 뒤, 각 건에 대해 /v1/roomMove/process 당일 처리와 동일하게 방이동을 실행합니다. 매일 자정 스케줄러는 당일 기준으로 자동 실행됩니다."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2026-02-24"
+ *         description: "실행할 이동일 (YYYY-MM-DD). 없으면 당일."
+ *     responses:
+ *       200:
+ *         description: 실행 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "당일 방이동 실행 완료"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: "당일 PENDING 건수"
+ *                     processed:
+ *                       type: integer
+ *                       description: "성공 처리 건수"
+ *                     failed:
+ *                       type: integer
+ *                       description: "실패 건수"
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           roomMoveStatusId:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ */
+router.get('/daily/roomMove', isAuthMiddleware.isAuthAdmin, roomMoveController.runDailyRoomMoveAPI);
 
 /**
  * @swagger

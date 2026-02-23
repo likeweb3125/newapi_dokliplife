@@ -10,6 +10,7 @@ const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
+const { dateToYmd } = require('../utils/dateHelper');
 const formatAge = require('../utils/formatAge');
 
 const HISTORY_PREFIX = 'HISTORY';
@@ -1180,11 +1181,7 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			const pDateRaw = paymentInfo[0].pDate;
 			let firstPaymentDate = null;
 			if (pDateRaw) {
-				if (typeof pDateRaw === 'string') {
-					firstPaymentDate = pDateRaw.split('T')[0].substring(0, 10);
-				} else if (pDateRaw instanceof Date && !isNaN(pDateRaw.getTime())) {
-					firstPaymentDate = pDateRaw.toISOString().slice(0, 10);
-				}
+				firstPaymentDate = dateToYmd(pDateRaw);
 			}
 			if (firstPaymentDate) {
 				const settlementQuery = `

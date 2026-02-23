@@ -6,6 +6,7 @@
 
 const cron = require('node-cron');
 const dailySellingClosing = require('./dailySellingClosing');
+const dailyRoomMove = require('./dailyRoomMove');
 
 /** 매일 00:00 (자정) 실행 — 크론 표현식: 0 0 * * * */
 const DAILY_MIDNIGHT = '0 0 * * *';
@@ -20,12 +21,20 @@ function start() {
 			// eslint-disable-next-line no-console
 			console.error(`[${dailySellingClosing.JOB_NAME}] 자정 실행 실패`, err.message, err.stack);
 		}
+		try {
+			const result = await dailyRoomMove.run();
+			// eslint-disable-next-line no-console
+			console.log(`[${dailyRoomMove.JOB_NAME}] 자정 실행 완료`, result);
+		} catch (err) {
+			// eslint-disable-next-line no-console
+			console.error(`[${dailyRoomMove.JOB_NAME}] 자정 실행 실패`, err.message, err.stack);
+		}
 	}, {
 		scheduled: true,
 		timezone: 'Asia/Seoul',
 	});
 	// eslint-disable-next-line no-console
-	console.log(`[scheduler] 일일 매출 마감 잡 등록됨: 매일 00:00 (Asia/Seoul)`);
+	console.log(`[scheduler] 일일 매출 마감·방이동 잡 등록됨: 매일 00:00 (Asia/Seoul)`);
 }
 
 module.exports = { start };

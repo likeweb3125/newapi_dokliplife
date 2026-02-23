@@ -12,7 +12,8 @@ module.exports = {
 			envTZ: process.env.TZ,
 			// 현재 시간 (로컬)
 			localTime: now.toString(),
-			// 현재 시간 (ISO)
+			// 현재 시간 (ISO, 디버깅용 UTC 표시)
+			// eslint-disable-next-line no-restricted-syntax -- 타임존 비교용으로 의도적 UTC 표시
 			isoTime: now.toISOString(),
 			// UTC 오프셋 (분)
 			utcOffset: -now.getTimezoneOffset(),

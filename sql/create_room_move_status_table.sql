@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS `roomMoveStatus` (
   INDEX `idx_move_date_delete` (`moveDate`, `deleteYN`),
   CONSTRAINT `fk_roomMoveStatus_gosiwon` FOREIGN KEY (`gosiwonEsntlId`)
     REFERENCES `gosiwon` (`esntlId`)
-    ON DELETE CASCADE
+    ON DELETE RESTRICT
     ON UPDATE CASCADE,
   CONSTRAINT `fk_roomMoveStatus_contract` FOREIGN KEY (`contractEsntlId`)
     REFERENCES `roomContract` (`esntlId`)
-    ON DELETE CASCADE
+    ON DELETE RESTRICT
     ON UPDATE CASCADE,
   CONSTRAINT `fk_roomMoveStatus_customer` FOREIGN KEY (`customerEsntlId`)
     REFERENCES `customer` (`esntlId`)
@@ -52,11 +52,11 @@ CREATE TABLE IF NOT EXISTS `roomMoveStatus` (
     ON UPDATE CASCADE,
   CONSTRAINT `fk_roomMoveStatus_originalRoom` FOREIGN KEY (`originalRoomEsntlId`)
     REFERENCES `room` (`esntlId`)
-    ON DELETE CASCADE
+    ON DELETE RESTRICT
     ON UPDATE CASCADE,
   CONSTRAINT `fk_roomMoveStatus_targetRoom` FOREIGN KEY (`targetRoomEsntlId`)
     REFERENCES `room` (`esntlId`)
-    ON DELETE CASCADE
+    ON DELETE RESTRICT
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci COMMENT='방이동 상태 관리 테이블';
 
