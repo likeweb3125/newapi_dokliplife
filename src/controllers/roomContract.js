@@ -442,15 +442,16 @@ exports.getContractDetail = async (req, res, next) => {
 		});
 
 		// 방이동 예정 정보 조회 (roomMoveStatus에서 status가 PENDING인 경우)
+		// moveDate는 DATE_FORMAT으로 문자열 반환 (Date 객체가 되면 JSON 직렬화 시 UTC로 나가서 -9시간 되어 보이는 문제 방지)
 		const roomMoveQuery = `
 			SELECT 
 				esntlId,
-				moveDate
+				DATE_FORMAT(moveDate, '%Y-%m-%d %H:%i:%s') AS moveDate
 			FROM roomMoveStatus
 			WHERE contractEsntlId = ?
 				AND status = 'PENDING'
 				AND deleteYN = 'N'
-			ORDER BY moveDate ASC
+			ORDER BY moveDate DESC
 			LIMIT 1
 		`;
 
@@ -462,7 +463,7 @@ exports.getContractDetail = async (req, res, next) => {
 		// 방이동 예정 정보를 contractInfo에 추가
 		if (roomMoveInfo && roomMoveInfo.moveDate) {
 			contractInfo.isRoomMoveScheduled = true;
-			contractInfo.roomMoveDate = roomMoveInfo.moveDate;
+			contractInfo.roomMoveDate = roomMoveInfo.moveDate; // DB 저장값 그대로 문자열로 반환
 			contractInfo.roomMoveEsntlId = roomMoveInfo.esntlId;
 		} else {
 			contractInfo.isRoomMoveScheduled = false;

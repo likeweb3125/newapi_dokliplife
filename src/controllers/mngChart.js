@@ -342,7 +342,7 @@ exports.mngChartMain = async (req, res, next) => {
 		}
 
 		// Groups 데이터 변환 - id는 room.esntlId 사용
-		// subStatus가 ROOM_MOVE_OUT/ROOM_MOVE_IN이면 '방이동'(ROOM_MOVE)으로 표시
+		// subStatus가 ROOM_MOVE_OUT이면 '방이동'(ROOM_MOVE)으로 표시. ROOM_MOVE_IN(이동 들어온 방)은 이미 입주 상태이므로 status(예: CONTRACT) 그대로 사용
 		// roomEsntlId -> roomStatus.status(원본) 매핑 (items의 itemStatus용)
 		// roomEsntlId -> roomNumber 매핑 (방이동 content용)
 		const roomIdToStatusRaw = {};
@@ -350,7 +350,7 @@ exports.mngChartMain = async (req, res, next) => {
 		const groups = rooms.map((room) => {
 			roomIdToRoomNumber[room.id] = room.roomNumber || room.id;
 			const baseStatus = room.status || 'BEFORE_SALES';
-			const statusKey = (room.roomSubStatus === 'ROOM_MOVE_OUT' || room.roomSubStatus === 'ROOM_MOVE_IN')
+			const statusKey = room.roomSubStatus === 'ROOM_MOVE_OUT'
 				? 'ROOM_MOVE'
 				: baseStatus;
 			roomIdToStatusRaw[room.id] = statusKey;

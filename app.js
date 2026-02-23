@@ -95,6 +95,10 @@ app.use(helmet.crossOriginResourcePolicy({ policy: 'cross-origin' }));
 app.use(bodyParser.urlencoded({ extended: true })); // x-www-form-urlencoded <form>
 app.use(bodyParser.json());
 
+// API 응답 시 Date 객체를 KST 문자열로 직렬화 (UTC로 나가 -9시간 되어 보이는 문제 방지)
+const { dateJsonMiddleware } = require('./src/middleware/dateJson');
+app.use(dateJsonMiddleware);
+
 app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
 // Swagger Docs with Basic Authentication
