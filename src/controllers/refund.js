@@ -480,6 +480,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				rrr_leave_date,
 				rrr_leave_reason,
 				rrr_liability_reason,
+				rrr_contacted_owner,
 				rrr_payment_amt,
 				rrr_use_period,
 				rrr_use_amt,
@@ -488,7 +489,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				rrr_registrant_id,
 				rrr_update_dtm,
 				rrr_updater_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
 			`,
 			{
 				replacements: [
@@ -500,6 +501,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 					cancelDate,
 					leaveReason,
 					liabilityReason || null,
+					contactedOwner ? 1 : 0, // rrr_contacted_owner: 0 미연락, 1 연락완료
 					paymentAmount || 0,
 					usePeriodDays, // rrr_use_period: 입실 시작일부터 현재일까지 일수
 					proratedRent || 0,

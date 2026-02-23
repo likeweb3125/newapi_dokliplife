@@ -86,11 +86,11 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'rrr_refund_total_arr',
 				comment: '환불총액',
 			},
-			rrr_process_status_: {
+			rrr_process_status_cd: {
 				type: DataTypes.STRING(30),
 				allowNull: false,
 				defaultValue: 'REQUEST',
-				field: 'rrr_process_status_',
+				field: 'rrr_process_status_cd',
 				comment: '요청(REQUEST), 승인(APPROVAL), 반려(REJECT), 취소(CANCELLATION)',
 			},
 			rrr_process_reason: {

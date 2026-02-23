@@ -487,6 +487,46 @@ exports.getContractDetail = async (req, res, next) => {
 		}
 		contractInfo.deposit = deposit;
 
+		// il_room_refund_request: 해당 계약의 환불 요청 정보 1건 조회 (최신)
+		const refundRequestQuery = `
+			SELECT 
+				RRR.rrr_process_status_cd AS refundStatus,
+				DATE_FORMAT(RRR.rrr_regist_dtm, '%Y-%m-%d %H:%i:%s') AS refundRequestDate,
+				RRR.rrr_leave_date AS refundCheckOutDate,
+				RRR.rrr_leave_type_cd AS refundLeaveType,
+				RRR.rrr_leave_reason AS refundLeaveReason,
+				RRR.rrr_registrant_id AS refundRegistrantId,
+				RRR.rrr_contacted_owner AS refundContactedOwner,
+				RRR.rrr_refund_total_amt AS refundTotalAmount
+			FROM il_room_refund_request RRR
+			WHERE RRR.ctt_eid = ?
+			ORDER BY RRR.rrr_sno DESC
+			LIMIT 1
+		`;
+		const [refundRequestRow] = await mariaDBSequelize.query(refundRequestQuery, {
+			replacements: [contractEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+		if (refundRequestRow) {
+			contractInfo.refundStatus = refundRequestRow.refundStatus;
+			contractInfo.refundRequestDate = refundRequestRow.refundRequestDate;
+			contractInfo.refundCheckOutDate = refundRequestRow.refundCheckOutDate;
+			contractInfo.refundLeaveType = refundRequestRow.refundLeaveType;
+			contractInfo.refundLeaveReason = refundRequestRow.refundLeaveReason;
+			contractInfo.refundRegistrantId = refundRequestRow.refundRegistrantId;
+			contractInfo.refundContactedOwner = refundRequestRow.refundContactedOwner != null ? Number(refundRequestRow.refundContactedOwner) : null;
+			contractInfo.refundTotalAmount = refundRequestRow.refundTotalAmount != null ? Number(refundRequestRow.refundTotalAmount) : null;
+		} else {
+			contractInfo.refundStatus = null;
+			contractInfo.refundRequestDate = null;
+			contractInfo.refundCheckOutDate = null;
+			contractInfo.refundLeaveType = null;
+			contractInfo.refundLeaveReason = null;
+			contractInfo.refundRegistrantId = null;
+			contractInfo.refundContactedOwner = null;
+			contractInfo.refundTotalAmount = null;
+		}
+
 		errorHandler.successThrow(res, '계약 상세보기 조회 성공', {
 			contractInfo: contractInfo,
 			paymentLogList: paymentLogList || [],
