@@ -228,8 +228,8 @@ const roomContractController = require('../controllers/roomContract');
  *                           depositStatus:
  *                             type: string
  *                             nullable: true
- *                             description: "보증금 상태 (il_room_deposit 기준, 방·고시원·입실자/계약자명 매칭 최신 건). rdp_return_dtm 있음 → RETURN_COMPLETE, rdp_completed_dtm 있음 → COMPLETE, 없음 → PENDING"
- *                             enum: [PENDING, COMPLETE, RETURN_COMPLETE]
+ *                             description: "보증금 상태 (il_room_deposit_history 최신 이력 기준, /v1/deposit/depositList와 동일). PENDING, PARTIAL, DELETED, COMPLETE 등"
+ *                             enum: [PENDING, PARTIAL, DELETED, COMPLETE]
  *                     totcnt:
  *                       type: integer
  *                       description: 전체 개수

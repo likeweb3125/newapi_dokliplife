@@ -187,16 +187,28 @@ exports.getContractList = async (req, res, next) => {
 					ELSE 'pay'
 				END AS paymentCategory,
 				COALESCE((
-					SELECT CASE 
-						WHEN D.rdp_completed_dtm IS NOT NULL THEN 'COMPLETE'
-						WHEN D.rdp_return_dtm IS NOT NULL THEN 'RETURN_COMPLETE'
-						ELSE 'PENDING'
+					SELECT CASE
+						WHEN DH.status IS NULL THEN NULL
+						WHEN DH.status = 'PENDING' THEN 'PENDING'
+						WHEN DH.status = 'PARTIAL' THEN 'PARTIAL'
+						WHEN DH.status = 'DELETED' THEN 'DELETED'
+						WHEN DH.status IN ('COMPLETED', 'RETURN_COMPLETED') THEN 'COMPLETE'
+						ELSE DH.status
 					END
 					FROM il_room_deposit D
-					WHERE D.rom_eid = RC.roomEsntlId 
+					LEFT JOIN (
+						SELECT H1.depositEsntlId, H1.status
+						FROM il_room_deposit_history H1
+						INNER JOIN (
+							SELECT depositEsntlId, MAX(createdAt) AS maxCreatedAt
+							FROM il_room_deposit_history
+							GROUP BY depositEsntlId
+						) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt
+					) DH ON D.rdp_eid = DH.depositEsntlId
+					WHERE D.rom_eid = RC.roomEsntlId
 					  AND D.gsw_eid = RC.gosiwonEsntlId
 					  AND D.rdp_delete_dtm IS NULL
-					ORDER BY D.rdp_regist_dtm DESC 
+					ORDER BY D.rdp_regist_dtm DESC
 					LIMIT 1
 				), 'PENDING') AS depositStatus
 			FROM roomContract RC
