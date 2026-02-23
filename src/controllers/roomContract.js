@@ -164,8 +164,7 @@ exports.getContractList = async (req, res, next) => {
 				RCW.customerGender AS contractCustomerGender,
 				RCW.customerAge AS contractCustomerAge,
 				COALESCE(PL.pyl_goods_amount, 0) AS pyl_goods_amount,
-				FORMAT(COALESCE(PL.paymentAmount, 0), 0) AS paymentAmount,
-				COALESCE(PL.paymentAmount, 0) AS payment_amount,
+				R.monthlyRent AS roomInfoAmount,
 				FORMAT(COALESCE(PL.paymentPoint, 0), 0) AS paymentPoint,
 				FORMAT(COALESCE(PL.paymentCoupon, 0), 0) AS paymentCoupon,
 				FORMAT(COALESCE(PL.cAmount, 0), 0) AS cAmount,
@@ -209,34 +208,7 @@ exports.getContractList = async (req, res, next) => {
 				SELECT 
 					contractEsntlId,
 					pTime,
-					pyl_goods_amount,
-					SUM(paymentAmount) AS paymentAmount,
-					SUM(paymentPoint) AS paymentPoint,
-					SUM(paymentCoupon) AS paymentCoupon,
-					SUM(cAmount) AS cAmount,
-					AVG(cPercent) AS cPercent
-				FROM paymentLog 
-				GROUP BY contractEsntlId
-			) PL ON RC.esntlId = PL.contractEsntlId
-			WHERE ${whereClause}
-			ORDER BY RC.contractDate ${orderDirection}, COALESCE(PL.pTime, '') ${orderDirection}
-			LIMIT ? OFFSET ?
-		`;
-
-		// 합계 조회 쿼리 (계약당 1행이 되도록 paymentLog는 계약별 집계 후 조인)
-		const summaryQuery = `
-			SELECT 
-				FORMAT(COALESCE(SUM(PL.paymentAmount), 0), 0) AS paymentAmount,
-				FORMAT(COALESCE(SUM(PL.paymentPoint), 0), 0) AS paymentPoint,
-				FORMAT(COALESCE(SUM(PL.paymentCoupon), 0), 0) AS paymentCoupon,
-				FORMAT(COALESCE(SUM(PL.cAmount), 0), 0) AS cAmount,
-				FORMAT(COALESCE(AVG(PL.cPercent), 0), 0) AS cPercent
-			FROM roomContract RC
-			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
-			JOIN customer C ON RC.customerEsntlId = C.esntlId
-			LEFT JOIN (
-				SELECT 
-					contractEsntlId,
+					SUM(CASE WHEN (extrapayEsntlId IS NULL OR extrapayEsntlId = '') AND calculateStatus = 'SUCCESS' THEN CAST(paymentAmount AS DECIMAL(20,0)) ELSE 0 END) AS pyl_goods_amount,
 					SUM(paymentAmount) AS paymentAmount,
 					SUM(paymentPoint) AS paymentPoint,
 					SUM(paymentCoupon) AS paymentCoupon,
@@ -246,17 +218,14 @@ exports.getContractList = async (req, res, next) => {
 				GROUP BY contractEsntlId
 			) PL ON RC.esntlId = PL.contractEsntlId
 			WHERE ${whereClause}
+			ORDER BY RC.contractDate ${orderDirection}, COALESCE(PL.pTime, '') ${orderDirection}
+			LIMIT ? OFFSET ?
 		`;
 
 		// 쿼리 실행
 		const mainValues = [...whereValues, limitNum, offset];
 		const mainResult = await mariaDBSequelize.query(mainQuery, {
 			replacements: mainValues,
-			type: mariaDBSequelize.QueryTypes.SELECT,
-		});
-
-		const summaryResult = await mariaDBSequelize.query(summaryQuery, {
-			replacements: whereValues,
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
@@ -276,17 +245,11 @@ exports.getContractList = async (req, res, next) => {
 
 		const totalCount = countResult[0]?.total || 0;
 		const resultList = Array.isArray(mainResult) ? mainResult : [];
-		const summary = summaryResult[0] || {};
 
 		// 응답 데이터 구성
 		const response = {
 			resultList: resultList,
 			totcnt: totalCount,
-			totPaymentAmount: summary.paymentAmount || '0',
-			totPaymentPoint: summary.paymentPoint || '0',
-			totPaymentCoupon: summary.paymentCoupon || '0',
-			totCAmount: summary.cAmount || '0',
-			totCPercent: summary.cPercent || '0',
 			page: pageNum,
 			limit: limitNum,
 			totalPages: Math.ceil(totalCount / limitNum),

@@ -183,10 +183,11 @@ const roomContractController = require('../controllers/roomContract');
  *                             description: 나이
  *                           pyl_goods_amount:
  *                             type: number
- *                             description: 상품 금액
- *                           paymentAmount:
+ *                             description: "해당 계약의 paymentLog 중 extrapayEsntlId가 null이고 calculateStatus가 SUCCESS인 건의 paymentAmount 합계"
+ *                           roomInfoAmount:
  *                             type: string
- *                             description: 결제 금액 (포맷팅)
+ *                             nullable: true
+ *                             description: "해당 방(roomContract.roomEsntlId)의 room.monthlyRent (월세/입실료)"
  *                           paymentPoint:
  *                             type: string
  *                             description: 포인트 결제 금액 (포맷팅)
@@ -232,21 +233,6 @@ const roomContractController = require('../controllers/roomContract');
  *                     totcnt:
  *                       type: integer
  *                       description: 전체 개수
- *                     totPaymentAmount:
- *                       type: string
- *                       description: 전체 결제 금액 합계
- *                     totPaymentPoint:
- *                       type: string
- *                       description: 전체 포인트 결제 금액 합계
- *                     totPaymentCoupon:
- *                       type: string
- *                       description: 전체 쿠폰 결제 금액 합계
- *                     totCAmount:
- *                       type: string
- *                       description: 전체 수수료 금액 합계
- *                     totCPercent:
- *                       type: string
- *                       description: 전체 수수료 비율 평균
  *                     page:
  *                       type: integer
  *                       description: 현재 페이지
