@@ -346,7 +346,7 @@ exports.mngChartMain = async (req, res, next) => {
 				`
 				SELECT esntlId, contractEsntlId, status, useStartDate, useEndDate, parkType, parkNumber, cost, memo
 				FROM parkStatus
-				WHERE contractEsntlId IN (?) AND deleteYN = 'N'
+				WHERE contractEsntlId IN (?) AND deleteYN = 'N' AND status = 'CONTRACT'
 				ORDER BY contractEsntlId, useStartDate
 				`,
 				{
