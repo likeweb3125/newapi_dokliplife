@@ -1203,11 +1203,13 @@ exports.getGosiwonList = async (req, res, next) => {
 			SELECT 
 				esntlId,
 				name,
+				is_favorite,
 				pendingCount
 			FROM (
 			SELECT 
 				g.esntlId,
 				g.name,
+				COALESCE(g.is_favorite, 0) AS is_favorite,
 					COUNT(DISTINCT CASE 
 						WHEN d.rom_eid IS NOT NULL 
 						AND d.rdp_completed_dtm IS NULL
@@ -1216,20 +1218,21 @@ exports.getGosiwonList = async (req, res, next) => {
 			FROM gosiwon g
 			LEFT JOIN il_room_deposit d ON g.esntlId = d.gsw_eid 
 			WHERE g.status = 'OPERATE'
-			GROUP BY g.esntlId, g.name
+			GROUP BY g.esntlId, g.name, g.is_favorite
 			) as gosiwonCounts
-			ORDER BY pendingCount DESC, name ASC
+			ORDER BY is_favorite DESC, pendingCount DESC, name ASC
 		`,
 			{
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}
 		);
 
-		// 결과 구성
+		// 결과 구성 (즐겨찾기 우선 정렬됨)
 		const result = gosiwonList.map((row) => {
 			return {
 				esntlId: row.esntlId,
 				name: row.name,
+				isFavorite: Number(row?.is_favorite) === 1,
 				pendingCount: parseInt(row.pendingCount) || 0,
 			};
 		});

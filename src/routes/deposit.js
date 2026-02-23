@@ -1181,7 +1181,7 @@ router.get('/history', depositController.getDepositHistory);
  * /v1/deposit/gosiwonList:
  *   get:
  *     summary: 고시원 목록 조회 (입금대기 건수 포함)
- *     description: 'status가 OPERATE인 고시원 목록을 조회하고, 입금대기(PENDING) 건수를 카운트하여 반환합니다. 카운트가 있으면 상단으로 정렬됩니다.'
+ *     description: "status가 OPERATE인 고시원 목록을 조회합니다. 정렬 순서는 즐겨찾기(is_favorite=1) 우선, 그 다음 입금대기 건수 많은 순, 이름 순입니다."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -1212,6 +1212,10 @@ router.get('/history', depositController.getDepositHistory);
  *                         type: string
  *                         description: 고시원 이름
  *                         example: 성수 고시원
+ *                       isFavorite:
+ *                         type: boolean
+ *                         description: 즐겨찾기 여부
+ *                         example: true
  *                       pendingCount:
  *                         type: integer
  *                         description: 입금대기 건수
