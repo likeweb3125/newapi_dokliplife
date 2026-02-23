@@ -1035,15 +1035,12 @@ exports.reserveCancel = async (req, res, next) => {
 		const decodedToken = verifyAdminToken(req);
 		const userSn = getWriterAdminId(decodedToken);
 
-		const { roomEsntlId, isReserve } = req.body;
+		const { roomEsntlId } = req.body;
 
 		// 필수 필드 검증
 		if (!roomEsntlId) {
 			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
 		}
-
-		// isReserve 값 처리 (기본값: false)
-		const isReserveValue = isReserve === 'Y' || isReserve === true;
 
 		// 1. 예약 상태를 CANCEL로 업데이트
 		const updateReservationQuery = `
@@ -1066,24 +1063,30 @@ exports.reserveCancel = async (req, res, next) => {
 			errorHandler.errorThrow(404, '취소할 예약을 찾을 수 없습니다. (WAIT 상태의 예약이 없습니다.)');
 		}
 
-		// 2. isReserve가 false인 경우에만 방 상태 업데이트
-		if (!isReserveValue) {
-			const updateRoomQuery = `
-				UPDATE room 
-				SET status = IF(customerEsntlId IS NOT NULL, 'CONTRACT', 'EMPTY')
-				WHERE esntlId = ?
-			`;
+		// 2. roomStatus: 해당 방의 예약 관련 상태(RESERVE_PENDING 등)를 소프트 삭제
+		await mariaDBSequelize.query(
+			`UPDATE roomStatus SET deleteYN = 'Y', deletedBy = ?, deletedAt = NOW(), updatedAt = NOW()
+			 WHERE roomEsntlId = ? AND status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING') AND (deleteYN IS NULL OR deleteYN = 'N')`,
+			{
+				replacements: [userSn, roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
 
-			await mariaDBSequelize.query(updateRoomQuery, {
+		// 3. room: 해당 방을 EMPTY로 변경
+		await mariaDBSequelize.query(
+			`UPDATE room SET status = 'EMPTY', startDate = NULL, endDate = NULL WHERE esntlId = ?`,
+			{
 				replacements: [roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
-			});
-		}
+			}
+		);
 
 		// 방 정보 조회하여 gosiwonEsntlId 가져오기 (히스토리 생성에 필요)
 		const roomBasicInfo = await room.findByPk(roomEsntlId, {
-			attributes: ['gosiwonEsntlId', 'status'],
+			attributes: ['gosiwonEsntlId'],
 			transaction,
 		});
 
@@ -1091,12 +1094,10 @@ exports.reserveCancel = async (req, res, next) => {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
 		}
 
-		// 3. 히스토리 생성
+		// 4. 히스토리 생성
 		try {
 			const historyId = await generateHistoryId(transaction);
-			const historyContent = isReserveValue
-				? `결제 요청이 취소되었습니다. (예약만 취소)`
-				: `결제 요청이 취소되었습니다. 방 상태: ${roomBasicInfo.status}`;
+			const historyContent = '결제 요청이 취소되었습니다. (roomStatus 소프트삭제, room EMPTY 처리)';
 
 			await history.create(
 				{
@@ -1122,8 +1123,7 @@ exports.reserveCancel = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '결제 요청 취소 성공', {
 			roomEsntlId: roomEsntlId,
-			isReserve: isReserveValue,
-			roomStatus: roomBasicInfo.status,
+			roomStatus: 'EMPTY',
 		});
 	} catch (err) {
 		await transaction.rollback();
