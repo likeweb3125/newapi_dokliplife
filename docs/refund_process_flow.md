@@ -64,13 +64,12 @@
 
 ### 3. roomStatus (UPDATE)
 
-`contractEsntlId`가 일치하는 행의 `status`를 `CHECKOUT_CONFIRMED`로, `statusEndDate`를 요청의 `cancelDate`로 변경.
+`contractEsntlId`가 일치하는 행의 `status`를 `CHECKOUT_CONFIRMED`로 변경.
 
-| 컬럼        | 용도                          |
-|-------------|-------------------------------|
-| status      | `CHECKOUT_CONFIRMED`로 업데이트 |
-| statusEndDate | 요청의 cancelDate             |
-| updatedAt   | 현재 시간 (한국 시간)         |
+| 컬럼    | 용도                      |
+|---------|---------------------------|
+| status  | `CHECKOUT_CONFIRMED`로 업데이트 |
+| updatedAt | 현재 시간 (한국 시간)     |
 
 ---
 
@@ -174,7 +173,7 @@
           v
 [5] roomStatus UPDATE
     WHERE contractEsntlId = ?
-    SET status = 'CHECKOUT_CONFIRMED', statusEndDate = cancelDate
+    SET status = 'CHECKOUT_CONFIRMED'
           |
           v
 [6] roomContract UPDATE
@@ -348,7 +347,7 @@ history ── (항상 1건) contractEsntlId, gosiwonEsntlId, roomEsntlId,
 |-----------------|--------------------------------------------------------------------------|----------------------------------------------|
 | **조회**        | roomContract, room, customer, deposit, customer(계약자)                 | 계약 검증 및 정보 수집                        |
 | **저장**        | il_room_refund_request                                                    | 환불 요청 1건 INSERT (rrr_sno 반환)           |
-| **갱신**        | roomStatus                                                                | status = CHECKOUT_CONFIRMED, statusEndDate = cancelDate |
+| **갱신**        | roomStatus                                                                | status = CHECKOUT_CONFIRMED                  |
 | **갱신**        | roomContract                                                              | status = CANCEL 또는 FIN                     |
 | **조건부 조회** | il_gosiwon_config                                                         | check_basic_sell === true일 때만             |
 | **조건부 생성** | roomStatus                                                                | roomAfterUse 호출 시 (ON_SALE / CAN_CHECKIN / BEFORE_SALES) |

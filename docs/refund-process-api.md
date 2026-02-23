@@ -57,7 +57,7 @@
 
 ### 1.3 roomStatus — UPDATE
 
-`contractEsntlId`가 일치하는 행의 `status`를 `CHECKOUT_CONFIRMED`로, `statusEndDate`를 요청의 `cancelDate`로 변경합니다.
+해당 계약의 **마지막 CONTRACT 상태 행** 1건을 찾아(`status = 'CONTRACT'`, `statusStartDate`·`esntlId` 기준 최신) `status`를 `CHECKOUT_CONFIRMED`로, `statusEndDate`를 **cancelDate**로 변경합니다. (당일이 아닌 퇴실일에도 맞게 종료일이 설정됨)
 
 ---
 
