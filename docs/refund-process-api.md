@@ -57,7 +57,7 @@
 
 ### 1.3 roomStatus — UPDATE
 
-`contractEsntlId`가 일치하는 행의 `status`를 `CHECKOUT_CONFIRMED`로 변경합니다.
+`contractEsntlId`가 일치하는 행의 `status`를 `CHECKOUT_CONFIRMED`로, `statusEndDate`를 요청의 `cancelDate`로 변경합니다.
 
 ---
 

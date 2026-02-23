@@ -39,7 +39,7 @@ roomStatus 테이블의 **status** 값을 설정하는 모든 위치를 파일·
 | **createRoomStatusAfterRefund** (check_basic_sell=true) | INSERT | `ON_SALE` | 이어서 ON_SALE 생성. |
 | **createRoomStatusAfterRefund** (check_basic_sell=false, unableCheckInReason 있음) | INSERT | `BEFORE_SALES` | 입실 불가 사유 있을 때. subStatus에 사유, 기간 9999-12-31까지. |
 | **createRoomStatusAfterRefund** (check_basic_sell=false, unableCheckInReason 없음) | (없음) | - | ON_SALE/CAN_CHECKIN 생성 안 함. |
-| **퇴실 확정 처리** (환불 확정 시) | UPDATE | `CHECKOUT_CONFIRMED` | contractEsntlId 기준 roomStatus 1건을 CHECKOUT_CONFIRMED로 변경, statusEndDate=CURDATE(). |
+| **퇴실 확정 처리** (환불 확정 시) | UPDATE | `CHECKOUT_CONFIRMED` | contractEsntlId 기준 roomStatus 1건을 CHECKOUT_CONFIRMED로 변경, statusEndDate=요청의 cancelDate. |
 
 ---
 

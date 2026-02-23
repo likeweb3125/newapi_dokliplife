@@ -514,17 +514,17 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		);
 		const rrrSno = refundInsertResult?.insertId || refundInsertResult;
 
-		// roomStatus를 CHECKOUT_CONFIRMED로 업데이트 (contractEsntlId 기준), statusEndDate는 당일로 설정
+		// roomStatus를 CHECKOUT_CONFIRMED로 업데이트 (contractEsntlId 기준), statusEndDate는 cancelDate로 설정
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomStatus 
 			SET status = 'CHECKOUT_CONFIRMED',
-				statusEndDate = CURDATE(),
+				statusEndDate = ?,
 				updatedAt = NOW()
 			WHERE contractEsntlId = ?
 		`,
 			{
-				replacements: [contractEsntlId],
+				replacements: [cancelDate, contractEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
 			}
