@@ -135,16 +135,29 @@ function addDaysToDateStr(dateStr, days) {
 	return `${y}-${m}-${day} 00:00:00`;
 }
 
-async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transaction = null) {
+/**
+ * 해당 방의 미종료(열린) roomStatus 행들을 newStatusStartDate - 1일로 종료한다.
+ * @param {string} roomEsntlId - 방 고유 아이디
+ * @param {string} newStatusStartDate - 새 상태 시작일 (YYYY-MM-DD 등)
+ * @param {object} [transaction] - Sequelize 트랜잭션 (선택)
+ * @param {{ excludeStatuses?: string[] }} [options] - 제외할 status 값 (예: 연장 시 기존 CONTRACT 유지용 ['CONTRACT','OVERDUE','CHECKOUT_REQUESTED','ROOM_MOVE'])
+ */
+async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transaction = null, options = null) {
 	if (!roomEsntlId || newStatusStartDate == null) return;
+	const excludeStatuses = (options && options.excludeStatuses && options.excludeStatuses.length) ? options.excludeStatuses : [];
 	let endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
 
+	const whereBase = `roomEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N') AND (statusEndDate IS NULL OR statusEndDate > ?)`;
+	const whereExclude = excludeStatuses.length ? ` AND status NOT IN (${excludeStatuses.map(() => '?').join(',')})` : '';
+
 	// -1일이 계약(상태) 시작일보다 작으면 안 됨: 갱신 대상 행들 중 최소 statusStartDate보다 작으면 그날과 같게 함
+	const selectReplacements = [roomEsntlId, endDtm];
+	if (excludeStatuses.length) selectReplacements.push(...excludeStatuses);
 	const [minRow] = await mariaDBSequelize.query(
 		`SELECT MIN(statusStartDate) AS minStart FROM roomStatus
-		 WHERE roomEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N') AND (statusEndDate IS NULL OR statusEndDate > ?)`,
+		 WHERE ${whereBase}${whereExclude}`,
 		{
-			replacements: [roomEsntlId, endDtm],
+			replacements: selectReplacements,
 			type: mariaDBSequelize.QueryTypes.SELECT,
 			transaction,
 		}
@@ -154,15 +167,17 @@ async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transac
 		endDtm = minStartStr;
 	}
 
-	console.log('[closeOpenStatusesForRoom] roomEsntlId=', roomEsntlId, 'newStatusStartDate=', newStatusStartDate, '→ endDtm=', endDtm, '(statusEndDate IS NULL OR statusEndDate > endDtm 인 행을 이 날짜로 종료)');
+	console.log('[closeOpenStatusesForRoom] roomEsntlId=', roomEsntlId, 'newStatusStartDate=', newStatusStartDate, '→ endDtm=', endDtm, excludeStatuses.length ? `(CONTRACT 계열 제외: ${excludeStatuses.join(',')})` : '', '(statusEndDate IS NULL OR statusEndDate > endDtm 인 행을 이 날짜로 종료)');
 
+	const updateReplacements = [endDtm, endDtm, roomEsntlId, endDtm];
+	if (excludeStatuses.length) updateReplacements.push(...excludeStatuses);
 	await mariaDBSequelize.query(
 		`UPDATE roomStatus 
 		 SET statusEndDate = GREATEST(?, COALESCE(statusStartDate, ?)), updatedAt = NOW() 
 		 WHERE roomEsntlId = ? 
-		   AND (statusEndDate IS NULL OR statusEndDate > ?)`,
+		   AND (statusEndDate IS NULL OR statusEndDate > ?)${whereExclude}`,
 		{
-			replacements: [endDtm, endDtm, roomEsntlId, endDtm],
+			replacements: updateReplacements,
 			type: mariaDBSequelize.QueryTypes.UPDATE,
 			transaction,
 		}

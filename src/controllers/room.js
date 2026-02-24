@@ -5,6 +5,7 @@ const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus, ROOM_STATUS_TO_RS_STATUS_LIST } = require('../utils/roomStatusHelper');
+const { dateToYmd } = require('../utils/dateHelper');
 const { sendContractLinkSMS } = require('../utils/contractLinkSms');
 
 // 공통 토큰 검증 함수
@@ -1428,8 +1429,32 @@ exports.roomReserve = async (req, res, next) => {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
 		}
 
-		// 3. roomStatus 테이블: RESERVE_PENDING(예약금 입금대기중) 레코드 추가. statusStartDate=오늘, statusEndDate=예약일(checkInDate). room 동기화는 INSERT 후 syncRoomFromRoomStatus로 수행
-		await closeOpenStatusesForRoom(roomEsntlId, todayStr, transaction);
+		// 기존 계약(CONTRACT 계열) 보호: 해당 방에 미종료 CONTRACT가 있으면 closeOpenStatusesForRoom을 호출하지 않고, RESERVE_PENDING의 statusStartDate는 기존 계약 종료일로 설정
+		const yesterday = new Date(todayStr.replace(/-/g, '/'));
+		yesterday.setDate(yesterday.getDate() - 1);
+		const reserveEndDtm = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')} 00:00:00`;
+		const openContractRows = await mariaDBSequelize.query(
+			`SELECT statusEndDate FROM roomStatus
+			 WHERE roomEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N')
+			   AND (statusEndDate IS NULL OR statusEndDate > ?)
+			   AND status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE')
+			 ORDER BY statusEndDate IS NULL, statusEndDate DESC`,
+			{ replacements: [roomEsntlId, reserveEndDtm], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
+		);
+		const hasOpenContract = Array.isArray(openContractRows) && openContractRows.length > 0;
+		// 연장 시 RESERVE_PENDING 시작일 = 기존 계약 종료일(가장 늦은 statusEndDate). null만 있으면 오늘 (DB가 Date 객체로 반환하므로 dateToYmd 사용)
+		const contractEndDateRow = hasOpenContract
+			? openContractRows.find((r) => r.statusEndDate != null) || null
+			: null;
+		const reservePendingStartDate = contractEndDateRow != null
+			? dateToYmd(contractEndDateRow.statusEndDate) || todayStr
+			: todayStr;
+
+		// 3. roomStatus 테이블: RESERVE_PENDING 레코드 추가. 연장이면 statusStartDate=기존 계약 종료일, 신규면 오늘. statusEndDate=예약일(checkInDate)
+		// 연장일 때는 closeOpenStatusesForRoom을 호출하지 않아 기존 CONTRACT의 statusEndDate가 절대 변경되지 않도록 함
+		if (!hasOpenContract) {
+			await closeOpenStatusesForRoom(roomEsntlId, todayStr, transaction);
+		}
 		const newRoomStatusId = await idsNext('roomStatus', undefined, transaction);
 		await mariaDBSequelize.query(
 			`INSERT INTO roomStatus (
@@ -1449,7 +1474,7 @@ exports.roomReserve = async (req, res, next) => {
 					roomEsntlId,
 					roomBasicInfo.gosiwonEsntlId,
 					reservationId,
-					todayStr,
+					reservePendingStartDate,
 					checkInDate || null,
 				],
 				type: mariaDBSequelize.QueryTypes.INSERT,
@@ -1459,7 +1484,7 @@ exports.roomReserve = async (req, res, next) => {
 		await syncRoomFromRoomStatus(
 			roomEsntlId,
 			'RESERVE_PENDING',
-			{ startDate: todayStr, endDate: checkInDate || null },
+			{ startDate: reservePendingStartDate, endDate: checkInDate || null },
 			transaction
 		);
 
