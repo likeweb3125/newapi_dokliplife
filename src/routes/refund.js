@@ -338,6 +338,11 @@ router.post('/refundInsert', refundController.refundInsert);
  *                       type: array
  *                       items:
  *                         type: object
+ *                         properties:
+ *                           gosiwonEsntlId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "해당 행의 고시원 고유아이디"
  *                     recordsTotal:
  *                       type: integer
  *                       description: 전체 레코드 수

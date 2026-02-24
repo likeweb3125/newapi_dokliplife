@@ -825,6 +825,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 		// 메인 쿼리 (il_room_refund_request 1건당 1행, paymentLog 조인 제거로 중복 제거)
 		const query = `
 			SELECT 
+				RRR.gsw_eid AS gosiwonEsntlId,
 				RRR.rrr_sno,
 				RRR.rrr_regist_dtm,
 				G.name AS gswName,
