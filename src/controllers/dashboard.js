@@ -597,3 +597,50 @@ exports.getWeeklyRanking = async (req, res, next) => {
 		next(err);
 	}
 };
+
+/**
+ * GET /v1/dashboard/tourReservationStats
+ * il_tour_reservation에서 기준일(또는 당일) 포함 과거 7일간 통계. notConfirm/confirmed/취소·무효 건수.
+ */
+exports.getTourReservationStats = async (req, res, next) => {
+	try {
+		const dateStr = isValidDateString(req.query.date) ? req.query.date : getTodayDateString();
+		const { startDtm, endDtm } = getWeekRange(dateStr);
+
+		const query = `
+			SELECT
+				COUNT(*) AS weekTotal,
+				SUM(CASE WHEN rtr_confirm_dtm IS NULL THEN 1 ELSE 0 END) AS notConfirm,
+				SUM(CASE WHEN rtr_confirm_dtm IS NOT NULL THEN 1 ELSE 0 END) AS confirmed,
+				SUM(CASE WHEN rtr_status = 'CANCEL_GOSIWON' THEN 1 ELSE 0 END) AS cancelGosiwon,
+				SUM(CASE WHEN rtr_status = 'CANCEL_USER' THEN 1 ELSE 0 END) AS cancelUser,
+				SUM(CASE WHEN rtr_status = 'INVALID' THEN 1 ELSE 0 END) AS invalid
+			FROM il_tour_reservation
+			WHERE rtr_tour_dtm >= ? AND rtr_tour_dtm < ?
+		`;
+		const [row] = await mariaDBSequelize.query(query, {
+			replacements: [startDtm, endDtm],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+
+		const fromDate = startDtm.slice(0, 10);
+
+		return res.status(200).json({
+			statusCode: 200,
+			message: '룸투어 예약 주간 통계 조회 성공',
+			data: {
+				date: dateStr,
+				from: fromDate,
+				to: dateStr,
+				weekTotal: Number(row?.weekTotal) || 0,
+				notConfirm: Number(row?.notConfirm) || 0,
+				confirmed: Number(row?.confirmed) || 0,
+				cancelGosiwon: Number(row?.cancelGosiwon) || 0,
+				cancelUser: Number(row?.cancelUser) || 0,
+				invalid: Number(row?.invalid) || 0,
+			},
+		});
+	} catch (err) {
+		next(err);
+	}
+};

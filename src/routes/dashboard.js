@@ -256,4 +256,72 @@ router.get('/dailySchedule', isAuthMiddleware.isAuthAdmin, dashboardController.g
  */
 router.get('/weeklyRanking', isAuthMiddleware.isAuthAdmin, dashboardController.getWeeklyRanking);
 
+/**
+ * @swagger
+ * /v1/dashboard/tourReservationStats:
+ *   get:
+ *     summary: 룸투어 예약 주간 통계
+ *     description: "il_tour_reservation 테이블에서 기준일(또는 당일) 포함 과거 7일간(rtr_tour_dtm 기준) 통계를 반환합니다. notConfirm(rtr_confirm_dtm 없음), weekTotal(한 주 총 건수), confirmed(rtr_confirm_dtm 있음), cancelGosiwon/cancelUser/invalid(rtr_status별 건수)를 집계합니다."
+ *     tags: [dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2026-02-20"
+ *         description: "기준일 (YYYY-MM-DD). 미입력 시 오늘. 해당일 포함 과거 7일(기준일-6일 ~ 기준일)을 집계합니다."
+ *     responses:
+ *       200:
+ *         description: 룸투어 예약 주간 통계 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: "룸투어 예약 주간 통계 조회 성공"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     date:
+ *                       type: string
+ *                       description: "요청 기준일 (YYYY-MM-DD)"
+ *                     from:
+ *                       type: string
+ *                       description: "집계 구간 시작일 (YYYY-MM-DD)"
+ *                     to:
+ *                       type: string
+ *                       description: "집계 구간 종료일 (YYYY-MM-DD, 기준일)"
+ *                     weekTotal:
+ *                       type: integer
+ *                       description: "한 주간 총 예약 건수"
+ *                     notConfirm:
+ *                       type: integer
+ *                       description: "rtr_confirm_dtm이 없는 건수 (미확인)"
+ *                     confirmed:
+ *                       type: integer
+ *                       description: "rtr_confirm_dtm이 있는 건수 (확인됨)"
+ *                     cancelGosiwon:
+ *                       type: integer
+ *                       description: "rtr_status가 CANCEL_GOSIWON인 건수"
+ *                     cancelUser:
+ *                       type: integer
+ *                       description: "rtr_status가 CANCEL_USER인 건수"
+ *                     invalid:
+ *                       type: integer
+ *                       description: "rtr_status가 INVALID인 건수"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/tourReservationStats', isAuthMiddleware.isAuthAdmin, dashboardController.getTourReservationStats);
+
 module.exports = router;
