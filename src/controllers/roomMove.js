@@ -378,6 +378,25 @@ exports.processRoomMove = async (req, res, next) => {
 			}
 		);
 
+		// 1-1. adjustmentAmount가 있으면 월 입실료 차액 반영 (monthlyRent는 만원 단위: 15 = 15만원, 5000원 = 0.5)
+		if (finalAdjustmentAmount > 0 && finalAdjustmentType) {
+			const currentRent = parseFloat(contractInfo.monthlyRent) || 0;
+			const delta = finalAdjustmentAmount / 10000; // 원 → 만원 단위
+			const newRent = finalAdjustmentType === 'REFUND'
+				? Math.max(0, currentRent - delta)
+				: currentRent + delta;
+			const newRentToStore = Number.isInteger(newRent) ? String(newRent) : String(Number(newRent.toFixed(2)));
+			const adjustmentMemo = `월입실료 조정: ${finalAdjustmentType === 'REFUND' ? '환불' : '추가'} ${finalAdjustmentAmount}원`;
+			await mariaDBSequelize.query(
+				`UPDATE roomContract SET monthlyRent = ?, memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)) WHERE esntlId = ?`,
+				{
+					replacements: [newRentToStore, adjustmentMemo, contractEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+
 		// 2. 원래 방의 roomStatus 처리
 		if (contractInfo.roomStatusSubStatus === 'ROOM_MOVE_IN') {
 			// 기존 행: status = ROOM_MOVE, subStatus = ROOM_MOVE_IN 유지, statusEndDate = 이동일 - 1일
@@ -1280,7 +1299,7 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 		const [contractInfo] = await mariaDBSequelize.query(
 			`
 			SELECT RC.esntlId, RC.roomEsntlId, RC.gosiwonEsntlId, RC.customerEsntlId,
-				RC.startDate, RC.endDate AS originalEndDate,
+				RC.startDate, RC.endDate AS originalEndDate, RC.monthlyRent,
 				RS.esntlId AS roomStatusEsntlId, RS.subStatus AS roomStatusSubStatus,
 				RS.customerEsntlId AS roomStatusCustomerEsntlId, RS.customerName AS roomStatusCustomerName,
 				RS.reservationEsntlId AS roomStatusReservationEsntlId, RS.reservationName AS roomStatusReservationName,
@@ -1320,6 +1339,21 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 			`UPDATE roomContract SET roomEsntlId = ?, startDate = ?, endDate = ?, memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)) WHERE esntlId = ?`,
 			{ replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
 		);
+
+		// adjustmentAmount가 있으면 월 입실료 차액 반영 (monthlyRent는 만원 단위: 15 = 15만원, 5000원 = 0.5)
+		const adjAmount = row.adjustmentAmount != null ? Number(row.adjustmentAmount) : 0;
+		const adjType = row.adjustmentType;
+		if (adjAmount > 0 && adjType && ['ADDITION', 'REFUND'].includes(adjType)) {
+			const currentRent = parseFloat(contractInfo.monthlyRent) || 0;
+			const delta = adjAmount / 10000;
+			const newRent = adjType === 'REFUND' ? Math.max(0, currentRent - delta) : currentRent + delta;
+			const newRentToStore = Number.isInteger(newRent) ? String(newRent) : String(Number(newRent.toFixed(2)));
+			const adjustmentMemo = `월입실료 조정: ${adjType === 'REFUND' ? '환불' : '추가'} ${adjAmount}원`;
+			await mariaDBSequelize.query(
+				`UPDATE roomContract SET monthlyRent = ?, memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)) WHERE esntlId = ?`,
+				{ replacements: [newRentToStore, adjustmentMemo, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
+			);
+		}
 
 		if (contractInfo.roomStatusSubStatus === 'ROOM_MOVE_IN') {
 			await mariaDBSequelize.query(`UPDATE roomStatus SET status = 'ROOM_MOVE', subStatus = 'ROOM_MOVE_IN', statusEndDate = ?, updatedAt = NOW() WHERE esntlId = ?`, { replacements: [moveDateMinusOneStr, contractInfo.roomStatusEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn });
