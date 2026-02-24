@@ -601,6 +601,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 					sell_able_end_date,
 					can_checkin_start_date,
 					can_checkin_end_date,
+					baseDate: cancelDate, // 퇴실 기준일: cancelDate 사용
 				},
 				transaction
 			);
