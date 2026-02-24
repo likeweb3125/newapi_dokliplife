@@ -78,6 +78,56 @@ router.get('/daily/roomMove', isAuthMiddleware.isAuthAdmin, roomMoveController.r
 
 /**
  * @swagger
+ * /v1/room/daily/reserveReminder:
+ *   get:
+ *     summary: 예약 리마인더(계약 링크 문자) 수동 실행
+ *     description: "il_room_reservation에서 ror_status_cd='WAIT'이고 ror_check_in_date가 기준일(또는 당일) 이후인 건을 조회한 뒤, 각 건의 ror_hp_no로 계약 링크 SMS를 발송합니다. 매일 오전 9시 스케줄러는 당일 기준으로 자동 실행됩니다."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2026-02-24"
+ *         description: "기준일 (YYYY-MM-DD). ror_check_in_date >= 이 날짜인 WAIT 예약에 발송. 없으면 당일."
+ *     responses:
+ *       200:
+ *         description: 실행 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "예약 리마인더 실행 완료"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: "발송 대상 건수"
+ *                     sent:
+ *                       type: integer
+ *                       description: "발송 성공 건수"
+ *                     failed:
+ *                       type: integer
+ *                       description: "발송 실패 건수"
+ *                     targetDate:
+ *                       type: string
+ *                       description: "기준일 (YYYY-MM-DD)"
+ */
+router.get('/daily/reserveReminder', isAuthMiddleware.isAuthAdmin, roomController.runDailyReserveReminderAPI);
+
+/**
+ * @swagger
  * /v1/room/list:
  *   get:
  *     summary: 방 목록 조회
