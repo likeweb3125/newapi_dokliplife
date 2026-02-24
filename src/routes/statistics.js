@@ -282,6 +282,54 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                             type: integer
  *                             description: '계산된 보증금 (roomDeposit이 있으면 roomDeposit, 없으면 gosiwonDeposit * 10000)'
  *                             example: 500000
+ *                           checkinName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '입실자 이름 (roomContractWho.checkinName)'
+ *                           checkinPhone:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '입실자 연락처 (roomContractWho.checkinPhone)'
+ *                           checkinGender:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '입실자 성별 (roomContractWho.checkinGender)'
+ *                           checkinAge:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: '입실자 나이 (roomContractWho.checkinAge)'
+ *                           contractCustomerName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '계약자 이름 (roomContractWho.customerName)'
+ *                           contractCustomerPhone:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '계약자 연락처 (roomContractWho.customerPhone)'
+ *                           contractCustomerGender:
+ *                             type: string
+ *                             nullable: true
+ *                             description: '계약자 성별 (roomContractWho.customerGender)'
+ *                           contractCustomerAge:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: '계약자 나이 (roomContractWho.customerAge)'
+ *                           isRefund:
+ *                             type: string
+ *                             description: "결제 구분 (paymentType이 REFUND면 REFUND, 아니면 PAY)"
+ *                             example: PAY
+ *                           isPayClosed:
+ *                             type: string
+ *                             description: "정산여부 (pyl_expected_settlement_date가 오늘 이후면 close, 아니면 open)"
+ *                             example: open
+ *                           contractPeriod:
+ *                             type: string
+ *                             description: "계약기간 (roomContract.month 있으면 Nmonth, 없으면 contractDay+days)"
+ *                             example: "1month"
+ *                           isExtend:
+ *                             type: boolean
+ *                             description: "연장 계약 여부 (roomContract.checkInTime이 RCTT로 시작하면 true)"
+ *                             example: false
  *                     recordsTotal:
  *                       type: integer
  *                       description: 전체 레코드 수

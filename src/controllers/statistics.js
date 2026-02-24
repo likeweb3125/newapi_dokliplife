@@ -650,7 +650,7 @@ exports.getRealTimeList = async (req, res, next) => {
 		const limitNum = parseInt(limit) || parseInt(length) || 10;
 		const offset = (pageNum - 1) * limitNum;
 
-		// 메인 쿼리 (extrapayEsntlId 있으면 extraPayment.extendWithPayment 함께 조회)
+		// 메인 쿼리 (extrapayEsntlId 있으면 extraPayment.extendWithPayment 함께 조회, roomContractWho로 입실자/계약자 정보)
 		const mainQuery = `
 			SELECT 
 				pl.esntlId,
@@ -659,6 +659,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				pl.paymentType,
 				pl.extrapayEsntlId,
 				ep.extendWithPayment AS extendWithPayment,
+				pl.pyl_expected_settlement_date,
 				pl.contractEsntlId AS contractEsntlId,
 				pl.gosiwonEsntlId,
 				(SELECT name FROM gosiwon WHERE esntlId = pl.gosiwonEsntlId) AS gosiwonName,
@@ -682,6 +683,17 @@ exports.getRealTimeList = async (req, res, next) => {
 				pl.cPercent,
 				pl.calculateStatus,
 				pl.tid,
+				rc.month AS rc_month,
+				rc.contractDay AS rc_contractDay,
+				rc.checkInTime AS rc_checkInTime,
+				RCW.checkinName AS checkinName,
+				RCW.checkinPhone AS checkinPhone,
+				RCW.checkinGender AS checkinGender,
+				RCW.checkinAge AS checkinAge,
+				RCW.customerName AS contractCustomerName,
+				RCW.customerPhone AS contractCustomerPhone,
+				RCW.customerGender AS contractCustomerGender,
+				RCW.customerAge AS contractCustomerAge,
 				CASE
 					WHEN pl.paymentType = 'REFUND' THEN rc.cancelStatus
 					WHEN (SELECT COUNT(*)
@@ -696,6 +708,7 @@ exports.getRealTimeList = async (req, res, next) => {
 			JOIN room r ON pl.roomEsntlId = r.esntlId
 			JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
 			JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
+			LEFT JOIN roomContractWho RCW ON rc.esntlId = RCW.contractEsntlId
 			WHERE 1=1
 				AND pl.calculateStatus = 'SUCCESS'
 				AND pl.pDate LIKE CONCAT(?, '%')
@@ -728,6 +741,10 @@ exports.getRealTimeList = async (req, res, next) => {
 		]);
 
 		const totalCount = countResult[0]?.total || 0;
+
+		// 오늘 날짜 (YYYY-MM-DD, 정산여부 isPayClosed 판단용)
+		const today = new Date();
+		const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
 		// deposit 필드 계산 및 고유값 생성
 		const data = rows.map((ele) => {
@@ -765,6 +782,7 @@ exports.getRealTimeList = async (req, res, next) => {
 				paymentType,
 				extrapayEsntlId,
 				extendWithPayment,
+				pyl_expected_settlement_date,
 				contractEsntlId,
 				gosiwonEsntlId,
 				gosiwonName,
@@ -789,6 +807,17 @@ exports.getRealTimeList = async (req, res, next) => {
 				calculateStatus,
 				tid,
 				contractType,
+				rc_month,
+				rc_contractDay,
+				rc_checkInTime,
+				checkinName,
+				checkinPhone,
+				checkinGender,
+				checkinAge,
+				contractCustomerName,
+				contractCustomerPhone,
+				contractCustomerGender,
+				contractCustomerAge,
 			} = ele;
 
 			// extrapayEsntlId 값 유무로 payType 구분 (값 있으면 extraPay, 없으면 checkInPay)
@@ -798,6 +827,15 @@ exports.getRealTimeList = async (req, res, next) => {
 			} else {
 				payType = 'checkInPay';
 			}
+
+			// isRefund: paymentType이 REFUND면 'REFUND', 아니면 'PAY'
+			const isRefund = paymentType === 'REFUND' ? 'REFUND' : 'PAY';
+			// isPayClosed: pyl_expected_settlement_date가 오늘 이후면 'close', 아니면 'open'
+			const isPayClosed = (pyl_expected_settlement_date && String(pyl_expected_settlement_date).trim() >= todayStr) ? 'close' : 'open';
+			// contractPeriod: rc.month 있으면 'Nmonth', 없으면 contractDay+'days'
+			const contractPeriod = (rc_month != null && rc_month !== '') ? `${rc_month}month` : `${rc_contractDay ?? 0}days`;
+			// isExtend: roomContract.checkInTime이 RCTT로 시작하면 true, 아니면 false
+			const isExtend = !!(rc_checkInTime && String(rc_checkInTime).startsWith('RCTT'));
 
 			return {
 				esntlId,
@@ -833,6 +871,19 @@ exports.getRealTimeList = async (req, res, next) => {
 				tid,
 				contractType,
 				deposit: deposit,
+				// 입실자/계약자 정보 (roomContractWho)
+				checkinName: checkinName ?? null,
+				checkinPhone: checkinPhone ?? null,
+				checkinGender: checkinGender ?? null,
+				checkinAge: checkinAge != null ? Number(checkinAge) : null,
+				contractCustomerName: contractCustomerName ?? null,
+				contractCustomerPhone: contractCustomerPhone ?? null,
+				contractCustomerGender: contractCustomerGender ?? null,
+				contractCustomerAge: contractCustomerAge != null ? Number(contractCustomerAge) : null,
+				isRefund,
+				isPayClosed,
+				contractPeriod,
+				isExtend,
 			};
 		});
 
