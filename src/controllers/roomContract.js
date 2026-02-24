@@ -390,6 +390,11 @@ exports.getContractDetail = async (req, res, next) => {
 			paymentLogList && paymentLogList.length > 0
 				? (paymentLogList[0].rawPaymentAmount ?? paymentLogList[0].paymentAmount ?? null)
 				: null;
+		// 메인 결제와 같은 행의 결제일·결제시간 (pDate, pTime)
+		contractInfo.pDate =
+			paymentLogList && paymentLogList.length > 0 ? (paymentLogList[0].pDate ?? null) : null;
+		contractInfo.pTime =
+			paymentLogList && paymentLogList.length > 0 ? (paymentLogList[0].pTime ?? null) : null;
 
 		// 추가 결제 내역 조회 (extraPayment, extrapayEsntlId로 extraPayment.esntlId 반환)
 		const paymentQuery = `

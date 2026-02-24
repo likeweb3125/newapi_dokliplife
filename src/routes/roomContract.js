@@ -360,6 +360,18 @@ router.get('/list', roomContractController.getContractList);
  *                           type: string
  *                           description: '메인 결제 상태 (paymentLog extrapayEsntlId 값 없음 기준 최신 건의 calculateStatus, 예: SUCCESS, REQUEST)'
  *                           example: SUCCESS
+ *                         paymentAmount:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "메인 결제 금액 (최신 일반 결제 1건의 paymentAmount). 없으면 null"
+ *                         pDate:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "메인 결제와 같은 행의 결제일 (YYYY-MM-DD). 없으면 null"
+ *                         pTime:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "메인 결제와 같은 행의 결제 시간 (HH:mm:ss). 없으면 null"
  *                         isRoomMoveScheduled:
  *                           type: boolean
  *                           description: 방이동 예정 여부 (roomMoveStatus 테이블의 status가 PENDING인 경우 true)
