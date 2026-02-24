@@ -464,20 +464,35 @@ const MEMBER_TYPE_ALL = 'all';
 const MEMBER_TYPE_CONTRACTOR = 'contractor';
 const MEMBER_TYPE_OCCUPANT = 'occupant';
 
-const mapRowToItem = (row) => {
-	const item = {
-		esntlId: row.esntlId,
-		name: row.name,
-		phone: row.phone,
-		gender: row.gender,
-		age: formatAge(row.birth) ?? '',
-	};
-	if (row.startDate != null && row.endDate != null) {
-		item.startDate = row.startDate;
-		item.endDate = row.endDate;
-	}
-	return item;
-};
+/** 응답 공통 형식: esntlId, name, phone, gender, age */
+const toPerson = (esntlId, name, phone, gender, age) => ({
+	esntlId,
+	name: name ?? null,
+	phone: phone ?? null,
+	gender: gender ?? null,
+	age: age != null ? Number(age) : null,
+});
+
+/** occupant용: roomContractWho checkin* → name, phone, gender, age 로 반환 */
+const mapOccupantToItem = (row) => toPerson(
+	row.esntlId,
+	row.checkinName,
+	row.checkinPhone,
+	row.checkinGender,
+	row.checkinAge
+);
+
+/** contractor용: roomContractWho customer* → name, phone, gender, age 로 반환 */
+const mapContractorToItem = (row) => toPerson(
+	row.esntlId,
+	row.contractCustomerName,
+	row.contractCustomerPhone,
+	row.contractCustomerGender,
+	row.contractCustomerAge
+);
+
+/** name, phone, gender, age 모두 일치할 때만 동일인 키 (all 중복 제거용) */
+const personKey = (p) => `${String(p.name ?? '')}|${String(p.phone ?? '')}|${String(p.gender ?? '')}|${String(p.age ?? '')}`;
 
 exports.getMemberSearch = async (req, res, next) => {
 	try {
@@ -513,7 +528,7 @@ exports.getMemberSearch = async (req, res, next) => {
 		let contractorList = [];
 		let occupantList = [];
 
-		// 입실자 목록: roomContract.customerEsntlId 기준 (현재 활성 계약서만: status=USED, 오늘 기준 계약기간 내)
+		// 입실자 목록: roomContract.customerEsntlId 기준, roomContractWho의 checkin* 정보 포함 (현재 활성 계약서만)
 		if (needOccupantList) {
 			const occupantQuery = `
 				SELECT DISTINCT
@@ -523,18 +538,23 @@ exports.getMemberSearch = async (req, res, next) => {
 					C.gender,
 					C.birth,
 					RC_ACTIVE.startDate,
-					RC_ACTIVE.endDate
+					RC_ACTIVE.endDate,
+					RCW.checkinName,
+					RCW.checkinPhone,
+					RCW.checkinGender,
+					RCW.checkinAge
 				FROM customer C
 				INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.gosiwonEsntlId = :gosiwonEsntlId
 					AND RC.status = 'USED'
 					AND RC.startDate <= CURDATE() AND (RC.endDate >= CURDATE() OR RC.endDate IS NULL)
 				LEFT JOIN (
-					SELECT customerEsntlId, gosiwonEsntlId, startDate, endDate,
+					SELECT customerEsntlId, gosiwonEsntlId, esntlId AS contractEsntlId, startDate, endDate,
 						ROW_NUMBER() OVER (PARTITION BY customerEsntlId ORDER BY contractDate DESC) AS rn
 					FROM roomContract
 					WHERE gosiwonEsntlId = :gosiwonEsntlId2 AND status = 'USED'
 						AND startDate <= CURDATE() AND (endDate >= CURDATE() OR endDate IS NULL)
 				) RC_ACTIVE ON RC_ACTIVE.customerEsntlId = C.esntlId AND RC_ACTIVE.gosiwonEsntlId = :gosiwonEsntlId3 AND RC_ACTIVE.rn = 1
+				LEFT JOIN roomContractWho RCW ON RCW.contractEsntlId = RC_ACTIVE.contractEsntlId
 				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
 				${hasGender ? 'AND C.gender = :gender' : ''}
 				ORDER BY (RC_ACTIVE.startDate IS NOT NULL) DESC, C.name
@@ -543,10 +563,10 @@ exports.getMemberSearch = async (req, res, next) => {
 				replacements,
 				type: db.mariaDBSequelize.QueryTypes.SELECT,
 			});
-			occupantList = (Array.isArray(occupantRows) ? occupantRows : []).map(mapRowToItem);
+			occupantList = (Array.isArray(occupantRows) ? occupantRows : []).map(mapOccupantToItem);
 		}
 
-		// 계약자 목록: deposit.contractorEsntlId 우선, 없으면 roomContract.customerEsntlId (현재 활성 계약서만: status=USED, 오늘 기준 계약기간 내)
+		// 계약자 목록: deposit.contractorEsntlId 우선, roomContractWho의 customer*(계약자) 정보 포함 (현재 활성 계약서만)
 		if (needContractorList) {
 			const contractorQuery = `
 				SELECT DISTINCT
@@ -556,7 +576,11 @@ exports.getMemberSearch = async (req, res, next) => {
 					C.gender,
 					C.birth,
 					RC_ACTIVE.startDate,
-					RC_ACTIVE.endDate
+					RC_ACTIVE.endDate,
+					RCW.customerName AS contractCustomerName,
+					RCW.customerPhone AS contractCustomerPhone,
+					RCW.customerGender AS contractCustomerGender,
+					RCW.customerAge AS contractCustomerAge
 				FROM customer C
 				INNER JOIN (
 					SELECT COALESCE(D.contractorEsntlId, RC.customerEsntlId) AS contractorEsntlId,
@@ -574,10 +598,11 @@ exports.getMemberSearch = async (req, res, next) => {
 						AND RC.startDate <= CURDATE() AND (RC.endDate >= CURDATE() OR RC.endDate IS NULL)
 				) RCX ON RCX.contractorEsntlId = C.esntlId
 				LEFT JOIN (
-					SELECT contractorEsntlId, startDate, endDate,
+					SELECT contractorEsntlId, contractEsntlId, startDate, endDate,
 						ROW_NUMBER() OVER (PARTITION BY contractorEsntlId ORDER BY contractDate DESC) AS rn
 					FROM (
 						SELECT COALESCE(D2.contractorEsntlId, RC2.customerEsntlId) AS contractorEsntlId,
+							RC2.esntlId AS contractEsntlId,
 							RC2.startDate, RC2.endDate, RC2.contractDate
 						FROM roomContract RC2
 						LEFT JOIN deposit D2 ON D2.contractEsntlId = RC2.esntlId AND D2.deleteYN = 'N'
@@ -585,6 +610,7 @@ exports.getMemberSearch = async (req, res, next) => {
 							AND RC2.startDate <= CURDATE() AND (RC2.endDate >= CURDATE() OR RC2.endDate IS NULL)
 					) T
 				) RC_ACTIVE ON RC_ACTIVE.contractorEsntlId = C.esntlId AND RC_ACTIVE.rn = 1
+				LEFT JOIN roomContractWho RCW ON RCW.contractEsntlId = RC_ACTIVE.contractEsntlId
 				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
 				${hasGender ? 'AND C.gender = :gender' : ''}
 				ORDER BY (RC_ACTIVE.startDate IS NOT NULL) DESC, C.name
@@ -593,25 +619,19 @@ exports.getMemberSearch = async (req, res, next) => {
 				replacements,
 				type: db.mariaDBSequelize.QueryTypes.SELECT,
 			});
-			contractorList = (Array.isArray(contractorRows) ? contractorRows : []).map(mapRowToItem);
+			contractorList = (Array.isArray(contractorRows) ? contractorRows : []).map(mapContractorToItem);
 		}
 
-		// data 아래 구분 없이 배열만 반환: all이면 중복 제거 후 하나의 배열, contractor/occupant면 해당 배열만
+		// all일 때: name, phone, gender, age 네 값이 모두 일치할 때만 한 사람으로 보고 중복 제거. 하나라도 다르면 별도 인물로 data에 포함.
 		if (isAll) {
-			const seen = new Set();
-			const list = [];
-			contractorList.forEach((item) => {
-				if (!seen.has(item.esntlId)) {
-					seen.add(item.esntlId);
-					list.push(item);
-				}
-			});
-			occupantList.forEach((item) => {
-				if (!seen.has(item.esntlId)) {
-					seen.add(item.esntlId);
-					list.push(item);
-				}
-			});
+			const byPersonKey = new Map();
+			const addIfNew = (item) => {
+				const key = personKey(item);
+				if (!byPersonKey.has(key)) byPersonKey.set(key, { ...item });
+			};
+			contractorList.forEach(addIfNew);
+			occupantList.forEach(addIfNew);
+			const list = Array.from(byPersonKey.values());
 			list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
 			errorHandler.successThrow(res, '조회 성공', list);
 			return;

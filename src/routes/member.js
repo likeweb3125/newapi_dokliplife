@@ -290,7 +290,7 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  * /v1/admin/member/search:
  *   get:
  *     summary: memberSearch
- *     description: "고시원코드, 이름/연락처 텍스트, 성별(선택), 전체/계약자/입실자 필터로 회원을 검색합니다. 모든 리턴값은 현재 활성 계약서(status=USED, 오늘 기준 계약기간 내) 기준입니다. memberType이 all이면 contractorList·occupantList 구분 없이 allList로 중복 제거하여 반환하고, contractor/occupant이면 계약자·입실자 목록을 각각 반환합니다."
+ *     description: "고시원코드, 이름/연락처 텍스트, 성별(선택), 전체/계약자/입실자 필터로 회원을 검색합니다. 모든 리턴값은 현재 활성 계약서(status=USED, 오늘 기준 계약기간 내) 기준입니다. memberType=all이면 name·phone·gender·age 네 값이 모두 일치할 때만 한 사람으로 보고 중복 제거하고, 하나라도 다르면 별도 인물로 data에 포함합니다. contractor/occupant이면 계약자·입실자 목록만 반환합니다. 응답은 구분 없이 esntlId, name, phone, gender, age로 통일합니다."
  *     tags: [Member]
  *     parameters:
  *       - in: query
@@ -335,31 +335,30 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                   example: 조회 성공
  *                 data:
  *                   type: array
- *                   description: "회원 목록 배열 (memberType에 따라 all=중복 제거 통합, contractor=계약자만, occupant=입실자만). contractorList/occupantList/allList 구분 없이 data가 곧 배열"
+ *                   description: "회원 목록 배열 (memberType에 따라 all=name·phone·gender·age 기준 동일인 중복 제거, contractor=계약자만, occupant=입실자만). 모든 타입 공통으로 항목당 esntlId, name, phone, gender, age만 반환"
  *                   items:
  *                     type: object
+ *                     description: "항목당 esntlId, name, phone, gender, age만 반환 (입실자·계약자 구분 없이 통일)"
  *                     properties:
  *                       esntlId:
  *                         type: string
- *                         description: 회원 고유 아이디
+ *                         description: 회원(고객) 고유 아이디
  *                       name:
  *                         type: string
- *                         description: 이름
+ *                         nullable: true
+ *                         description: "이름 (occupant는 roomContractWho.checkinName, contractor는 roomContractWho.customerName)"
  *                       phone:
  *                         type: string
- *                         description: 연락처
+ *                         nullable: true
+ *                         description: "연락처 (occupant는 checkinPhone, contractor는 customerPhone)"
  *                       gender:
  *                         type: string
- *                         description: 성별
+ *                         nullable: true
+ *                         description: "성별 (occupant는 checkinGender, contractor는 customerGender)"
  *                       age:
- *                         type: string
- *                         description: "customer.birth 기준 현재 나이 (없으면 빈값)"
- *                       startDate:
- *                         type: string
- *                         description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
- *                       endDate:
- *                         type: string
- *                         description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
+ *                         type: number
+ *                         nullable: true
+ *                         description: "나이 (occupant는 checkinAge, contractor는 customerAge)"
  *       400:
  *         description: 고시원코드 누락
  *         content:
