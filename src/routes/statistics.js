@@ -324,8 +324,8 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *                             example: open
  *                           contractPeriod:
  *                             type: string
- *                             description: "계약기간 (roomContract.month 있으면 Nmonth, 없으면 contractDay+days)"
- *                             example: "1month"
+ *                             description: "계약기간 한글 표기 (roomContract.month 있으면 N달, 없으면 contractDay+일)"
+ *                             example: "1달"
  *                           isExtend:
  *                             type: boolean
  *                             description: "연장 계약 여부 (roomContract.checkInTime이 RCTT로 시작하면 true)"

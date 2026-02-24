@@ -290,7 +290,7 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  * /v1/admin/member/search:
  *   get:
  *     summary: memberSearch
- *     description: "고시원코드, 이름/연락처 텍스트, 성별(선택), 전체/계약자/입실자 필터로 회원을 검색합니다. 해당 고시원에 계약 이력이 있는 회원만 대상이며, 계약자·입실자 목록을 각각 반환합니다. 활성 계약(USED)이 있으면 사용기간(startDate, endDate)을 포함합니다."
+ *     description: "고시원코드, 이름/연락처 텍스트, 성별(선택), 전체/계약자/입실자 필터로 회원을 검색합니다. 모든 리턴값은 현재 활성 계약서(status=USED, 오늘 기준 계약기간 내) 기준입니다. memberType이 all이면 contractorList·occupantList 구분 없이 allList로 중복 제거하여 반환하고, contractor/occupant이면 계약자·입실자 목록을 각각 반환합니다."
  *     tags: [Member]
  *     parameters:
  *       - in: query
@@ -336,9 +336,36 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                 data:
  *                   type: object
  *                   properties:
+ *                     allList:
+ *                       type: array
+ *                       description: "memberType이 all일 때만 반환. 계약자·입실자 구분 없이 중복 제거된 회원 목록 (현재 활성 계약서 기준)"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           esntlId:
+ *                             type: string
+ *                             description: 회원 고유 아이디
+ *                           name:
+ *                             type: string
+ *                             description: 이름
+ *                           phone:
+ *                             type: string
+ *                             description: 연락처
+ *                           gender:
+ *                             type: string
+ *                             description: 성별
+ *                           age:
+ *                             type: string
+ *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
+ *                           startDate:
+ *                             type: string
+ *                             description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
+ *                           endDate:
+ *                             type: string
+ *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
  *                     contractorList:
  *                       type: array
- *                       description: "계약자 목록 (memberType이 계약자 또는 전체일 때만 채워짐)"
+ *                       description: "계약자 목록 (memberType이 계약자일 때만 반환, 현재 활성 계약서 기준)"
  *                       items:
  *                         type: object
  *                         properties:
@@ -365,7 +392,7 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
  *                     occupantList:
  *                       type: array
- *                       description: "입실자 목록 (memberType이 입실자 또는 전체일 때만 채워짐)"
+ *                       description: "입실자 목록 (memberType이 입실자일 때만 반환, 현재 활성 계약서 기준)"
  *                       items:
  *                         type: object
  *                         properties:

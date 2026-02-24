@@ -513,7 +513,7 @@ exports.getMemberSearch = async (req, res, next) => {
 		let contractorList = [];
 		let occupantList = [];
 
-		// 입실자 목록: roomContract.customerEsntlId 기준
+		// 입실자 목록: roomContract.customerEsntlId 기준 (현재 활성 계약서만: status=USED, 오늘 기준 계약기간 내)
 		if (needOccupantList) {
 			const occupantQuery = `
 				SELECT DISTINCT
@@ -526,11 +526,14 @@ exports.getMemberSearch = async (req, res, next) => {
 					RC_ACTIVE.endDate
 				FROM customer C
 				INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.gosiwonEsntlId = :gosiwonEsntlId
+					AND RC.status = 'USED'
+					AND RC.startDate <= CURDATE() AND (RC.endDate >= CURDATE() OR RC.endDate IS NULL)
 				LEFT JOIN (
 					SELECT customerEsntlId, gosiwonEsntlId, startDate, endDate,
 						ROW_NUMBER() OVER (PARTITION BY customerEsntlId ORDER BY contractDate DESC) AS rn
 					FROM roomContract
 					WHERE gosiwonEsntlId = :gosiwonEsntlId2 AND status = 'USED'
+						AND startDate <= CURDATE() AND (endDate >= CURDATE() OR endDate IS NULL)
 				) RC_ACTIVE ON RC_ACTIVE.customerEsntlId = C.esntlId AND RC_ACTIVE.gosiwonEsntlId = :gosiwonEsntlId3 AND RC_ACTIVE.rn = 1
 				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
 				${hasGender ? 'AND C.gender = :gender' : ''}
@@ -543,7 +546,7 @@ exports.getMemberSearch = async (req, res, next) => {
 			occupantList = (Array.isArray(occupantRows) ? occupantRows : []).map(mapRowToItem);
 		}
 
-		// 계약자 목록: deposit.contractorEsntlId 우선, 없으면 roomContract.customerEsntlId
+		// 계약자 목록: deposit.contractorEsntlId 우선, 없으면 roomContract.customerEsntlId (현재 활성 계약서만: status=USED, 오늘 기준 계약기간 내)
 		if (needContractorList) {
 			const contractorQuery = `
 				SELECT DISTINCT
@@ -567,6 +570,8 @@ exports.getMemberSearch = async (req, res, next) => {
 					FROM roomContract RC
 					LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
 					WHERE RC.gosiwonEsntlId = :gosiwonEsntlId4
+						AND RC.status = 'USED'
+						AND RC.startDate <= CURDATE() AND (RC.endDate >= CURDATE() OR RC.endDate IS NULL)
 				) RCX ON RCX.contractorEsntlId = C.esntlId
 				LEFT JOIN (
 					SELECT contractorEsntlId, startDate, endDate,
@@ -577,6 +582,7 @@ exports.getMemberSearch = async (req, res, next) => {
 						FROM roomContract RC2
 						LEFT JOIN deposit D2 ON D2.contractEsntlId = RC2.esntlId AND D2.deleteYN = 'N'
 						WHERE RC2.gosiwonEsntlId = :gosiwonEsntlId5 AND RC2.status = 'USED'
+							AND RC2.startDate <= CURDATE() AND (RC2.endDate >= CURDATE() OR RC2.endDate IS NULL)
 					) T
 				) RC_ACTIVE ON RC_ACTIVE.contractorEsntlId = C.esntlId AND RC_ACTIVE.rn = 1
 				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
@@ -588,6 +594,28 @@ exports.getMemberSearch = async (req, res, next) => {
 				type: db.mariaDBSequelize.QueryTypes.SELECT,
 			});
 			contractorList = (Array.isArray(contractorRows) ? contractorRows : []).map(mapRowToItem);
+		}
+
+		// memberType이 all일 때: contractorList·occupantList 구분 없이 allList로 중복 제거하여 반환
+		if (isAll) {
+			const seen = new Set();
+			const allList = [];
+			contractorList.forEach((item) => {
+				if (!seen.has(item.esntlId)) {
+					seen.add(item.esntlId);
+					allList.push(item);
+				}
+			});
+			occupantList.forEach((item) => {
+				if (!seen.has(item.esntlId)) {
+					seen.add(item.esntlId);
+					allList.push(item);
+				}
+			});
+			// 이름 순 정렬 (선택)
+			allList.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+			errorHandler.successThrow(res, '조회 성공', { allList });
+			return;
 		}
 
 		errorHandler.successThrow(res, '조회 성공', {

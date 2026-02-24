@@ -832,8 +832,8 @@ exports.getRealTimeList = async (req, res, next) => {
 			const isRefund = paymentType === 'REFUND' ? 'REFUND' : 'PAY';
 			// isPayClosed: pyl_expected_settlement_date가 오늘 이후면 'close', 아니면 'open'
 			const isPayClosed = (pyl_expected_settlement_date && String(pyl_expected_settlement_date).trim() >= todayStr) ? 'close' : 'open';
-			// contractPeriod: rc.month 있으면 'Nmonth', 없으면 contractDay+'days'
-			const contractPeriod = (rc_month != null && rc_month !== '') ? `${rc_month}month` : `${rc_contractDay ?? 0}days`;
+			// contractPeriod: rc.month 있으면 'N달', 없으면 contractDay+'일' (한글)
+			const contractPeriod = (rc_month != null && rc_month !== '') ? `${rc_month}달` : `${rc_contractDay ?? 0}일`;
 			// isExtend: roomContract.checkInTime이 RCTT로 시작하면 true, 아니면 false
 			const isExtend = !!(rc_checkInTime && String(rc_checkInTime).startsWith('RCTT'));
 
