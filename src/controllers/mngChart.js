@@ -188,11 +188,19 @@ exports.mngChartMain = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
 
-		const { gosiwonEsntlId, page = 1 } = req.query;
+		const { gosiwonEsntlId, page = 1, roomNumber: searchRoomNumber, checkInName: searchCheckInName, customerName: searchCustomerName } = req.query;
 
 		if (!gosiwonEsntlId) {
 			errorHandler.errorThrow(400, 'gosiwonEsntlId를 입력해주세요.');
 		}
+
+		// 검색 항목: 호실명(room.roomNumber), 입실자(roomContractWho.checkinName), 계약자(roomContractWho.customerName)
+		const roomNumberTrim = searchRoomNumber != null ? String(searchRoomNumber).trim() : '';
+		const checkInNameTrim = searchCheckInName != null ? String(searchCheckInName).trim() : '';
+		const customerNameTrim = searchCustomerName != null ? String(searchCustomerName).trim() : '';
+		const searchConditions = [];
+		const searchReplacements = [];
+		let personSearchRoomIds = []; // 입실자/계약자 검색 시 해당 방 ID 목록 (기간 내 계약 이력 기준)
 
 		// 고시원 이름 및 관리자(대표자·연락처) 조회 (gosiwon.adminEsntlId → gosiwonAdmin)
 		const [gosiwonRow] = await mariaDBSequelize.query(
@@ -243,6 +251,48 @@ exports.mngChartMain = async (req, res, next) => {
 		const toYmd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 		const endDateStr = toYmd(endDate);
 		const startDateStr = toYmd(startDate);
+
+		// 입실자/계약자 검색 시: 기간 내 해당 인원이 계약한 방 ID 목록 조회 → groups에 해당 방 정보가 나오도록 R.esntlId IN (?) 조건에 사용
+		if (checkInNameTrim !== '' || customerNameTrim !== '') {
+			const personCond = [];
+			const personRepl = [gosiwonEsntlId, endDateStr, startDateStr];
+			if (checkInNameTrim !== '') {
+				personCond.push('(RCW.checkinName IS NOT NULL AND RCW.checkinName LIKE ?)');
+				personRepl.push(`%${checkInNameTrim}%`);
+			}
+			if (customerNameTrim !== '') {
+				personCond.push('(RCW.customerName IS NOT NULL AND RCW.customerName LIKE ?)');
+				personRepl.push(`%${customerNameTrim}%`);
+			}
+			const personRoomRows = await mariaDBSequelize.query(
+				`SELECT DISTINCT RS.roomEsntlId
+				 FROM roomStatus RS
+				 INNER JOIN roomContractWho RCW ON RS.contractEsntlId = RCW.contractEsntlId
+				 WHERE RS.gosiwonEsntlId = ?
+				   AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N')
+				   AND RS.contractEsntlId IS NOT NULL AND RS.contractEsntlId != ''
+				   AND RS.statusStartDate <= ?
+				   AND (RS.statusEndDate IS NULL OR RS.statusEndDate >= ?)
+				   AND (${personCond.join(' OR ')})
+				`,
+				{
+					replacements: personRepl,
+					type: mariaDBSequelize.QueryTypes.SELECT,
+				}
+			);
+			personSearchRoomIds = (personRoomRows || []).map((r) => r.roomEsntlId).filter(Boolean);
+		}
+
+		// groups 쿼리용 검색 조건: 호실명(LIKE), 입실자/계약자(R.esntlId IN (기간 내 해당 인원 계약 방))
+		if (roomNumberTrim !== '') {
+			searchConditions.push('R.roomNumber LIKE ?');
+			searchReplacements.push(`%${roomNumberTrim}%`);
+		}
+		if (personSearchRoomIds.length > 0) {
+			searchConditions.push(`R.esntlId IN (${personSearchRoomIds.map(() => '?').join(',')})`);
+			searchReplacements.push(...personSearchRoomIds);
+		}
+		const searchWhereClause = searchConditions.length > 0 ? ` AND ${searchConditions.join(' AND ')}` : '';
 
 		// 1. Groups 데이터 조회 (활성 방 목록) - 오늘 날짜가 해당하는 roomStatus 기준, 없으면 판매신청전
 		// 오늘을 포함하는 roomStatus가 여러 건이면: 상태 우선순위(CONTRACT/ON_SALE 등 > CAN_CHECKIN > BEFORE_SALES) 적용 후 statusStartDate DESC, esntlId DESC
@@ -330,11 +380,12 @@ exports.mngChartMain = async (req, res, next) => {
 			LEFT JOIN roomCategory RCAT ON R.roomCategory = RCAT.esntlId
 			WHERE R.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
+				${searchWhereClause}
 			ORDER BY R.orderNo ASC, R.roomNumber ASC
 		`;
 
 		const rooms = await mariaDBSequelize.query(groupsQuery, {
-			replacements: [todayStr, todayStr, gosiwonEsntlId],
+			replacements: [todayStr, todayStr, gosiwonEsntlId, ...searchReplacements],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 

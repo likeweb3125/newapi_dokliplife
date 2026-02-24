@@ -36,6 +36,27 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *           default: 1
  *         description: "페이지 번호. 1=오늘~1개월 전, 2=1개월 전~2개월 전(과거). 0=오늘~1개월 후, -1=1개월후~2개월후(미래)"
  *         example: 1
+ *       - in: query
+ *         name: roomNumber
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "호실명 검색 (room.roomNumber, 부분 일치)"
+ *         example: "101"
+ *       - in: query
+ *         name: checkInName
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "입실자 검색 (계약서 기준 roomContractWho.checkInName, 부분 일치)"
+ *         example: "홍길동"
+ *       - in: query
+ *         name: customerName
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "계약자 검색 (계약서 기준 roomContractWho.customerName, 부분 일치)"
+ *         example: "김계약"
  *     responses:
  *       200:
  *         description: 관리객실현황 차트 데이터 조회 성공
