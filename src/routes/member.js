@@ -335,10 +335,10 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                   example: 조회 성공
  *                 data:
  *                   type: array
- *                   description: "회원 목록 배열 (memberType에 따라 all=name·phone·gender·age 기준 동일인 중복 제거, contractor=계약자만, occupant=입실자만). 모든 타입 공통으로 항목당 esntlId, name, phone, gender, age만 반환"
+ *                   description: "회원 목록 배열 (memberType에 따라 all=name·phone·gender·age 기준 동일인 중복 제거, contractor=계약자만, occupant=입실자만). 항목당 esntlId, name, phone, gender, age, roomNumber, startDate, endDate 반환"
  *                   items:
  *                     type: object
- *                     description: "항목당 esntlId, name, phone, gender, age만 반환 (입실자·계약자 구분 없이 통일)"
+ *                     description: "항목당 esntlId, name, phone, gender, age, 연동 계약서의 방 호수·기간(roomNumber, startDate, endDate) 반환"
  *                     properties:
  *                       esntlId:
  *                         type: string
@@ -359,6 +359,18 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                         type: number
  *                         nullable: true
  *                         description: "나이 (occupant는 checkinAge, contractor는 customerAge)"
+ *                       roomNumber:
+ *                         type: string
+ *                         nullable: true
+ *                         description: "연동된 계약서의 방 호수 (room.roomNumber)"
+ *                       startDate:
+ *                         type: string
+ *                         nullable: true
+ *                         description: "연동된 계약서의 계약 시작일 (YYYY-MM-DD)"
+ *                       endDate:
+ *                         type: string
+ *                         nullable: true
+ *                         description: "연동된 계약서의 계약 종료일 (YYYY-MM-DD)"
  *       400:
  *         description: 고시원코드 누락
  *         content:

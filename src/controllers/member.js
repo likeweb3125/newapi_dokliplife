@@ -464,31 +464,40 @@ const MEMBER_TYPE_ALL = 'all';
 const MEMBER_TYPE_CONTRACTOR = 'contractor';
 const MEMBER_TYPE_OCCUPANT = 'occupant';
 
-/** 응답 공통 형식: esntlId, name, phone, gender, age */
-const toPerson = (esntlId, name, phone, gender, age) => ({
+/** 응답 공통 형식: esntlId, name, phone, gender, age, roomNumber, startDate, endDate */
+const toPerson = (esntlId, name, phone, gender, age, roomNumber, startDate, endDate) => ({
 	esntlId,
 	name: name ?? null,
 	phone: phone ?? null,
 	gender: gender ?? null,
 	age: age != null ? Number(age) : null,
+	roomNumber: roomNumber ?? null,
+	startDate: startDate ?? null,
+	endDate: endDate ?? null,
 });
 
-/** occupant용: roomContractWho checkin* → name, phone, gender, age 로 반환 */
+/** occupant용: roomContractWho checkin* + 연동 계약서 방 호수·기간 반환 */
 const mapOccupantToItem = (row) => toPerson(
 	row.esntlId,
 	row.checkinName,
 	row.checkinPhone,
 	row.checkinGender,
-	row.checkinAge
+	row.checkinAge,
+	row.roomNumber,
+	row.contractStartDate,
+	row.contractEndDate
 );
 
-/** contractor용: roomContractWho customer* → name, phone, gender, age 로 반환 */
+/** contractor용: roomContractWho customer* + 연동 계약서 방 호수·기간 반환 */
 const mapContractorToItem = (row) => toPerson(
 	row.esntlId,
 	row.contractCustomerName,
 	row.contractCustomerPhone,
 	row.contractCustomerGender,
-	row.contractCustomerAge
+	row.contractCustomerAge,
+	row.roomNumber,
+	row.contractStartDate,
+	row.contractEndDate
 );
 
 /** name, phone, gender, age 모두 일치할 때만 동일인 키 (all 중복 제거용) */
@@ -528,7 +537,7 @@ exports.getMemberSearch = async (req, res, next) => {
 		let contractorList = [];
 		let occupantList = [];
 
-		// 입실자 목록: roomContract.customerEsntlId 기준, roomContractWho의 checkin* 정보 포함 (현재 활성 계약서만)
+		// 입실자 목록: roomContract.customerEsntlId 기준, roomContractWho의 checkin* 정보 + 연동 계약서 방 호수·기간 포함 (현재 활성 계약서만)
 		if (needOccupantList) {
 			const occupantQuery = `
 				SELECT DISTINCT
@@ -537,8 +546,9 @@ exports.getMemberSearch = async (req, res, next) => {
 					C.phone,
 					C.gender,
 					C.birth,
-					RC_ACTIVE.startDate,
-					RC_ACTIVE.endDate,
+					RC_ACTIVE.startDate AS contractStartDate,
+					RC_ACTIVE.endDate AS contractEndDate,
+					R.roomNumber,
 					RCW.checkinName,
 					RCW.checkinPhone,
 					RCW.checkinGender,
@@ -548,12 +558,13 @@ exports.getMemberSearch = async (req, res, next) => {
 					AND RC.status = 'USED'
 					AND RC.startDate <= CURDATE() AND (RC.endDate >= CURDATE() OR RC.endDate IS NULL)
 				LEFT JOIN (
-					SELECT customerEsntlId, gosiwonEsntlId, esntlId AS contractEsntlId, startDate, endDate,
+					SELECT customerEsntlId, gosiwonEsntlId, esntlId AS contractEsntlId, roomEsntlId, startDate, endDate,
 						ROW_NUMBER() OVER (PARTITION BY customerEsntlId ORDER BY contractDate DESC) AS rn
 					FROM roomContract
 					WHERE gosiwonEsntlId = :gosiwonEsntlId2 AND status = 'USED'
 						AND startDate <= CURDATE() AND (endDate >= CURDATE() OR endDate IS NULL)
 				) RC_ACTIVE ON RC_ACTIVE.customerEsntlId = C.esntlId AND RC_ACTIVE.gosiwonEsntlId = :gosiwonEsntlId3 AND RC_ACTIVE.rn = 1
+				LEFT JOIN room R ON R.esntlId = RC_ACTIVE.roomEsntlId
 				LEFT JOIN roomContractWho RCW ON RCW.contractEsntlId = RC_ACTIVE.contractEsntlId
 				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
 				${hasGender ? 'AND C.gender = :gender' : ''}
@@ -566,7 +577,7 @@ exports.getMemberSearch = async (req, res, next) => {
 			occupantList = (Array.isArray(occupantRows) ? occupantRows : []).map(mapOccupantToItem);
 		}
 
-		// 계약자 목록: deposit.contractorEsntlId 우선, roomContractWho의 customer*(계약자) 정보 포함 (현재 활성 계약서만)
+		// 계약자 목록: deposit.contractorEsntlId 우선, roomContractWho의 customer*(계약자) 정보 + 연동 계약서 방 호수·기간 포함 (현재 활성 계약서만)
 		if (needContractorList) {
 			const contractorQuery = `
 				SELECT DISTINCT
@@ -575,8 +586,9 @@ exports.getMemberSearch = async (req, res, next) => {
 					C.phone,
 					C.gender,
 					C.birth,
-					RC_ACTIVE.startDate,
-					RC_ACTIVE.endDate,
+					RC_ACTIVE.startDate AS contractStartDate,
+					RC_ACTIVE.endDate AS contractEndDate,
+					R.roomNumber,
 					RCW.customerName AS contractCustomerName,
 					RCW.customerPhone AS contractCustomerPhone,
 					RCW.customerGender AS contractCustomerGender,
@@ -598,11 +610,12 @@ exports.getMemberSearch = async (req, res, next) => {
 						AND RC.startDate <= CURDATE() AND (RC.endDate >= CURDATE() OR RC.endDate IS NULL)
 				) RCX ON RCX.contractorEsntlId = C.esntlId
 				LEFT JOIN (
-					SELECT contractorEsntlId, contractEsntlId, startDate, endDate,
+					SELECT contractorEsntlId, contractEsntlId, roomEsntlId, startDate, endDate,
 						ROW_NUMBER() OVER (PARTITION BY contractorEsntlId ORDER BY contractDate DESC) AS rn
 					FROM (
 						SELECT COALESCE(D2.contractorEsntlId, RC2.customerEsntlId) AS contractorEsntlId,
 							RC2.esntlId AS contractEsntlId,
+							RC2.roomEsntlId,
 							RC2.startDate, RC2.endDate, RC2.contractDate
 						FROM roomContract RC2
 						LEFT JOIN deposit D2 ON D2.contractEsntlId = RC2.esntlId AND D2.deleteYN = 'N'
@@ -610,6 +623,7 @@ exports.getMemberSearch = async (req, res, next) => {
 							AND RC2.startDate <= CURDATE() AND (RC2.endDate >= CURDATE() OR RC2.endDate IS NULL)
 					) T
 				) RC_ACTIVE ON RC_ACTIVE.contractorEsntlId = C.esntlId AND RC_ACTIVE.rn = 1
+				LEFT JOIN room R ON R.esntlId = RC_ACTIVE.roomEsntlId
 				LEFT JOIN roomContractWho RCW ON RCW.contractEsntlId = RC_ACTIVE.contractEsntlId
 				WHERE (C.name LIKE :searchPattern OR C.phone LIKE :searchPattern)
 				${hasGender ? 'AND C.gender = :gender' : ''}
