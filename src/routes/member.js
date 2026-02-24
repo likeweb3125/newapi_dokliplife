@@ -334,89 +334,32 @@ router.put('/customer', memberController.putCustomerUpdate); // 회원 수정 (c
  *                   type: string
  *                   example: 조회 성공
  *                 data:
- *                   type: object
- *                   properties:
- *                     allList:
- *                       type: array
- *                       description: "memberType이 all일 때만 반환. 계약자·입실자 구분 없이 중복 제거된 회원 목록 (현재 활성 계약서 기준)"
- *                       items:
- *                         type: object
- *                         properties:
- *                           esntlId:
- *                             type: string
- *                             description: 회원 고유 아이디
- *                           name:
- *                             type: string
- *                             description: 이름
- *                           phone:
- *                             type: string
- *                             description: 연락처
- *                           gender:
- *                             type: string
- *                             description: 성별
- *                           age:
- *                             type: string
- *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
- *                           startDate:
- *                             type: string
- *                             description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
- *                           endDate:
- *                             type: string
- *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
- *                     contractorList:
- *                       type: array
- *                       description: "계약자 목록 (memberType이 계약자일 때만 반환, 현재 활성 계약서 기준)"
- *                       items:
- *                         type: object
- *                         properties:
- *                           esntlId:
- *                             type: string
- *                             description: 회원 고유 아이디
- *                           name:
- *                             type: string
- *                             description: 이름
- *                           phone:
- *                             type: string
- *                             description: 연락처
- *                           gender:
- *                             type: string
- *                             description: 성별
- *                           age:
- *                             type: string
- *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
- *                           startDate:
- *                             type: string
- *                             description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
- *                           endDate:
- *                             type: string
- *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
- *                     occupantList:
- *                       type: array
- *                       description: "입실자 목록 (memberType이 입실자일 때만 반환, 현재 활성 계약서 기준)"
- *                       items:
- *                         type: object
- *                         properties:
- *                           esntlId:
- *                             type: string
- *                             description: 회원 고유 아이디
- *                           name:
- *                             type: string
- *                             description: 이름
- *                           phone:
- *                             type: string
- *                             description: 연락처
- *                           gender:
- *                             type: string
- *                             description: 성별
- *                           age:
- *                             type: string
- *                             description: "customer.birth 기준 현재 나이 (없으면 빈값)"
- *                           startDate:
- *                             type: string
- *                             description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
- *                           endDate:
- *                             type: string
- *                             description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
+ *                   type: array
+ *                   description: "회원 목록 배열 (memberType에 따라 all=중복 제거 통합, contractor=계약자만, occupant=입실자만). contractorList/occupantList/allList 구분 없이 data가 곧 배열"
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       esntlId:
+ *                         type: string
+ *                         description: 회원 고유 아이디
+ *                       name:
+ *                         type: string
+ *                         description: 이름
+ *                       phone:
+ *                         type: string
+ *                         description: 연락처
+ *                       gender:
+ *                         type: string
+ *                         description: 성별
+ *                       age:
+ *                         type: string
+ *                         description: "customer.birth 기준 현재 나이 (없으면 빈값)"
+ *                       startDate:
+ *                         type: string
+ *                         description: "사용기간 시작일 (활성 계약이 있을 때만 포함)"
+ *                       endDate:
+ *                         type: string
+ *                         description: "사용기간 종료일 (활성 계약이 있을 때만 포함)"
  *       400:
  *         description: 고시원코드 누락
  *         content:

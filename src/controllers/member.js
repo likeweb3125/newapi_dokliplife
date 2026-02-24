@@ -596,32 +596,29 @@ exports.getMemberSearch = async (req, res, next) => {
 			contractorList = (Array.isArray(contractorRows) ? contractorRows : []).map(mapRowToItem);
 		}
 
-		// memberType이 all일 때: contractorList·occupantList 구분 없이 allList로 중복 제거하여 반환
+		// data 아래 구분 없이 배열만 반환: all이면 중복 제거 후 하나의 배열, contractor/occupant면 해당 배열만
 		if (isAll) {
 			const seen = new Set();
-			const allList = [];
+			const list = [];
 			contractorList.forEach((item) => {
 				if (!seen.has(item.esntlId)) {
 					seen.add(item.esntlId);
-					allList.push(item);
+					list.push(item);
 				}
 			});
 			occupantList.forEach((item) => {
 				if (!seen.has(item.esntlId)) {
 					seen.add(item.esntlId);
-					allList.push(item);
+					list.push(item);
 				}
 			});
-			// 이름 순 정렬 (선택)
-			allList.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
-			errorHandler.successThrow(res, '조회 성공', { allList });
+			list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+			errorHandler.successThrow(res, '조회 성공', list);
 			return;
 		}
 
-		errorHandler.successThrow(res, '조회 성공', {
-			contractorList,
-			occupantList,
-		});
+		const list = isContractor ? contractorList : occupantList;
+		errorHandler.successThrow(res, '조회 성공', list);
 	} catch (err) {
 		next(err);
 	}
