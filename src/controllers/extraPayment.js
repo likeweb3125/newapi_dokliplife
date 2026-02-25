@@ -5,11 +5,11 @@ const {
 	room,
 	customer,
 	gosiwon,
-	history,
 	parking,
 	parkStatus,
 } = require('../models');
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const aligoSMS = require('../module/aligo/sms');
@@ -320,23 +320,12 @@ exports.roomExtraPayment = async (req, res, next) => {
 		}
 
 		// History 기록 생성
-		const historyIdQuery = `
-			SELECT CONCAT('HISTORY', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 8) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-			FROM history
-		`;
-		const [historyIdResult] = await mariaDBSequelize.query(historyIdQuery, {
-			type: mariaDBSequelize.QueryTypes.SELECT,
-			transaction,
-		});
-		const historyId = historyIdResult?.nextId || 'HISTORY0000000001';
-
 		const historyContent = `추가 결제 요청: ${extraPayments.length}건, 총액: ${totalAmount.toLocaleString()}원${
 			receiverPhone ? `, 수신자: ${receiverPhone}` : ''
 		}${sendDate ? `, 발송일: ${sendDate}` : ''}`;
 
-		await history.create(
+		const newHistory = await historyController.createHistoryRecord(
 			{
-				esntlId: historyId,
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				contractEsntlId: contractEsntlId,
@@ -346,9 +335,8 @@ exports.roomExtraPayment = async (req, res, next) => {
 				publicRange: 0,
 				writerAdminId: writerAdminId,
 				writerType: 'ADMIN',
-				deleteYN: 'N',
 			},
-			{ transaction }
+			transaction
 		);
 
 		await transaction.commit();
@@ -371,7 +359,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 			totalAmount: totalAmount,
 			paymentCount: createdPayments.length,
 			payments: createdPayments,
-			historyId: historyId,
+			historyId: newHistory.esntlId,
 		});
 	} catch (err) {
 		await transaction.rollback();

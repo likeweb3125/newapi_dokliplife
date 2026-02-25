@@ -1,7 +1,8 @@
 const { Op } = require('sequelize');
-const { gosiwon, history, mariaDBSequelize } = require('../models');
+const { gosiwon, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const enumConfig = require('../middleware/enum');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
@@ -42,9 +43,6 @@ const verifyAdminToken = (req) => {
 const GOSIWON_PREFIX = 'GOSI';
 const GOSIWON_PADDING = 10;
 
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
 /** gosiwonBuilding.parking, elevator를 DB 저장 형식(^T^, ^F^)으로 변환 */
 const normalizeGosiwonBuildingBoolean = (building) => {
 	if (!building || typeof building !== 'object') return building;
@@ -58,30 +56,6 @@ const normalizeGosiwonBuildingBoolean = (building) => {
 	if (Object.prototype.hasOwnProperty.call(out, 'parking')) out.parking = toCaret(out.parking);
 	if (Object.prototype.hasOwnProperty.call(out, 'elevator')) out.elevator = toCaret(out.elevator);
 	return out;
-};
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
 };
 
 // TINYINT(1) 필드를 boolean으로 변환하는 공통 함수
@@ -389,13 +363,11 @@ exports.toggleFavorite = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const action = newFavorite === 1 ? '추가' : '제거';
 			const historyContent = `고시원 즐겨찾기 ${action}: ${gosiwonInfo.name}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: esntlId,
 					etcEsntlId: esntlId,
 					content: historyContent,
@@ -404,9 +376,8 @@ exports.toggleFavorite = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
@@ -720,12 +691,10 @@ exports.createGosiwon = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `고시원 생성: ${name}${address ? `, 주소: ${address}` : ''}${phone ? `, 전화: ${phone}` : ''}${keeperName ? `, 관리자: ${keeperName}` : ''}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: esntlId,
 					etcEsntlId: esntlId,
 					content: historyContent,
@@ -734,9 +703,8 @@ exports.createGosiwon = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
@@ -1081,7 +1049,6 @@ exports.updateGosiwon = async (req, res, next) => {
 		// History 기록 생성 (변경사항 추적)
 		try {
 			if (Object.keys(updateData).length > 0) {
-				const historyId = await generateHistoryId(transaction);
 				const changes = [];
 				
 				// 주요 필드 변경사항 추적
@@ -1117,9 +1084,8 @@ exports.updateGosiwon = async (req, res, next) => {
 
 				const historyContent = `고시원 정보 수정: ${changes.join(', ')}`;
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: esntlId,
 						etcEsntlId: esntlId,
 						content: historyContent,
@@ -1128,9 +1094,8 @@ exports.updateGosiwon = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			}
 		} catch (historyErr) {
@@ -1214,12 +1179,10 @@ exports.deleteGosiwon = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `고시원 삭제: ${gosiwonInfo.name}${gosiwonInfo.address ? ` (${gosiwonInfo.address})` : ''}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: esntlId,
 					etcEsntlId: esntlId,
 					content: historyContent,
@@ -1228,9 +1191,8 @@ exports.deleteGosiwon = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
@@ -1417,7 +1379,6 @@ exports.updateGosiwonConfig = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const changes = [];
 			if (ableCheckDays !== undefined) changes.push(`입실가능기간: ${ableCheckDays}`);
 			if (ableContractDays !== undefined) changes.push(`계약가능기간: ${ableContractDays}`);
@@ -1429,9 +1390,8 @@ exports.updateGosiwonConfig = async (req, res, next) => {
 
 			const historyContent = `운영환경설정 저장: ${changes.length > 0 ? changes.join(', ') : '설정 변경'}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: esntlId,
 					etcEsntlId: esntlId,
 					content: historyContent,
@@ -1440,9 +1400,8 @@ exports.updateGosiwonConfig = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);

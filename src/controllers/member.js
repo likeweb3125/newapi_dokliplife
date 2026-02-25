@@ -2,9 +2,10 @@ const moment = require('moment');
 const { Op, Sequelize } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { i_member, i_member_level, i_board, i_board_comment, i_member_login, i_member_sec, customer, history } = require('../models');
+const { i_member, i_member_level, i_board, i_board_comment, i_member_login, i_member_sec, customer } = require('../models');
 
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const enumConfig = require('../middleware/enum');
 const isAuthControllers = require('../controllers/auth');
 const db = require('../models');
@@ -38,33 +39,6 @@ const verifyAdminToken = (req) => {
 
 const CUSTOMER_PREFIX = 'CUTR';
 const CUSTOMER_PADDING = 10;
-
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
-};
 
 // 고객 ID 생성 함수
 const generateCustomerId = async (transaction) => {
@@ -215,12 +189,10 @@ exports.postCustomerRegister = async (req, res, next) => {
 		// History 기록 생성 (관리자가 등록한 경우만)
 		if (writerAdminId) {
 			try {
-				const historyId = await generateHistoryId(transaction);
 				const historyContent = `고객 회원 등록: ${name} (${id}), 전화번호 ${phone}${gender ? `, 성별 ${gender}` : ''}`;
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: null,
 						etcEsntlId: esntlId,
 						content: historyContent,
@@ -229,9 +201,8 @@ exports.postCustomerRegister = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			} catch (historyErr) {
 				console.error('History 생성 실패:', historyErr);
@@ -359,7 +330,6 @@ exports.putCustomerUpdate = async (req, res, next) => {
 		// History 기록 생성 (관리자가 수정한 경우만)
 		if (writerAdminId) {
 			try {
-				const historyId = await generateHistoryId(transaction);
 				const changes = [];
 				
 				if (updateFields.name && updateFields.name !== beforeCustomer.name) {
@@ -390,9 +360,8 @@ exports.putCustomerUpdate = async (req, res, next) => {
 				if (changes.length > 0) {
 					const historyContent = `고객 회원 정보 수정: ${changes.join(', ')}`;
 
-					await history.create(
+					await historyController.createHistoryRecord(
 						{
-							esntlId: historyId,
 							gosiwonEsntlId: null,
 							etcEsntlId: esntlId,
 							content: historyContent,
@@ -401,9 +370,8 @@ exports.putCustomerUpdate = async (req, res, next) => {
 							publicRange: 0,
 							writerAdminId: writerAdminId,
 							writerType: 'ADMIN',
-							deleteYN: 'N',
 						},
-						{ transaction }
+						transaction
 					);
 				}
 			} catch (historyErr) {

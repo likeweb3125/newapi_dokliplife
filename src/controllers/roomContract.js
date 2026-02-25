@@ -1,35 +1,9 @@
-const { mariaDBSequelize, room, customer, history, deposit, extraPayment, paymentLog } = require('../models');
+const { mariaDBSequelize, room, customer, deposit, extraPayment, paymentLog } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 const formatAge = require('../utils/formatAge');
-
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
-};
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -944,12 +918,10 @@ exports.updateContract = async (req, res, next) => {
 		// 히스토리 생성
 		if (changes.length > 0) {
 			try {
-				const historyId = await generateHistoryId(transaction);
 				const historyContent = `계약 정보 수정: ${changes.join(', ')}`;
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: contract.gosiwonEsntlId,
 						roomEsntlId: contract.roomEsntlId,
 						contractEsntlId: contractEsntlId,
@@ -959,9 +931,8 @@ exports.updateContract = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			} catch (historyError) {
 				console.error('히스토리 생성 실패:', historyError);

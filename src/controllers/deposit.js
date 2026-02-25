@@ -801,7 +801,7 @@ exports.getDepositGroupByDepositor = async (req, res, next) => {
 			FROM il_room_deposit D
 			LEFT JOIN (
 				SELECT RC1.* FROM roomContract RC1
-				INNER JOIN (SELECT roomEsntlId, MAX(contractDate) as maxContractDate FROM roomContract WHERE status = 'CONTRACT' GROUP BY roomEsntlId) RC2
+				INNER JOIN (SELECT roomEsntlId, MAX(contractDate) as maxContractDate FROM roomContract WHERE status = 'USED' GROUP BY roomEsntlId) RC2
 				ON RC1.roomEsntlId = RC2.roomEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON RC.roomEsntlId = D.rom_eid
 			WHERE D.rom_eid = ?
@@ -1359,7 +1359,7 @@ exports.getReservationList = async (req, res, next) => {
 				INNER JOIN (
 					SELECT gosiwonEsntlId, roomEsntlId, customerEsntlId, MAX(contractDate) as maxContractDate
 					FROM roomContract
-					WHERE status = 'CONTRACT'
+					WHERE status = 'USED'
 					GROUP BY gosiwonEsntlId, roomEsntlId, customerEsntlId
 				) RC2 ON RC1.gosiwonEsntlId = RC2.gosiwonEsntlId AND RC1.roomEsntlId = RC2.roomEsntlId AND RC1.customerEsntlId = RC2.customerEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON R.gosiwonEsntlId = RC.gosiwonEsntlId AND R.esntlId = RC.roomEsntlId AND R.customerEsntlId = RC.customerEsntlId
@@ -1404,7 +1404,7 @@ exports.getReservationList = async (req, res, next) => {
 				INNER JOIN (
 					SELECT gosiwonEsntlId, roomEsntlId, customerEsntlId, MAX(contractDate) as maxContractDate
 					FROM roomContract
-					WHERE status = 'CONTRACT'
+					WHERE status = 'USED'
 					GROUP BY gosiwonEsntlId, roomEsntlId, customerEsntlId
 				) RC2 ON RC1.gosiwonEsntlId = RC2.gosiwonEsntlId AND RC1.roomEsntlId = RC2.roomEsntlId AND RC1.customerEsntlId = RC2.customerEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON R.gosiwonEsntlId = RC.gosiwonEsntlId AND R.esntlId = RC.roomEsntlId AND R.customerEsntlId = RC.customerEsntlId
@@ -1699,7 +1699,7 @@ exports.getDepositList = async (req, res, next) => {
 				INNER JOIN (
 					SELECT gosiwonEsntlId, roomEsntlId, customerEsntlId, MAX(contractDate) as maxContractDate
 					FROM roomContract
-					WHERE status = 'CONTRACT'
+					WHERE status = 'USED'
 					GROUP BY gosiwonEsntlId, roomEsntlId, customerEsntlId
 				) RC2 ON RC1.gosiwonEsntlId = RC2.gosiwonEsntlId AND RC1.roomEsntlId = RC2.roomEsntlId AND RC1.customerEsntlId = RC2.customerEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON D.gsw_eid = RC.gosiwonEsntlId AND D.rom_eid = RC.roomEsntlId AND R.customerEsntlId = RC.customerEsntlId
@@ -1747,7 +1747,7 @@ exports.getDepositList = async (req, res, next) => {
 				INNER JOIN (
 					SELECT gosiwonEsntlId, roomEsntlId, customerEsntlId, MAX(contractDate) as maxContractDate
 					FROM roomContract
-					WHERE status = 'CONTRACT'
+					WHERE status = 'USED'
 					GROUP BY gosiwonEsntlId, roomEsntlId, customerEsntlId
 				) RC2 ON RC1.gosiwonEsntlId = RC2.gosiwonEsntlId AND RC1.roomEsntlId = RC2.roomEsntlId AND RC1.customerEsntlId = RC2.customerEsntlId AND RC1.contractDate = RC2.maxContractDate AND RC1.status = 'CONTRACT'
 			) RC ON D.gsw_eid = RC.gosiwonEsntlId AND D.rom_eid = RC.roomEsntlId AND R.customerEsntlId = RC.customerEsntlId

@@ -1,6 +1,7 @@
-const { roomCategory, roomCategoryOption, history, mariaDBSequelize } = require('../models');
+const { roomCategory, roomCategoryOption, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 
@@ -30,33 +31,6 @@ const verifyAdminToken = (req) => {
 
 const OPTION_PREFIX = 'COPT';
 const OPTION_PADDING = 10;
-
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
-};
 
 const generateOptionId = async (transaction) => {
 	const latest = await roomCategoryOption.findOne({
@@ -178,12 +152,10 @@ exports.createCategory = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 카테고리 생성: ${categoryName}, 기본가격 ${basePriceValue}원${memo ? `, 메모: ${memo}` : ''}${options && options.length > 0 ? `, 옵션 ${options.length}개` : ''}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: goID,
 					etcEsntlId: categoryId,
 					content: historyContent,
@@ -192,9 +164,8 @@ exports.createCategory = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
@@ -295,7 +266,6 @@ exports.updateCategory = async (req, res, next) => {
 
 		// History 기록 생성 (변경사항 추적)
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const changes = [];
 			if (categoryName && categoryName !== category.name) {
 				changes.push(`이름: ${category.name} → ${categoryName}`);
@@ -320,9 +290,8 @@ exports.updateCategory = async (req, res, next) => {
 			if (changes.length > 0) {
 				const historyContent = `방 카테고리 수정: ${changes.join(', ')}`;
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: category.gosiwonEsntlId,
 						etcEsntlId: categoryID,
 						content: historyContent,
@@ -331,9 +300,8 @@ exports.updateCategory = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			}
 		} catch (historyErr) {
@@ -392,12 +360,10 @@ exports.deleteCategory = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 카테고리 삭제: ${category.name} (기본가격 ${category.base_price}원)`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: category.gosiwonEsntlId,
 					etcEsntlId: categoryID,
 					content: historyContent,
@@ -406,9 +372,8 @@ exports.deleteCategory = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);

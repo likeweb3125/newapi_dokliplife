@@ -3,9 +3,9 @@ const {
 	extraPayment,
 	parking,
 	parkStatus,
-	history,
 } = require('../models');
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const formatAge = require('../utils/formatAge');
@@ -14,8 +14,6 @@ const EXTR_PREFIX = 'EXTR';
 const EXTR_PADDING = 10;
 const PARKSTATUS_PREFIX = 'PKST';
 const PARKSTATUS_PADDING = 10;
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -79,19 +77,6 @@ const generateUniqueId = (pDate, esntlId) => {
 	// uniqueId 생성: 날짜(YYYYMMDD) + 숫자 부분(앞의 0 제거)
 	const uniqueId = dateStr && esntlIdNumeric ? `${dateStr}${esntlIdNumeric}` : null;
 	return uniqueId;
-};
-
-// history ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const idQuery = `
-		SELECT CONCAT('HISTORY', LPAD(COALESCE(MAX(CAST(SUBSTRING(esntlId, 8) AS UNSIGNED)), 0) + 1, 10, '0')) AS nextId
-		FROM history
-	`;
-	const [idResult] = await mariaDBSequelize.query(idQuery, {
-		type: mariaDBSequelize.QueryTypes.SELECT,
-		transaction,
-	});
-	return idResult?.nextId || 'HISTORY0000000001';
 };
 
 // 현재 날짜/시간 (YYYY-MM-DD, HH:MM:SS 형식)
@@ -262,13 +247,11 @@ exports.createParking = async (req, res, next) => {
 		await syncGosiwonParkingUse(contract.gosiwonEsntlId, transaction);
 
 		// History 기록 생성
-		const historyId = await generateHistoryId(transaction);
 		const costText = cost > 0 ? `${cost.toLocaleString()}원` : '입실료 포함';
 		const historyContent = `주차 등록: ${optionName}${parkNumber ? ` (${parkNumber})` : ''}, 주차비: ${costText}`;
 
-		await history.create(
+		const newHistory = await historyController.createHistoryRecord(
 			{
-				esntlId: historyId,
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				contractEsntlId: contractEsntlId,
@@ -278,9 +261,8 @@ exports.createParking = async (req, res, next) => {
 				publicRange: 0,
 				writerAdminId: writerAdminId,
 				writerType: 'ADMIN',
-				deleteYN: 'N',
 			},
-			{ transaction }
+			transaction
 		);
 
 		await transaction.commit();
@@ -289,7 +271,7 @@ exports.createParking = async (req, res, next) => {
 			contractEsntlId: contractEsntlId,
 			paymentLogId: paymentId,
 			parkStatusId: parkStatusId,
-			historyId: historyId,
+			historyId: newHistory.esntlId,
 		});
 	} catch (err) {
 		await transaction.rollback();
@@ -550,10 +532,8 @@ exports.updateParking = async (req, res, next) => {
 			if (rc) roomEsntlId = rc.roomEsntlId || '';
 		}
 
-		const historyId = await generateHistoryId(transaction);
-		await history.create(
+		const newHistory = await historyController.createHistoryRecord(
 			{
-				esntlId: historyId,
 				gosiwonEsntlId: parkStatusInfo.gosiwonEsntlId,
 				roomEsntlId: roomEsntlId,
 				contractEsntlId: parkStatusInfo.contractEsntlId,
@@ -563,16 +543,15 @@ exports.updateParking = async (req, res, next) => {
 				publicRange: 0,
 				writerAdminId: writerAdminId,
 				writerType: 'ADMIN',
-				deleteYN: 'N',
 			},
-			{ transaction }
+			transaction
 		);
 
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '주차 정보 수정이 완료되었습니다.', {
 			parkStatusId: parkingId,
-			historyId: historyId,
+			historyId: newHistory.esntlId,
 		});
 	} catch (err) {
 		await transaction.rollback();
@@ -622,10 +601,8 @@ exports.deleteParking = async (req, res, next) => {
 		);
 		if (rc) roomEsntlId = rc.roomEsntlId || '';
 
-		const historyId = await generateHistoryId(transaction);
-		await history.create(
+		const newHistory = await historyController.createHistoryRecord(
 			{
-				esntlId: historyId,
 				gosiwonEsntlId: parkStatusInfo.gosiwonEsntlId,
 				roomEsntlId: roomEsntlId,
 				contractEsntlId: parkStatusInfo.contractEsntlId,
@@ -635,16 +612,15 @@ exports.deleteParking = async (req, res, next) => {
 				publicRange: 0,
 				writerAdminId: writerAdminId,
 				writerType: 'ADMIN',
-				deleteYN: 'N',
 			},
-			{ transaction }
+			transaction
 		);
 
 		await transaction.commit();
 
 		errorHandler.successThrow(res, '주차 삭제가 완료되었습니다.', {
 			parkStatusId: parkingId,
-			historyId: historyId,
+			historyId: newHistory.esntlId,
 		});
 	} catch (err) {
 		await transaction.rollback();

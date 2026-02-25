@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { history, mariaDBSequelize } = require('../models');
+const { dateToYmdHms } = require('../utils/dateHelper');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
@@ -173,18 +174,22 @@ exports.getHistoryList = async (req, res, next) => {
 			offset: offset,
 		});
 
-		// TINYINT(1) 필드를 boolean으로 변환
-		const convertHistoryBoolean = (item) => {
-			if (item.publicRange !== undefined && item.publicRange !== null) {
-				item.publicRange = item.publicRange === 1 || item.publicRange === true || item.publicRange === '1';
+		// TINYINT(1) 필드 boolean 변환 + Date 필드는 로컬(KST) 문자열로 변환 (UTC 직렬화 방지)
+		const convertHistoryItem = (item) => {
+			const converted = item.toJSON ? item.toJSON() : { ...item };
+			if (converted.publicRange !== undefined && converted.publicRange !== null) {
+				converted.publicRange = converted.publicRange === 1 || converted.publicRange === true || converted.publicRange === '1';
 			}
-			if (item.isPinned !== undefined && item.isPinned !== null) {
-				item.isPinned = item.isPinned === 1 || item.isPinned === true || item.isPinned === '1';
+			if (converted.isPinned !== undefined && converted.isPinned !== null) {
+				converted.isPinned = converted.isPinned === 1 || converted.isPinned === true || converted.isPinned === '1';
 			}
-			return item;
+			// createdAt, updatedAt: Date → 로컬 기준 YYYY-MM-DD HH:mm:ss 문자열
+			if (converted.createdAt) converted.createdAt = dateToYmdHms(converted.createdAt);
+			if (converted.updatedAt) converted.updatedAt = dateToYmdHms(converted.updatedAt);
+			return converted;
 		};
 
-		const convertedRows = rows.map(convertHistoryBoolean);
+		const convertedRows = rows.map(convertHistoryItem);
 
 		res.status(200).json({
 			success: true,
@@ -223,17 +228,20 @@ exports.getHistoryDetail = async (req, res, next) => {
 			errorHandler.errorThrow(404, '히스토리를 찾을 수 없습니다.');
 		}
 
-		// TINYINT(1) 필드를 boolean으로 변환
-		if (historyData.publicRange !== undefined && historyData.publicRange !== null) {
-			historyData.publicRange = historyData.publicRange === 1 || historyData.publicRange === true || historyData.publicRange === '1';
+		// TINYINT(1) 필드 boolean 변환 + Date 필드 로컬 문자열 변환
+		const data = historyData.toJSON ? historyData.toJSON() : { ...historyData };
+		if (data.publicRange !== undefined && data.publicRange !== null) {
+			data.publicRange = data.publicRange === 1 || data.publicRange === true || data.publicRange === '1';
 		}
-		if (historyData.isPinned !== undefined && historyData.isPinned !== null) {
-			historyData.isPinned = historyData.isPinned === 1 || historyData.isPinned === true || historyData.isPinned === '1';
+		if (data.isPinned !== undefined && data.isPinned !== null) {
+			data.isPinned = data.isPinned === 1 || data.isPinned === true || data.isPinned === '1';
 		}
+		if (data.createdAt) data.createdAt = dateToYmdHms(data.createdAt);
+		if (data.updatedAt) data.updatedAt = dateToYmdHms(data.updatedAt);
 
 		res.status(200).json({
 			success: true,
-			data: historyData,
+			data,
 		});
 	} catch (error) {
 		next(error);

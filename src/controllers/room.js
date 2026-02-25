@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
-const { room, memo, history, roomCategory, roomCategoryOption, mariaDBSequelize } = require('../models');
+const { room, memo, roomCategory, roomCategoryOption, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus, ROOM_STATUS_TO_RS_STATUS_LIST } = require('../utils/roomStatusHelper');
 const { dateToYmd } = require('../utils/dateHelper');
@@ -39,33 +40,6 @@ const ROOM_PADDING = 10;
 
 const MEMO_PREFIX = 'MEMO';
 const MEMO_PADDING = 10;
-
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
-};
 
 // 메모 ID 생성 함수
 const generateMemoId = async (transaction) => {
@@ -559,12 +533,10 @@ exports.createRoom = async (req, res, next) => {
 
 		// 히스토리 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 정보가 등록되었습니다. 방번호: ${roomNumber || '미지정'}, 타입: ${roomType || '미지정'}, 상태: ${status || 'EMPTY'}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: goID,
 					roomEsntlId: roomId,
 					content: historyContent,
@@ -573,9 +545,8 @@ exports.createRoom = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyError) {
 			console.error('히스토리 생성 실패:', historyError);
@@ -759,14 +730,12 @@ exports.updateRoom = async (req, res, next) => {
 
 			// 히스토리 생성
 			try {
-				const historyId = await generateHistoryId(transaction);
 				const historyContent = changes.length > 0 
 					? `방 정보가 수정되었습니다. 변경사항: ${changes.join(', ')}`
 					: '방 정보가 수정되었습니다.';
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: roomInfo.gosiwonEsntlId,
 						roomEsntlId: esntlID,
 						content: historyContent,
@@ -775,9 +744,8 @@ exports.updateRoom = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			} catch (historyError) {
 				console.error('히스토리 생성 실패:', historyError);
@@ -845,12 +813,10 @@ exports.updateRoomCategory = async (req, res, next) => {
 			);
 
 			// 해당 방의 history에 카테고리 변경 기록
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `카테고리 변경: ${previousCategory} → ${categoryName}(${category})`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
 					roomEsntlId: roomEsntlId,
 					content: historyContent,
@@ -859,9 +825,8 @@ exports.updateRoomCategory = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 
 			updatedRooms.push({ roomEsntlId, updated: true });
@@ -940,15 +905,13 @@ exports.updateRoomAgreement = async (req, res, next) => {
 
 			// 히스토리 생성
 			try {
-				const historyId = await generateHistoryId(transaction);
 				const historyContent =
 					changes.length > 0
 						? `방 특약 내역이 수정되었습니다. 변경사항: ${changes.join(', ')}`
 						: '방 특약 내역이 수정되었습니다.';
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: roomInfo.gosiwonEsntlId,
 						roomEsntlId: roomEsntlId,
 						content: historyContent,
@@ -957,9 +920,8 @@ exports.updateRoomAgreement = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			} catch (historyError) {
 				console.error('히스토리 생성 실패:', historyError);
@@ -1030,12 +992,10 @@ exports.updateRoomDpAt = async (req, res, next) => {
 
 		// 히스토리 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 DP 여부가 수정되었습니다. 변경사항: ${oldValue} → ${newValue}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
 					roomEsntlId: roomEsntlId,
 					content: historyContent,
@@ -1044,9 +1004,8 @@ exports.updateRoomDpAt = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyError) {
 			console.error('히스토리 생성 실패:', historyError);
@@ -1138,12 +1097,10 @@ exports.reserveCancel = async (req, res, next) => {
 
 		// 4. 히스토리 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
-			const historyContent = '결제 요청이 취소되었습니다. (roomStatus 소프트삭제, room EMPTY 처리)';
+			const historyContent = '결제 요청 취소: 예약 관련 roomStatus(RESERVE_PENDING, RESERVED, VBANK_PENDING) 소프트삭제, room을 EMPTY로 변경';
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: roomBasicInfo.gosiwonEsntlId,
 					roomEsntlId: roomEsntlId,
 					content: historyContent,
@@ -1152,9 +1109,8 @@ exports.reserveCancel = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: userSn,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyError) {
 			console.error('히스토리 생성 실패:', historyError);
@@ -1264,12 +1220,10 @@ exports.deleteRoom = async (req, res, next) => {
 
 		// 히스토리 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 정보가 삭제되었습니다. 방번호: ${roomInfo.roomNumber || '미지정'}, 타입: ${roomInfo.roomType || '미지정'}, 상태: ${roomInfo.status || '없음'}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: roomInfo.gosiwonEsntlId,
 					roomEsntlId: esntlID,
 					content: historyContent,
@@ -1278,9 +1232,8 @@ exports.deleteRoom = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyError) {
 			console.error('히스토리 생성 실패:', historyError);
@@ -1490,12 +1443,10 @@ exports.roomReserve = async (req, res, next) => {
 
 		// 4. History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `방 예약 생성: 예약ID ${reservationId}, 입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${monthlyRentToStore ? `, 월세 ${monthlyRentToStore}` : ''}${rorPayMethod ? `, 결제방법 ${rorPayMethod}` : ''}`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: roomBasicInfo.gosiwonEsntlId,
 					roomEsntlId: roomEsntlId,
 					etcEsntlId: reservationId,
@@ -1505,9 +1456,8 @@ exports.roomReserve = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: userSn,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
@@ -1677,7 +1627,8 @@ exports.runDailyReserveReminderAPI = async (req, res, next) => {
 exports.startRoomSell = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { rooms } = req.body;
 
@@ -1720,9 +1671,9 @@ exports.startRoomSell = async (req, res, next) => {
 
 			// 각 roomId에 대해 처리
 			for (const singleRoomId of roomIdArray) {
-				// 방 정보 조회 (고시원 ID 확인)
+				// 방 정보 조회 (고시원 ID, 방번호 확인)
 				const [roomInfo] = await mariaDBSequelize.query(
-					`SELECT esntlId, gosiwonEsntlId FROM room WHERE esntlId = ? AND deleteYN = 'N'`,
+					`SELECT esntlId, gosiwonEsntlId, roomNumber FROM room WHERE esntlId = ? AND deleteYN = 'N'`,
 					{
 						replacements: [singleRoomId],
 						type: mariaDBSequelize.QueryTypes.SELECT,
@@ -1864,6 +1815,24 @@ exports.startRoomSell = async (req, res, next) => {
 							}
 						);
 					}
+					// roomStatus 변경 history 기록
+					try {
+						await historyController.createHistoryRecord(
+							{
+								gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+								roomEsntlId: singleRoomId,
+								content: `방 판매 시작(수정): ${roomInfo.roomNumber || singleRoomId}호, ON_SALE 판매기간 ${String(statusStartDate).slice(0, 10)} ~ ${String(finalStatusEndDate).slice(0, 10)}, CAN_CHECKIN 입실가능기간 ${String(finalEtcStartDate).slice(0, 10)} ~ ${String(finalEtcEndDate).slice(0, 10)}`,
+								category: 'ROOM',
+								priority: 'NORMAL',
+								publicRange: 0,
+								writerAdminId,
+								writerType: 'ADMIN',
+							},
+							transaction
+						);
+					} catch (historyErr) {
+						console.error('[roomSell/start] history 생성 실패:', historyErr);
+					}
 					results.push({
 						roomId: singleRoomId,
 						action: 'updated',
@@ -1945,6 +1914,24 @@ exports.startRoomSell = async (req, res, next) => {
 					// roomStatus(ON_SALE, CAN_CHECKIN) 반영 → room.status = OPEN
 					await syncRoomFromRoomStatus(singleRoomId, 'ON_SALE', {}, transaction);
 					await syncRoomFromRoomStatus(singleRoomId, 'CAN_CHECKIN', {}, transaction);
+					// roomStatus 생성 history 기록
+					try {
+						await historyController.createHistoryRecord(
+							{
+								gosiwonEsntlId: roomInfo.gosiwonEsntlId,
+								roomEsntlId: singleRoomId,
+								content: `방 판매 시작(신규): ${roomInfo.roomNumber || singleRoomId}호, ON_SALE 판매기간 ${String(statusStartDate).slice(0, 10)} ~ ${String(finalStatusEndDate).slice(0, 10)}, CAN_CHECKIN 입실가능기간 ${String(finalEtcStartDate).slice(0, 10)} ~ ${String(finalEtcEndDate).slice(0, 10)}`,
+								category: 'ROOM',
+								priority: 'NORMAL',
+								publicRange: 0,
+								writerAdminId,
+								writerType: 'ADMIN',
+							},
+							transaction
+						);
+					} catch (historyErr) {
+						console.error('[roomSell/start] history 생성 실패:', historyErr);
+					}
 					results.push({
 						roomId: singleRoomId,
 						action: 'created',
@@ -2124,7 +2111,8 @@ exports.getTourReservationList = async (req, res, next) => {
 exports.addEventDirectly = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const { roomEsntlId, startDate, endDate, status, statusMemo, setRoomEmpty } = req.body;
 
@@ -2144,9 +2132,9 @@ exports.addEventDirectly = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'status가 ETC일 때 statusMemo는 필수입니다.');
 		}
 
-		// 방 정보 조회 (gosiwonEsntlId)
+		// 방 정보 조회 (gosiwonEsntlId, roomNumber)
 		const [roomRow] = await mariaDBSequelize.query(
-			`SELECT esntlId, gosiwonEsntlId FROM room WHERE esntlId = ? LIMIT 1`,
+			`SELECT esntlId, gosiwonEsntlId, roomNumber FROM room WHERE esntlId = ? LIMIT 1`,
 			{
 				replacements: [roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.SELECT,
@@ -2199,6 +2187,27 @@ exports.addEventDirectly = async (req, res, next) => {
 		// roomStatus 입력 시 room 테이블 상태 동기화 (ETC/BEFORE_SALES → EMPTY, startDate/endDate null)
 		await syncRoomFromRoomStatus(roomEsntlId, status, {}, transaction);
 
+		// roomStatus 생성 history 기록 (상태·기간·사유 상세)
+		const statusLabel = status === 'ETC' ? '기타(룸투어·입실불가)' : '판매전';
+		const memoPart = status === 'ETC' && statusMemo ? `, 사유: ${String(statusMemo).slice(0, 50)}${String(statusMemo).length > 50 ? '…' : ''}` : '';
+		try {
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId,
+					roomEsntlId,
+					content: `방 상태 추가: ${statusLabel} (${roomRow.roomNumber || roomEsntlId}호), 기간 ${String(startDate).slice(0, 10)} ~ ${String(endDate).slice(0, 10)}${memoPart}`,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId,
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('방 이벤트 history 생성 실패:', historyErr);
+		}
+
 		await transaction.commit();
 
 		return errorHandler.successThrow(res, '방 이벤트가 추가되었습니다.', {
@@ -2221,7 +2230,8 @@ exports.addEventDirectly = async (req, res, next) => {
 exports.cancelSales = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		verifyAdminToken(req);
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
 
 		const {
 			roomEsntlId: roomEsntlIdInput,
@@ -2274,9 +2284,9 @@ exports.cancelSales = async (req, res, next) => {
 		const errors = [];
 
 		for (const roomEsntlId of roomIds) {
-			// 방 정보 조회 (gosiwonEsntlId)
+			// 방 정보 조회 (gosiwonEsntlId, roomNumber)
 			const [roomRow] = await mariaDBSequelize.query(
-				`SELECT esntlId, gosiwonEsntlId FROM room WHERE esntlId = ? AND deleteYN = 'N' LIMIT 1`,
+				`SELECT esntlId, gosiwonEsntlId, roomNumber FROM room WHERE esntlId = ? AND deleteYN = 'N' LIMIT 1`,
 				{
 					replacements: [roomEsntlId],
 					type: mariaDBSequelize.QueryTypes.SELECT,
@@ -2397,6 +2407,33 @@ exports.cancelSales = async (req, res, next) => {
 			// roomStatus(ETC) 반영 → room.status = EMPTY, startDate/endDate null
 			await syncRoomFromRoomStatus(roomEsntlId, 'ETC', {}, transaction);
 
+			// roomStatus 변경 history 기록 (상세)
+			const roomLabel = roomRow.roomNumber || roomEsntlId;
+			let historyDetail = `방 판매 종료: ${roomLabel}호, ON_SALE 종료일 ${String(salesEndDate).slice(0, 10)}로 변경`;
+			if (setInfinity === true) {
+				historyDetail += ', 이후 무기한 판매중지(ETC) 추가';
+			} else {
+				const reasonShort = `${unableCheckinReason}: ${String(unableCheckinReasonDetail || '').slice(0, 30)}`;
+				historyDetail += `, 이후 ETC(입실불가) 추가: ${reasonShort}${String(unableCheckinReasonDetail || '').length > 30 ? '…' : ''}, 기간 ${String(unableCheckinStartDate).slice(0, 10)} ~ ${String(unableCheckinEndDate).slice(0, 10)}`;
+			}
+			try {
+				await historyController.createHistoryRecord(
+					{
+						gosiwonEsntlId,
+						roomEsntlId,
+						content: historyDetail,
+						category: 'ROOM',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId,
+						writerType: 'ADMIN',
+					},
+					transaction
+				);
+			} catch (historyErr) {
+				console.error('[cancelSales] history 생성 실패:', historyErr);
+			}
+
 			results.push({
 				roomEsntlId,
 				roomStatusEsntlId,
@@ -2447,9 +2484,12 @@ exports.modifyStatus = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'modifyType은 cancel 또는 update여야 합니다.');
 		}
 
-		// 삭제되지 않은 roomStatus 1건 조회
+		// 삭제되지 않은 roomStatus 1건 조회 (히스토리용 roomEsntlId, gosiwonEsntlId, status, roomNumber)
 		const [row] = await mariaDBSequelize.query(
-			`SELECT esntlId FROM roomStatus WHERE esntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N') LIMIT 1`,
+			`SELECT RS.esntlId, RS.roomEsntlId, RS.gosiwonEsntlId, RS.status, RS.statusStartDate, RS.statusEndDate, RS.statusMemo, R.roomNumber
+			 FROM roomStatus RS
+			 LEFT JOIN room R ON RS.roomEsntlId = R.esntlId
+			 WHERE RS.esntlId = ? AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N') LIMIT 1`,
 			{
 				replacements: [roomStatusEsntlId],
 				type: mariaDBSequelize.QueryTypes.SELECT,
@@ -2469,6 +2509,25 @@ exports.modifyStatus = async (req, res, next) => {
 					transaction,
 				}
 			);
+			// roomStatus 소프트삭제 history 기록
+			const statusLabel = { ON_SALE: '판매중', CAN_CHECKIN: '입실가능', ETC: '기타', BEFORE_SALES: '판매전', RESERVE_PENDING: '예약대기', RESERVED: '예약확정' }[row.status] || row.status;
+			try {
+				await historyController.createHistoryRecord(
+					{
+						gosiwonEsntlId: row.gosiwonEsntlId,
+						roomEsntlId: row.roomEsntlId,
+						content: `방 상태 취소: ${row.roomNumber || row.roomEsntlId}호, ${statusLabel} (기간 ${row.statusStartDate ? String(row.statusStartDate).slice(0, 10) : '-'} ~ ${row.statusEndDate ? String(row.statusEndDate).slice(0, 10) : '-'})${statusMemo ? `, 사유: ${String(statusMemo).slice(0, 50)}` : ''}`,
+						category: 'ROOM',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId,
+						writerType: 'ADMIN',
+					},
+					transaction
+				);
+			} catch (historyErr) {
+				console.error('[modifyStatus/cancel] history 생성 실패:', historyErr);
+			}
 			await transaction.commit();
 			return errorHandler.successThrow(res, '방상태가 취소되었습니다.', {
 				roomStatusEsntlId,
@@ -2516,6 +2575,28 @@ exports.modifyStatus = async (req, res, next) => {
 				transaction,
 			}
 		);
+		// roomStatus 수정 history 기록 (변경된 항목만)
+		const changeParts = [];
+		if (statusStartDate !== undefined) changeParts.push(`시작일: ${String(statusStartDate).replace('T', ' ').slice(0, 10)}`);
+		if (statusEndDate !== undefined) changeParts.push(`종료일: ${String(statusEndDate).replace('T', ' ').slice(0, 10)}`);
+		if (statusMemo !== undefined) changeParts.push(`메모: ${String(statusMemo).slice(0, 50)}${String(statusMemo).length > 50 ? '…' : ''}`);
+		try {
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: row.gosiwonEsntlId,
+					roomEsntlId: row.roomEsntlId,
+					content: `방 상태 수정: ${row.roomNumber || row.roomEsntlId}호, ${(row.status === 'ETC' ? '기타' : row.status === 'BEFORE_SALES' ? '판매전' : row.status)} 변경사항: ${changeParts.join(', ')}`,
+					category: 'ROOM',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId,
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[modifyStatus/update] history 생성 실패:', historyErr);
+		}
 		await transaction.commit();
 		errorHandler.successThrow(res, '방상태가 수정되었습니다.', {
 			roomStatusEsntlId,

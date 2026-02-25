@@ -1,6 +1,7 @@
-const { mariaDBSequelize, room, history } = require('../models');
+const { mariaDBSequelize, room } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const historyController = require('./history');
 const { roomAfterUse } = require('./refund');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
@@ -8,32 +9,6 @@ const { dateToYmd } = require('../utils/dateHelper');
 
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
-};
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -665,14 +640,11 @@ exports.processRoomMove = async (req, res, next) => {
 
 		// 3-2. history 테이블에 방마다 히스토리 기록 (나가는 방: 이 방에서 타겟방으로, 타겟방: 어떤 방에서 이 방으로)
 		try {
-			const historyContentOriginal = `이 방에서 ${targetRoomNumber}로 방이동`;
-			const historyContentTarget = `${originalRoomNumber}에서 이 방으로 방이동`;
+			const historyContentOriginal = `방이동: 이 방(${originalRoomNumber}) → ${targetRoomNumber}, 이동일 ${moveDateStr}, roomStatus ROOM_MOVE_OUT 처리`;
+			const historyContentTarget = `방이동: ${originalRoomNumber} → 이 방(${targetRoomNumber}), 이동일 ${moveDateStr}, roomStatus CONTRACT(ROOM_MOVE_IN) 등록`;
 
-			// ID를 나눠서 생성 (한 번에 두 개 부르면 같은 ID가 나와 두 번째 create에서 PK 중복 발생)
-			const historyIdOut = await generateHistoryId(transaction);
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyIdOut,
 					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
 					roomEsntlId: originalRoomEsntlId,
 					contractEsntlId: contractEsntlId,
@@ -682,27 +654,23 @@ exports.processRoomMove = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 
-			const historyIdIn = await generateHistoryId(transaction);
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyIdIn,
 					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
 					roomEsntlId: targetRoomEsntlId,
-					contractEsntlId: contractEsntlId, // 계약 유지
+					contractEsntlId: contractEsntlId,
 					content: historyContentTarget,
 					category: 'CONTRACT',
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('방이동 history 생성 실패:', historyErr);
@@ -1262,6 +1230,51 @@ exports.deleteRoomMove = async (req, res, next) => {
 			}
 		);
 
+		// 6. roomStatus 변경 history 기록 (원래방·이동방 각각)
+		try {
+			const [originalRoom] = await mariaDBSequelize.query(
+				`SELECT roomNumber FROM room WHERE esntlId = ? LIMIT 1`,
+				{ replacements: [existingRoomMove.originalRoomEsntlId], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
+			);
+			const [targetRoom] = await mariaDBSequelize.query(
+				`SELECT roomNumber FROM room WHERE esntlId = ? LIMIT 1`,
+				{ replacements: [existingRoomMove.targetRoomEsntlId], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
+			);
+			const origNum = originalRoom?.[0]?.roomNumber || existingRoomMove.originalRoomEsntlId;
+			const tgtNum = targetRoom?.[0]?.roomNumber || existingRoomMove.targetRoomEsntlId;
+
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: existingRoomMove.gosiwonEsntlId,
+					roomEsntlId: existingRoomMove.originalRoomEsntlId,
+					contractEsntlId: existingRoomMove.contractEsntlId,
+					content: `방이동 취소: ${origNum}호 원상복구 (roomStatus ROOM_MOVE_OUT → CONTRACT, ROOM_MOVE_IN 삭제, 생성된 ON_SALE/CAN_CHECKIN/BEFORE_SALES 삭제)`,
+					category: 'CONTRACT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId,
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: existingRoomMove.gosiwonEsntlId,
+					roomEsntlId: existingRoomMove.targetRoomEsntlId,
+					contractEsntlId: existingRoomMove.contractEsntlId,
+					content: `방이동 취소: ${tgtNum}호 원상복구 (roomStatus CONTRACT/ROOM_MOVE_IN 삭제, room EMPTY, ON_SALE 상태 복구)`,
+					category: 'CONTRACT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId,
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[deleteRoomMove] history 생성 실패:', historyErr);
+		}
+
 		await transaction.commit();
 
 		res.status(200).json({
@@ -1405,10 +1418,34 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 		let memoWithStatusIds = (row.memo || '').replace(/\s*\[STATUS_IDS:.*?\]\s*/, '') + ` [STATUS_IDS:${JSON.stringify(statusIdsInfo)}]`;
 
 		try {
-			const historyIdOut = await generateHistoryId(txn);
-			await history.create({ esntlId: historyIdOut, gosiwonEsntlId: contractInfo.gosiwonEsntlId, roomEsntlId: originalRoomEsntlId, contractEsntlId, content: `이 방에서 ${targetRoomNumber}로 방이동`, category: 'CONTRACT', priority: 'NORMAL', publicRange: 0, writerAdminId, writerType: 'ADMIN', deleteYN: 'N' }, { transaction: txn });
-			const historyIdIn = await generateHistoryId(txn);
-			await history.create({ esntlId: historyIdIn, gosiwonEsntlId: contractInfo.gosiwonEsntlId, roomEsntlId: targetRoomEsntlId, contractEsntlId, content: `${originalRoomNumber}에서 이 방으로 방이동`, category: 'CONTRACT', priority: 'NORMAL', publicRange: 0, writerAdminId, writerType: 'ADMIN', deleteYN: 'N' }, { transaction: txn });
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+					roomEsntlId: originalRoomEsntlId,
+					contractEsntlId,
+					content: `방이동: 이 방(${originalRoomNumber}) → ${targetRoomNumber}, 이동일 ${moveDateStr}, roomStatus ROOM_MOVE_OUT 처리`,
+					category: 'CONTRACT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId,
+					writerType: 'ADMIN',
+				},
+				txn
+			);
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+					roomEsntlId: targetRoomEsntlId,
+					contractEsntlId,
+					content: `방이동: ${originalRoomNumber} → 이 방(${targetRoomNumber}), 이동일 ${moveDateStr}, roomStatus CONTRACT(ROOM_MOVE_IN) 등록`,
+					category: 'CONTRACT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId,
+					writerType: 'ADMIN',
+				},
+				txn
+			);
 		} catch (historyErr) {
 			console.error('[executeOneScheduledRoomMove] history 생성 실패:', historyErr);
 		}

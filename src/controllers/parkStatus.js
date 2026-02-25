@@ -1,7 +1,8 @@
 const { Op } = require('sequelize');
-const { parkStatus, history, mariaDBSequelize } = require('../models');
+const { parkStatus, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 
@@ -28,33 +29,6 @@ const verifyAdminToken = (req) => {
 		errorHandler.errorThrow(401, '관리자 정보가 없습니다.');
 	}
 	return decodedToken;
-};
-
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
 };
 
 // 주차 상태 목록 조회
@@ -225,7 +199,6 @@ exports.createParkStatus = async (req, res, next) => {
 		);
 
 		// 히스토리 생성
-		const historyId = await generateHistoryId(transaction);
 		const statusText = {
 			PENDING: '입금대기',
 			CONTRACT: '사용중',
@@ -242,11 +215,9 @@ exports.createParkStatus = async (req, res, next) => {
 
 		const historyContent = `주차 상태가 생성되었습니다. 상태: ${statusText}${dateRange ? `, 사용기간: ${dateRange}` : ''}`;
 
-		// 히스토리 생성
 		try {
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: gosiwonEsntlId,
 					contractEsntlId: validContractEsntlId,
 					etcEsntlId: parkStatusId,
@@ -256,9 +227,8 @@ exports.createParkStatus = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyError) {
 			console.error('히스토리 생성 실패:', historyError);
@@ -384,7 +354,6 @@ exports.updateParkStatus = async (req, res, next) => {
 
 			// 히스토리 생성
 			try {
-				const historyId = await generateHistoryId(transaction);
 				const historyContent = `주차 상태가 수정되었습니다. 변경사항: ${changes.join(', ')}`;
 
 				// 업데이트된 contractEsntlId 사용 (없으면 기존 값)
@@ -392,9 +361,8 @@ exports.updateParkStatus = async (req, res, next) => {
 					? updateData.contractEsntlId 
 					: existingParkStatus.contractEsntlId;
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: updateData.gosiwonEsntlId || existingParkStatus.gosiwonEsntlId,
 						contractEsntlId: finalContractEsntlId,
 						etcEsntlId: parkStatusId,
@@ -404,9 +372,8 @@ exports.updateParkStatus = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			} catch (historyError) {
 				console.error('히스토리 생성 실패:', historyError);
@@ -477,7 +444,6 @@ exports.deleteParkStatus = async (req, res, next) => {
 		);
 
 		// 히스토리 생성
-		const historyId = await generateHistoryId(transaction);
 		const statusText = {
 			AVAILABLE: '사용가능',
 			CONTRACT: '사용중',
@@ -487,11 +453,9 @@ exports.deleteParkStatus = async (req, res, next) => {
 
 		const historyContent = `주차 상태가 삭제되었습니다. (상태: ${statusText})`;
 
-		// 히스토리 생성
 		try {
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: existingParkStatus.gosiwonEsntlId,
 					contractEsntlId: existingParkStatus.contractEsntlId || null,
 					etcEsntlId: parkStatusId,
@@ -501,9 +465,8 @@ exports.deleteParkStatus = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyError) {
 			console.error('히스토리 생성 실패:', historyError);

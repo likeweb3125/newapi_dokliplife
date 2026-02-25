@@ -17,6 +17,22 @@ function dateToYmd(v) {
 	return String(v).slice(0, 10);
 }
 
+/**
+ * Date를 로컬 기준 'YYYY-MM-DD HH:mm:ss' 문자열로 반환 (JSON 직렬화 시 UTC로 나가는 문제 방지)
+ * @param {Date|string|null|undefined} v - DB에서 온 Date, 또는 이미 'YYYY-MM-DD HH:mm:ss' 형태 문자열
+ * @returns {string|null} 'YYYY-MM-DD HH:mm:ss' 또는 null
+ */
+function dateToYmdHms(v) {
+	if (v == null) return null;
+	if (typeof v === 'string') return v.slice(0, 19);
+	if (v instanceof Date && !Number.isNaN(v.getTime())) {
+		const pad = (n) => String(n).padStart(2, '0');
+		return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())} ${pad(v.getHours())}:${pad(v.getMinutes())}:${pad(v.getSeconds())}`;
+	}
+	return String(v).slice(0, 19);
+}
+
 module.exports = {
 	dateToYmd,
+	dateToYmdHms,
 };

@@ -1,7 +1,8 @@
 const { Op } = require('sequelize');
-const { parking, gosiwon, history, mariaDBSequelize } = require('../models');
+const { parking, gosiwon, mariaDBSequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
+const historyController = require('./history');
 const { getWriterAdminId } = require('../utils/auth');
 
 const verifyAdminToken = (req) => {
@@ -30,33 +31,6 @@ const verifyAdminToken = (req) => {
 
 const PARKING_PREFIX = 'PARK';
 const PARKING_PADDING = 10;
-
-const HISTORY_PREFIX = 'HISTORY';
-const HISTORY_PADDING = 10;
-
-// 히스토리 ID 생성 함수
-const generateHistoryId = async (transaction) => {
-	const latest = await history.findOne({
-		attributes: ['esntlId'],
-		order: [['esntlId', 'DESC']],
-		transaction,
-		lock: transaction ? transaction.LOCK.UPDATE : undefined,
-	});
-
-	if (!latest || !latest.esntlId) {
-		return `${HISTORY_PREFIX}${String(1).padStart(HISTORY_PADDING, '0')}`;
-	}
-
-	const numberPart = parseInt(
-		latest.esntlId.replace(HISTORY_PREFIX, ''),
-		10
-	);
-	const nextNumber = Number.isNaN(numberPart) ? 1 : numberPart + 1;
-	return `${HISTORY_PREFIX}${String(nextNumber).padStart(
-		HISTORY_PADDING,
-		'0'
-	)}`;
-};
 
 const generateParkingId = async (transaction) => {
 	const latest = await parking.findOne({
@@ -185,12 +159,10 @@ exports.createParking = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `주차장 정보 생성: 구조 ${structure || '미지정'}, 자동차 ${parseInt(auto, 10) || 0}대(${parseInt(autoPrice, 10) || 0}원), 오토바이 ${parseInt(bike, 10) || 0}대(${parseInt(bikePrice, 10) || 0}원)`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: esntlId,
 					etcEsntlId: parkingId,
 					content: historyContent,
@@ -199,9 +171,8 @@ exports.createParking = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
@@ -271,7 +242,6 @@ exports.updateParking = async (req, res, next) => {
 
 		// History 기록 생성 (변경사항 추적)
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const changes = [];
 			
 			if (structure !== undefined && structure !== beforeParking.structure) {
@@ -293,9 +263,8 @@ exports.updateParking = async (req, res, next) => {
 			if (changes.length > 0) {
 				const historyContent = `주차장 정보 수정: ${changes.join(', ')}`;
 
-				await history.create(
+				await historyController.createHistoryRecord(
 					{
-						esntlId: historyId,
 						gosiwonEsntlId: parkingInfo.gosiwonEsntlId,
 						etcEsntlId: parkingID,
 						content: historyContent,
@@ -304,9 +273,8 @@ exports.updateParking = async (req, res, next) => {
 						publicRange: 0,
 						writerAdminId: writerAdminId,
 						writerType: 'ADMIN',
-						deleteYN: 'N',
 					},
-					{ transaction }
+					transaction
 				);
 			}
 		} catch (historyErr) {
@@ -353,12 +321,10 @@ exports.deleteParking = async (req, res, next) => {
 
 		// History 기록 생성
 		try {
-			const historyId = await generateHistoryId(transaction);
 			const historyContent = `주차장 정보 삭제: 구조 ${parkingInfo.structure || '미지정'}, 자동차 ${parkingInfo.auto || 0}대, 오토바이 ${parkingInfo.bike || 0}대`;
 
-			await history.create(
+			await historyController.createHistoryRecord(
 				{
-					esntlId: historyId,
 					gosiwonEsntlId: parkingInfo.gosiwonEsntlId,
 					etcEsntlId: parkingID,
 					content: historyContent,
@@ -367,9 +333,8 @@ exports.deleteParking = async (req, res, next) => {
 					publicRange: 0,
 					writerAdminId: writerAdminId,
 					writerType: 'ADMIN',
-					deleteYN: 'N',
 				},
-				{ transaction }
+				transaction
 			);
 		} catch (historyErr) {
 			console.error('History 생성 실패:', historyErr);
