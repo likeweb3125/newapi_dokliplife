@@ -522,6 +522,8 @@ exports.mngChartMain = async (req, res, next) => {
 				RCW.customerAge AS contractorAge,
 				PL.paymentAmount,
 				PL.pyl_goods_amount,
+				PL.paymentPoint,
+				PL.paymentCoupon,
 				GA.ceo AS adminName,
 				CASE WHEN RC.startDate IS NOT NULL AND RC.endDate IS NOT NULL THEN (
 					SELECT D.rdp_eid FROM il_room_deposit D
@@ -573,7 +575,9 @@ exports.mngChartMain = async (req, res, next) => {
 				SELECT 
 					contractEsntlId,
 					SUM(CAST(paymentAmount AS UNSIGNED)) AS paymentAmount,
-					SUM(pyl_goods_amount) AS pyl_goods_amount
+					SUM(pyl_goods_amount) AS pyl_goods_amount,
+					SUM(COALESCE(paymentPoint, 0)) AS paymentPoint,
+					SUM(COALESCE(paymentCoupon, 0)) AS paymentCoupon
 				FROM paymentLog
 				WHERE withdrawalStatus != 'WITHDRAWAL'
 					AND (extrapayEsntlId IS NULL OR extrapayEsntlId = '')
@@ -720,6 +724,8 @@ exports.mngChartMain = async (req, res, next) => {
 				contractType: null,
 				entryFee: null,
 				paymentAmount: null,
+				paymentPoint: null,
+				paymentCoupon: null,
 				accountInfo: null,
 				deposit: null,
 				additionalPaymentOption: null,
@@ -764,6 +770,8 @@ exports.mngChartMain = async (req, res, next) => {
 				}
 				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
 				if (hasContract && (parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
+				if (hasContract && (parseInt(row.paymentPoint) || 0) > 0) reserveOverrides.paymentPoint = parseInt(row.paymentPoint) || 0;
+				if (hasContract && (parseInt(row.paymentCoupon) || 0) > 0) reserveOverrides.paymentCoupon = parseInt(row.paymentCoupon) || 0;
 				if (hasContract && (parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
 				if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') reserveOverrides.depositEsntlId = row.depositEsntlId;
 				if (row.depositCompleteDate != null) reserveOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
@@ -812,6 +820,8 @@ exports.mngChartMain = async (req, res, next) => {
 					contractOverrides.contractType = contractType;
 					contractOverrides.entryFee = entryFee > 0 ? `${entryFee}` : '0';
 					contractOverrides.paymentAmount = paymentAmount > 0 ? `${paymentAmount}` : '0';
+					contractOverrides.paymentPoint = (parseInt(row.paymentPoint) || 0) > 0 ? parseInt(row.paymentPoint) : 0;
+					contractOverrides.paymentCoupon = (parseInt(row.paymentCoupon) || 0) > 0 ? parseInt(row.paymentCoupon) : 0;
 					contractOverrides.accountInfo = accountInfo;
 					contractOverrides.deposit = deposit > 0 ? `${deposit.toLocaleString()} 원` : '0 원';
 					if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') contractOverrides.depositEsntlId = row.depositEsntlId;
@@ -849,6 +859,8 @@ exports.mngChartMain = async (req, res, next) => {
 					checkoutOverrides.contractType = row.contractDate && row.contractStartDate ? getContractType(row.contractDate, row.contractStartDate) : '';
 					checkoutOverrides.entryFee = row.pyl_goods_amount ? `${row.pyl_goods_amount}` : '0';
 					checkoutOverrides.paymentAmount = (parseInt(row.paymentAmount) || 0) > 0 ? `${parseInt(row.paymentAmount) || 0}` : '0';
+					checkoutOverrides.paymentPoint = (parseInt(row.paymentPoint) || 0) > 0 ? parseInt(row.paymentPoint) : 0;
+					checkoutOverrides.paymentCoupon = (parseInt(row.paymentCoupon) || 0) > 0 ? parseInt(row.paymentCoupon) : 0;
 					checkoutOverrides.accountInfo = row.customerBank && row.customerBankAccount ? `${row.customerBank} ${row.customerBankAccount} ${contractorName}` : '-';
 					checkoutOverrides.deposit = (parseInt(row.roomDeposit) || 0) > 0 ? `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원` : '0 원';
 					if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') checkoutOverrides.depositEsntlId = row.depositEsntlId;
@@ -993,6 +1005,8 @@ exports.mngChartMain = async (req, res, next) => {
 				contractType: null,
 				entryFee: null,
 				paymentAmount: null,
+				paymentPoint: null,
+				paymentCoupon: null,
 				accountInfo: null,
 				deposit: null,
 				additionalPaymentOption: null,
@@ -1034,11 +1048,13 @@ exports.mngChartMain = async (req, res, next) => {
 				contractType: null,
 				entryFee: null,
 				paymentAmount: null,
+				paymentPoint: null,
+				paymentCoupon: null,
 				accountInfo: null,
 				deposit: null,
 				additionalPaymentOption: null,
 			});
-		});
+			});
 
 		// history 테이블: roomEsntlId·createdAt 기준 조회 후 roomStatuses content에 추가, start/end는 createdAt 반영
 		const roomIds = groups.map((g) => g.id || g.roomEsntlId).filter(Boolean);

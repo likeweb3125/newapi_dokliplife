@@ -364,6 +364,16 @@ router.get('/list', roomContractController.getContractList);
  *                           type: string
  *                           nullable: true
  *                           description: "메인 결제 금액 (최신 일반 결제 1건의 paymentAmount). 없으면 null"
+ *                         entryFee:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입실료/상품금액 (최신 일반 결제 1건의 pyl_goods_amount). 없으면 null"
+ *                         paymentPoint:
+ *                           type: integer
+ *                           description: "포인트 결제 금액 (최신 일반 결제 1건)"
+ *                         paymentCoupon:
+ *                           type: integer
+ *                           description: "쿠폰 결제 금액 (최신 일반 결제 1건)"
  *                         pDate:
  *                           type: string
  *                           nullable: true

@@ -362,6 +362,8 @@ exports.getContractDetail = async (req, res, next) => {
 				PL.pyl_goods_amount,
 				PL.paymentAmount AS rawPaymentAmount,
 				FORMAT(IFNULL(PL.paymentAmount, 0), 0) AS paymentAmount,
+				PL.paymentPoint,
+				PL.paymentCoupon,
 				PL.paymentType,
 				PL.calculateStatus,
 				PL.code,
@@ -390,6 +392,19 @@ exports.getContractDetail = async (req, res, next) => {
 			paymentLogList && paymentLogList.length > 0
 				? (paymentLogList[0].rawPaymentAmount ?? paymentLogList[0].paymentAmount ?? null)
 				: null;
+		// 입실료(상품금액), 포인트·쿠폰 (최신 일반 결제 1건 기준)
+		contractInfo.entryFee =
+			paymentLogList && paymentLogList.length > 0
+				? (paymentLogList[0].pyl_goods_amount ?? null)
+				: null;
+		contractInfo.paymentPoint =
+			paymentLogList && paymentLogList.length > 0
+				? (parseInt(paymentLogList[0].paymentPoint, 10) || 0)
+				: 0;
+		contractInfo.paymentCoupon =
+			paymentLogList && paymentLogList.length > 0
+				? (parseInt(paymentLogList[0].paymentCoupon, 10) || 0)
+				: 0;
 		// 메인 결제와 같은 행의 결제일·결제시간 (pDate, pTime)
 		contractInfo.pDate =
 			paymentLogList && paymentLogList.length > 0 ? (paymentLogList[0].pDate ?? null) : null;

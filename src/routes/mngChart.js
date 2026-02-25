@@ -228,6 +228,12 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           paymentAmount:
  *                             type: string
  *                             description: '결제 금액 (예: 70 만원)'
+ *                           paymentPoint:
+ *                             type: integer
+ *                             description: '포인트 결제 금액'
+ *                           paymentCoupon:
+ *                             type: integer
+ *                             description: '쿠폰 결제 금액'
  *                           accountInfo:
  *                             type: string
  *                             description: 계좌 정보 (은행 계좌번호 계약자명)
