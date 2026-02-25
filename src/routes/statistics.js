@@ -118,7 +118,7 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  * /v1/stats/realTimeList:
  *   post:
  *     summary: 실시간 매출 현황 상세 목록 조회
- *     description: 날짜를 입력받아 해당 기간의 결제 상세 목록을 조회합니다. DataTables 형식으로 반환됩니다.
+ *     description: "날짜 또는 방 ID를 입력받아 결제 상세 목록을 조회합니다. roomEsntlId만 있으면 해당 방의 전체 결제 조회(기간 제한 없음). roomEsntlId와 date 둘 다 있으면 해당 방·기간으로 필터. date만 있으면 해당 기간 전체 조회. date 또는 roomEsntlId 중 하나는 필수. DataTables 형식으로 반환됩니다."
  *     tags: [실시간 결제]
  *     security:
  *       - bearerAuth: []
@@ -128,13 +128,15 @@ router.post('/realTimeStats', isAuthMiddleware.isAuthAdmin, statController.getRe
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - date
  *             properties:
  *               date:
  *                 type: string
- *                 description: '날짜 (예: 2025, 2025-07, 2025-07-01)'
+ *                 description: "날짜 (예: 2025, 2025-07, 2025-07-01). roomEsntlId 없을 때 필수."
  *                 example: '2025-07'
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: "방 ID. 있으면 해당 방 기준 조회. date 없으면 전체, date 있으면 해당 기간만."
+ *                 example: 'ROOM0000019357'
  *               page:
  *                 type: integer
  *                 description: '페이지 번호 (기본값: 1)'

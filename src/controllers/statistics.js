@@ -639,16 +639,33 @@ exports.getRealTimeStats = async (req, res, next) => {
 // 실시간 매출 현황 상세 목록 조회
 exports.getRealTimeList = async (req, res, next) => {
 	try {
-		const { date, page = 1, limit = 10, start = 0, length = 10 } = req.body;
+		const { date, roomEsntlId, page = 1, limit = 10, start = 0, length = 10 } = req.body;
 
-		if (!date) {
-			errorHandler.errorThrow(400, 'date는 필수입니다.');
+		// date 또는 roomEsntlId 중 하나는 필수
+		if (!roomEsntlId && !date) {
+			errorHandler.errorThrow(400, 'date 또는 roomEsntlId 중 하나는 필수입니다.');
 		}
 
 		// DataTables 파라미터 처리
 		const pageNum = parseInt(page) || Math.floor(parseInt(start) / parseInt(length)) + 1 || 1;
 		const limitNum = parseInt(limit) || parseInt(length) || 10;
 		const offset = (pageNum - 1) * limitNum;
+
+		// WHERE 조건: 방 ID 있으면 방 조건 추가. 날짜 있으면 날짜 조건 추가. 방 ID만 있으면 전체, 둘 다 있으면 둘 다 적용
+		const whereConditions = ['pl.calculateStatus = \'SUCCESS\''];
+		const mainReplacements = [];
+		if (roomEsntlId) {
+			whereConditions.push('pl.roomEsntlId = ?');
+			mainReplacements.push(String(roomEsntlId).trim());
+		}
+		if (date) {
+			whereConditions.push('pl.pDate LIKE CONCAT(?, \'%\')');
+			mainReplacements.push(date);
+		}
+		mainReplacements.push(limitNum, offset);
+		const countReplacements = [...mainReplacements.slice(0, -2)]; // limit, offset 제외
+
+		const whereClause = whereConditions.join(' AND ');
 
 		// 메인 쿼리 (extrapayEsntlId 있으면 extraPayment.extendWithPayment 함께 조회, roomContractWho로 입실자/계약자 정보)
 		const mainQuery = `
@@ -705,13 +722,11 @@ exports.getRealTimeList = async (req, res, next) => {
 			FROM paymentLog pl
 			LEFT JOIN customer c ON pl.customerEsntlId = c.esntlId
 			LEFT JOIN extraPayment ep ON pl.extrapayEsntlId = ep.esntlId
-			JOIN room r ON pl.roomEsntlId = r.esntlId
-			JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
-			JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
+			LEFT JOIN room r ON pl.roomEsntlId = r.esntlId
+			LEFT JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
+			LEFT JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
 			LEFT JOIN roomContractWho RCW ON rc.esntlId = RCW.contractEsntlId
-			WHERE 1=1
-				AND pl.calculateStatus = 'SUCCESS'
-				AND pl.pDate LIKE CONCAT(?, '%')
+			WHERE ${whereClause}
 			ORDER BY pl.esntlId DESC
 			LIMIT ? OFFSET ?
 		`;
@@ -720,22 +735,19 @@ exports.getRealTimeList = async (req, res, next) => {
 		const countQuery = `
 			SELECT COUNT(*) AS total
 			FROM paymentLog pl
-			LEFT JOIN customer c ON pl.customerEsntlId = c.esntlId
-			JOIN room r ON pl.roomEsntlId = r.esntlId
-			JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
-			JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
-			WHERE 1=1
-				AND pl.calculateStatus = 'SUCCESS'
-				AND pl.pDate LIKE CONCAT(?, '%')
+			LEFT JOIN room r ON pl.roomEsntlId = r.esntlId
+			LEFT JOIN gosiwonUse gu ON pl.gosiwonEsntlId = gu.esntlId
+			LEFT JOIN roomContract AS rc ON rc.esntlId = pl.contractEsntlId
+			WHERE ${whereClause}
 		`;
 
 		const [rows, countResult] = await Promise.all([
 			mariaDBSequelize.query(mainQuery, {
-				replacements: [date, limitNum, offset],
+				replacements: mainReplacements,
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}),
 			mariaDBSequelize.query(countQuery, {
-				replacements: [date],
+				replacements: countReplacements,
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}),
 		]);
