@@ -1999,7 +1999,7 @@ exports.getFreeRoomList = async (req, res, next) => {
 			WHERE R.gosiwonEsntlId = :goID
 				AND R.deleteYN = 'N'
 				AND R.status IN ('OPEN', 'EMPTY', 'LEAVE')
-			ORDER BY R.orderNo ASC
+			ORDER BY R.roomNumber ASC
 		`;
 
 		const roomList = await mariaDBSequelize.query(query, {

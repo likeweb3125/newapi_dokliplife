@@ -48,7 +48,7 @@ const extraPaymentController = require('../controllers/extraPayment');
  *                       example: 주차비
  *                     cost:
  *                       type: integer
- *                       description: '비용 (음수 입력 가능 - 부분 환불 시)'
+ *                       description: "비용 (1,000원 이상, 음수 입력 가능 - 부분 환불 시)"
  *                       example: 20000
  *                     memo:
  *                       type: string

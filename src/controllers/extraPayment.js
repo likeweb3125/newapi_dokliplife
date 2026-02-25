@@ -212,6 +212,9 @@ exports.roomExtraPayment = async (req, res, next) => {
 			if (cost === undefined || cost === null) {
 				errorHandler.errorThrow(400, 'cost를 입력해주세요.');
 			}
+			if (Number(cost) < 1000) {
+				errorHandler.errorThrow(400, '1,000원 이상 결제 가능합니다.');
+			}
 
 			// esntlId 생성
 			const esntlId = await generateExtraPaymentId(transaction);
