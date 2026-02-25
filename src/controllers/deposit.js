@@ -1647,8 +1647,8 @@ exports.getDepositList = async (req, res, next) => {
 					WHEN DH.status IN ('COMPLETED', 'RETURN_COMPLETED') THEN 'COMPLETE'
 					ELSE DH.status
 				END) as depositStatus,
-				(SELECT COALESCE(SUM(H_sum.amount), 0) FROM il_room_deposit_history H_sum WHERE H_sum.depositEsntlId = D.rdp_eid) as depositLastestAmount,
-				MAX(DATE_FORMAT(D.rdp_regist_dtm, '%Y-%m-%d %H:%i')) as depositLastestTime,
+				(SELECT COALESCE(SUM(H_sum.amount), 0) FROM il_room_deposit_history H_sum WHERE H_sum.depositEsntlId = D.rdp_eid AND H_sum.type = 'DEPOSIT') as depositLastestAmount,
+				(SELECT DATE_FORMAT(MAX(H_dep.createdAt), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_dep WHERE H_dep.depositEsntlId = D.rdp_eid AND H_dep.type = 'DEPOSIT') as depositLastestTime,
 				MAX(D.rdp_regist_dtm) as depositCreatedAt,
 				(
 					SELECT H_ret.status
@@ -1714,8 +1714,9 @@ exports.getDepositList = async (req, res, next) => {
 				INNER JOIN (
 					SELECT depositEsntlId, MAX(createdAt) as maxCreatedAt
 					FROM il_room_deposit_history
+					WHERE type = 'DEPOSIT'
 					GROUP BY depositEsntlId
-				) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt
+				) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt AND H1.type = 'DEPOSIT'
 			) DH ON D.rdp_eid = DH.depositEsntlId
 			${whereClause}
 			GROUP BY D.rdp_eid
