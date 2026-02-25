@@ -996,6 +996,66 @@ exports.updateRefundRequestStatus = async (req, res, next) => {
 	}
 };
 
+// 환불 확정/반려 (refundConfirm)
+exports.refundConfirm = async (req, res, next) => {
+	const transaction = await mariaDBSequelize.transaction();
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+
+		const { contractId, type, reason } = req.body;
+
+		if (!contractId) {
+			errorHandler.errorThrow(400, 'contractId(계약서 ID)는 필수입니다.');
+		}
+		if (!type) {
+			errorHandler.errorThrow(400, 'type은 필수입니다.');
+		}
+
+		const validTypes = ['APPROVAL', 'REJECT'];
+		if (!validTypes.includes(type)) {
+			errorHandler.errorThrow(
+				400,
+				`type은 ${validTypes.join(', ')} 중 하나여야 합니다.`
+			);
+		}
+
+		let processStatusCd = type;
+		let processReason =
+			reason && String(reason).trim()
+				? String(reason).trim()
+				: type === 'APPROVAL'
+					? '환불완료'
+					: '환불불가';
+
+		const query = `
+			UPDATE il_room_refund_request 
+			SET rrr_process_status_cd = ?,
+				rrr_process_reason = ?,
+				rrr_update_dtm = NOW(),
+				rrr_updater_id = ?
+			WHERE ctt_eid = ?
+		`;
+
+		const [result] = await mariaDBSequelize.query(query, {
+			replacements: [processStatusCd, processReason, writerAdminId, contractId],
+			type: mariaDBSequelize.QueryTypes.UPDATE,
+			transaction,
+		});
+
+		await transaction.commit();
+
+		if (result?.affectedRows === 0) {
+			errorHandler.errorThrow(404, '해당 계약의 환불 요청을 찾을 수 없습니다.');
+		}
+
+		return errorHandler.successThrow(res, '환불 처리 확정 완료');
+	} catch (error) {
+		await transaction.rollback();
+		next(error);
+	}
+};
+
 // 환불 데이터 조회 (결제 정보 포함)
 exports.getRefundData = async (req, res, next) => {
 	try {

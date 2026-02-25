@@ -407,6 +407,63 @@ router.put('/updateStatus', refundController.updateRefundRequestStatus);
 
 /**
  * @swagger
+ * /v1/refund/refundConfirm:
+ *   put:
+ *     summary: 환불 확정/반려
+ *     description: "계약서 ID를 기준으로 il_room_refund_request의 rrr_process_status_cd, rrr_process_reason을 업데이트합니다. type이 APPROVAL이면 승인(사유 없으면 환불완료), REJECT이면 반려(사유 없으면 환불불가)로 처리합니다."
+ *     tags: [계약현황]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contractId
+ *               - type
+ *             properties:
+ *               contractId:
+ *                 type: string
+ *                 description: 계약서 고유 아이디
+ *                 example: 'RCTT0000000001'
+ *               type:
+ *                 type: string
+ *                 enum: [APPROVAL, REJECT]
+ *                 description: "APPROVAL(승인)이면 rrr_process_status_cd=APPROVAL, rrr_process_reason=reason 또는 환불완료. REJECT(반려)이면 rrr_process_status_cd=REJECT, rrr_process_reason=reason 또는 환불불가"
+ *                 example: 'APPROVAL'
+ *               reason:
+ *                 type: string
+ *                 description: "처리 사유 (선택). 없으면 APPROVAL 시 환불완료, REJECT 시 환불불가로 설정"
+ *                 example: '환불 승인 완료'
+ *     responses:
+ *       200:
+ *         description: 환불 처리 확정 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 환불 처리 확정 완료
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/refundConfirm', refundController.refundConfirm);
+
+/**
+ * @swagger
  * /v1/refund/refundData:
  *   get:
  *     summary: 환불 데이터 조회 (결제 정보 포함)
