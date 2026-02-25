@@ -45,13 +45,13 @@ const getDateStringDaysFrom = (dateStr, daysAgo) => {
 
 /**
  * GET /v1/dashboard/stats
- * 기준일 포함 최근 30일간 일별: 회원 방문자 수, 계약 건수, 매출을 반환.
+ * 기준일 포함 최근 7일간 일별: 회원 방문자 수, 계약 건수, 매출을 반환.
  * query.date(YYYY-MM-DD) 미입력 시 오늘을 기준일로 사용.
  */
 exports.getStats = async (req, res, next) => {
 	try {
 		const endStr = isValidDateString(req.query.date) ? req.query.date : getTodayDateString();
-		const startStr = getDateStringDaysFrom(endStr, 29); // 기준일 포함 30일
+		const startStr = getDateStringDaysFrom(endStr, 6); // 기준일 포함 7일
 
 		// 1) 회원 방문자 수 - yn_access_log, asl_regist_dtm 기준 일별, asl_user_id DISTINCT (NULL 제외)
 		const visitorQuery = `
@@ -107,10 +107,10 @@ exports.getStats = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 날짜별 객체로 채우기 (기준일 포함 30일, 빈 날은 0으로)
+		// 날짜별 객체로 채우기 (기준일 포함 7일, 빈 날은 0으로)
 		const dateMap = {};
-		for (let i = 0; i < 30; i++) {
-			const key = getDateStringDaysFrom(endStr, 29 - i);
+		for (let i = 0; i < 7; i++) {
+			const key = getDateStringDaysFrom(endStr, 6 - i);
 			dateMap[key] = {
 				date: key,
 				visitorCount: 0,

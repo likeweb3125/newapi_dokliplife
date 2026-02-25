@@ -16,7 +16,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  * /v1/dashboard/stats:
  *   get:
  *     summary: 대시보드 통계 (일별)
- *     description: "기준일 포함 최근 30일간 일별로 회원 방문자 수(yn_access_log), 계약 건수(roomContract), 매출(il_daily_selling_closing)을 조회합니다. query.date 미입력 시 오늘을 기준일로 사용. 회원 방문자 수는 asl_user_id 기준 DISTINCT, 계약 건수는 취소 제외, 매출은 결제(PAYMENT)/환불(REFUND) 구분하여 집계합니다."
+ *     description: "기준일 포함 최근 7일간 일별로 회원 방문자 수(yn_access_log), 계약 건수(roomContract), 매출(il_daily_selling_closing)을 조회합니다. query.date 미입력 시 오늘을 기준일로 사용. 회원 방문자 수는 asl_user_id 기준 DISTINCT, 계약 건수는 취소 제외, 매출은 결제(PAYMENT)/환불(REFUND) 구분하여 집계합니다."
  *     tags: [dashboard]
  *     security:
  *       - bearerAuth: []
@@ -27,7 +27,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *           type: string
  *           format: date
  *           example: "2026-02-20"
- *         description: "집계 종료 기준일 (YYYY-MM-DD). 미입력 시 오늘. 해당일 포함 직전 30일 구간을 반환합니다."
+ *         description: "집계 종료 기준일 (YYYY-MM-DD). 미입력 시 오늘. 해당일 포함 직전 7일 구간을 반환합니다."
  *     responses:
  *       200:
  *         description: 대시보드 통계 조회 성공
@@ -53,7 +53,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                       description: "집계 종료일 (YYYY-MM-DD, 요청한 date 또는 오늘)"
  *                     daily:
  *                       type: array
- *                       description: "일별 통계 배열 (30일)"
+ *                       description: "일별 통계 배열 (7일)"
  *                       items:
  *                         type: object
  *                         properties:
@@ -80,7 +80,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                             description: "해당일 환불 총액"
  *                     summary:
  *                       type: object
- *                       description: "30일 합계"
+ *                       description: "7일 합계"
  *                       properties:
  *                         totalVisitorCount:
  *                           type: integer
