@@ -137,8 +137,7 @@ const roomAfterUse = async (
 		);
 		await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
 
-		// CAN_CHECKIN 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
-		await closeOpenStatusesForRoom(roomEsntlId, can_checkin_start_date, transaction);
+		// CAN_CHECKIN 상태 레코드 생성 (closeOpenStatusesForRoom 생략: 위 sell_able_start_date로 이미 처리됨. 재호출 시 방금 넣은 ON_SALE의 statusEndDate가 덮어씌워질 수 있음)
 		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
 		createdStatusIds.push(canCheckinId);
 		const canCheckinStartDate = new Date(can_checkin_start_date);
