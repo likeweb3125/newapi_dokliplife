@@ -121,7 +121,7 @@ module.exports = (sequelize, DataTypes) => {
 				allowNull: false,
 				defaultValue: 'PENDING',
 				field: 'paymentStatus',
-				comment: '결제 상태 (PENDING: 결제대기, COMPLETED: 결제완료, CANCELLED: 결제취소, FAILED: 결제실패)',
+				comment: "결제 상태 (PENDING: 결제대기, COMPLETED: 결제완료, CANCELLED: 결제취소, FAILED: 결제실패, FIN: 만료/종료)",
 			},
 			paymentType: {
 				type: DataTypes.STRING(50),

@@ -582,6 +582,20 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			}
 		);
 
+		// 해당 계약서의 extraPayment 항목을 만료 처리 (paymentStatus = 'FIN')
+		await mariaDBSequelize.query(
+			`
+			UPDATE extraPayment
+			SET paymentStatus = 'FIN', updatedAt = NOW()
+			WHERE contractEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N')
+		`,
+			{
+				replacements: [contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
 		// roomAfterUse 함수 호출
 		if (
 			check_basic_sell !== undefined ||

@@ -3,7 +3,7 @@
  * - roomStatus에서 statusEndDate가 기준일 이전인 건을 대상으로:
  *   1) status가 CHECKOUT_CONFIRMED인 경우: il_room_deposit(해당 방·계약자명·계약자 전화번호)의 rdp_return_dtm 여부에 따라
  *      rdp_return_dtm이 null이면 status를 END_DEPOSIT, 있으면 END로 업데이트
- *   2) status가 CHECKOUT_CONFIRMED가 아닌 경우: status를 OVERDUE로 업데이트
+ *   2) status가 CONTRACT이고 statusEndDate가 기준일 이전인 경우: status를 OVERDUE로 업데이트
  * - 매일 00:05 스케줄러에서 호출
  * - 수동 실행: GET /v1/room/daily/statusEnd (query.date 없으면 당일 기준)
  */
@@ -102,14 +102,13 @@ async function run(dateStr) {
 			result.checkoutConfirmedProcessed += 1;
 		}
 
-		// 2) CHECKOUT_CONFIRMED가 아니고 statusEndDate가 기준일 이전인 roomStatus를 OVERDUE로 일괄 업데이트
+		// 2) CONTRACT이고 statusEndDate가 기준일 이전인 roomStatus를 OVERDUE로 일괄 업데이트
 		const [overdueMeta] = await mariaDBSequelize.query(
 			`
 			UPDATE roomStatus
 			SET status = 'OVERDUE', updatedAt = NOW()
 			WHERE (deleteYN IS NULL OR deleteYN = 'N')
-				AND status <> 'CHECKOUT_CONFIRMED'
-				AND status NOT IN ('END_DEPOSIT', 'END', 'ON_SALE', 'BEFORE_SALES', 'ETC', 'CHECKOUT_ONSALE', 'CAN_CHECKIN')
+				AND status = 'CONTRACT'
 				AND DATE(statusEndDate) < ?
 			`,
 			{
