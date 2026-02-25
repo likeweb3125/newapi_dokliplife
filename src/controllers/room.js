@@ -7,6 +7,7 @@ const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus, ROOM_STATUS_TO_RS_STATUS_LIST } = require('../utils/roomStatusHelper');
 const { dateToYmd } = require('../utils/dateHelper');
+const formatAge = require('../utils/formatAge');
 const { sendContractLinkSMS } = require('../utils/contractLinkSms');
 
 // 공통 토큰 검증 함수
@@ -2050,7 +2051,9 @@ exports.getTourReservationList = async (req, res, next) => {
 				T.rtr_registrant_id AS registrantId,
 				DATE_FORMAT(T.rtr_confirm_dtm, '%Y-%m-%d %H:%i:%s') AS confirmDtm,
 				C.name AS applicantName,
-				C.phone AS applicantPhone
+				C.phone AS applicantPhone,
+				C.gender AS applicantGender,
+				C.birth AS applicantBirth
 			FROM il_tour_reservation T
 			LEFT JOIN room R ON R.esntlId = T.rom_eid
 			LEFT JOIN customer C ON C.esntlId = T.cus_eid
@@ -2094,6 +2097,8 @@ exports.getTourReservationList = async (req, res, next) => {
 			confirmDtm: row.confirmDtm ?? null,
 			applicantName: row.applicantName ?? null,
 			applicantPhone: row.applicantPhone ?? null,
+			applicantGender: row.applicantGender ?? null,
+			applicantAge: formatAge(row.applicantBirth),
 		}));
 
 		return errorHandler.successThrow(res, '룸 투어 예약 목록 조회 성공', {

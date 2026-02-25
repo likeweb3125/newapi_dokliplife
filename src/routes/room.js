@@ -434,6 +434,13 @@ router.get('/list', roomController.getRoomList);
  *                           applicantPhone:
  *                             type: string
  *                             description: 연락처 (customer.phone)
+ *                           applicantGender:
+ *                             type: string
+ *                             description: 예약자 성별 (customer.gender)
+ *                           applicantAge:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 예약자 만 나이 (customer.birth 기준)
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

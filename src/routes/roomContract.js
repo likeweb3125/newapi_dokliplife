@@ -514,7 +514,7 @@ router.get('/detail', roomContractController.getContractDetail);
  * /v1/roomContract/detail:
  *   put:
  *     summary: 계약 정보 수정
- *     description: 계약 정보를 수정합니다. roomContract, customer(입주자), customer(계약자), deposit, room 테이블의 정보를 수정할 수 있습니다.
+ *     description: "계약 정보를 수정합니다. roomContract, customer(입주자), customer(계약자), room 테이블의 정보를 수정할 수 있습니다."
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -682,7 +682,7 @@ router.put('/detail', roomContractController.updateContract);
  * /v1/roomContract/depositAndExtra:
  *   get:
  *     summary: 보증금 및 추가 결제 정보 조회
- *     description: 계약서 ID를 입력받아 고시원 ID, 방 ID, 계약서 ID를 기본으로 반환하고, extraPayment 테이블에서 계약서 ID를 기준으로 결제 내역을 모두 조회하며, deposit 테이블에서 해당 계약의 보증금 정보를 조회합니다.
+ *     description: "계약서 ID를 입력받아 고시원 ID, 방 ID, 계약서 ID를 기본으로 반환하고, extraPayment 테이블에서 결제 내역을 조회하며, il_room_deposit에서 계약 입실자/계약자/방id로 매칭된 보증금 정보를 조회합니다."
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -814,7 +814,7 @@ router.put('/detail', roomContractController.updateContract);
  *                             description: 수정일
  *                     depositData:
  *                       type: array
- *                       description: 보증금 정보 목록
+ *                       description: "il_room_deposit 기반 보증금 정보 목록 (입실자/계약자/방id 매칭, 구 deposit 응답 포맷 유지)"
  *                       items:
  *                         type: object
  *                         properties:

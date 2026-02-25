@@ -1,4 +1,4 @@
-const { mariaDBSequelize, room, customer, deposit, extraPayment, paymentLog } = require('../models');
+const { mariaDBSequelize, room, customer, extraPayment, paymentLog } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const historyController = require('./history');
@@ -556,7 +556,7 @@ exports.updateContract = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 정보 조회 (roomContractWho 포함)
+		// 계약 정보 조회 (roomContractWho 포함, deposit 테이블 제거)
 		const contractInfo = await mariaDBSequelize.query(
 			`
 			SELECT 
@@ -571,13 +571,14 @@ exports.updateContract = async (req, res, next) => {
 				RCW.customerAge AS customerAge,
 				RCW.emergencyContact AS emergencyContact,
 				C.birth AS customerBirth,
-				D.contractorEsntlId,
-				D.accountHolder AS depositAccountHolder
+				RC.customerEsntlId AS contractorEsntlId,
+				(SELECT ICR.cre_account_holder FROM il_customer_refund ICR
+				 WHERE ICR.cus_eid = RC.customerEsntlId AND ICR.cre_delete_dtm IS NULL
+				 ORDER BY ICR.cre_regist_dtm DESC LIMIT 1) AS depositAccountHolder
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
-			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`,
@@ -824,32 +825,6 @@ exports.updateContract = async (req, res, next) => {
 			}
 		}
 
-		// deposit 테이블 업데이트 (예금주)
-		const depositUpdateData = {};
-		const { accountHolder } = req.body;
-
-		if (contract.contractorEsntlId) {
-			const depositInfo = await deposit.findOne({
-				where: {
-					contractEsntlId: contractEsntlId,
-					deleteYN: 'N',
-				},
-				transaction,
-			});
-
-			if (depositInfo) {
-				if (
-					accountHolder !== undefined &&
-					accountHolder !== depositInfo.accountHolder
-				) {
-					depositUpdateData.accountHolder = accountHolder;
-					changes.push(
-						`예금주: ${depositInfo.accountHolder || '없음'} → ${accountHolder}`
-					);
-				}
-			}
-		}
-
 		// 업데이트 실행
 		if (Object.keys(contractUpdateData).length > 0) {
 			const setClause = Object.keys(contractUpdateData)
@@ -905,16 +880,6 @@ exports.updateContract = async (req, res, next) => {
 			});
 		}
 
-		if (Object.keys(depositUpdateData).length > 0) {
-			await deposit.update(depositUpdateData, {
-				where: {
-					contractEsntlId: contractEsntlId,
-					deleteYN: 'N',
-				},
-				transaction,
-			});
-		}
-
 		// 히스토리 생성
 		if (changes.length > 0) {
 			try {
@@ -962,14 +927,20 @@ exports.getDepositAndExtra = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id, monthlyRent)
+		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id, monthlyRent, 입실자/계약자)
 		const contractQuery = `
 			SELECT 
 				RC.esntlId AS contractEsntlId,
 				RC.gosiwonEsntlId,
 				RC.roomEsntlId,
-				RC.monthlyRent AS monthlyRent
+				RC.customerEsntlId,
+				RC.monthlyRent AS monthlyRent,
+				RCW.checkinName,
+				RCW.checkinPhone,
+				RCW.customerName AS contractorName,
+				RCW.customerPhone AS contractorPhone
 			FROM roomContract RC
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`;
@@ -1054,14 +1025,146 @@ exports.getDepositAndExtra = async (req, res, next) => {
 			};
 		});
 
-		// deposit 테이블에서 해당 계약의 보증금 정보 조회
-		const depositList = await deposit.findAll({
-			where: {
-				contractEsntlId: contractEsntlId,
-			},
-			order: [['createdAt', 'DESC']],
-			raw: true,
+		// il_room_deposit에서 계약서 입실자/계약자/방id로 매칭하여 보증금 정보 조회 (구 deposit 응답 포맷 유지)
+		const checkinName = (contractInfo.checkinName && String(contractInfo.checkinName).trim()) || '';
+		const checkinPhone = (contractInfo.checkinPhone && String(contractInfo.checkinPhone).trim()) || '';
+		const contractorName = (contractInfo.contractorName && String(contractInfo.contractorName).trim()) || '';
+		const contractorPhone = (contractInfo.contractorPhone && String(contractInfo.contractorPhone).trim()) || '';
+		const hasCheckin = checkinName || checkinPhone;
+		const hasContractor = contractorName || contractorPhone;
+
+		// [depositAndExtra] 디버그 로그
+		console.log('[depositAndExtra] contractEsntlId:', contractEsntlId);
+		console.log('[depositAndExtra] contractInfo(원본):', {
+			gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+			roomEsntlId: contractInfo.roomEsntlId,
+			checkinName: contractInfo.checkinName,
+			checkinPhone: contractInfo.checkinPhone,
+			contractorName: contractInfo.contractorName,
+			contractorPhone: contractInfo.contractorPhone,
 		});
+		console.log('[depositAndExtra] 매칭용(trim):', {
+			checkinName,
+			checkinPhone,
+			contractorName,
+			contractorPhone,
+			hasCheckin,
+			hasContractor,
+		});
+
+		let depositList = [];
+		if (hasCheckin || hasContractor) {
+			const depositQuery = `
+			SELECT
+				D.rdp_eid AS esntlId,
+				D.rom_eid AS roomEsntlId,
+				D.gsw_eid AS gosiwonEsntlId,
+				? AS customerEsntlId,
+				? AS contractorEsntlId,
+				? AS contractEsntlId,
+				'DEPOSIT' AS type,
+				D.rdp_price AS amount,
+				(SELECT COALESCE(SUM(H.amount), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT') AS paidAmount,
+				GREATEST(0, D.rdp_price - (SELECT COALESCE(SUM(H.amount), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT')) AS unpaidAmount,
+				(SELECT H_lat.accountBank FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS accountBank,
+				(SELECT H_lat.accountNumber FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS accountNumber,
+				(SELECT H_lat.accountHolder FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS accountHolder,
+				CASE
+					WHEN D.rdp_delete_dtm IS NOT NULL THEN 'DELETED'
+					WHEN D.rdp_completed_dtm IS NOT NULL THEN 'COMPLETED'
+					ELSE (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1)
+				END AS status,
+				(SELECT H_lat.manager FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS manager,
+				(SELECT H_lat.depositDate FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS depositDate,
+				D.rdp_return_dtm AS returnDate,
+				(SELECT COALESCE(SUM(H.amount + COALESCE(H.deductionAmount, 0)), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'RETURN' AND H.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')) AS returnAmount,
+				NULL AS returnReason,
+				(SELECT H_lat.memo FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS memo,
+				CASE WHEN D.rdp_delete_dtm IS NOT NULL THEN 'Y' ELSE 'N' END AS deleteYN,
+				D.rdp_deleter_id AS deletedBy,
+				D.rdp_delete_dtm AS deletedAt,
+				D.rdp_regist_dtm AS createdAt,
+				D.rdp_update_dtm AS updatedAt
+			FROM il_room_deposit D
+			WHERE D.gsw_eid = ?
+				AND D.rom_eid = ?
+				AND D.rdp_delete_dtm IS NULL
+				AND (
+					(TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR TRIM(IFNULL(D.rdp_customer_phone, '')) = ?))
+					OR (TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR TRIM(IFNULL(D.rdp_customer_phone, '')) = ?))
+				)
+			ORDER BY D.rdp_regist_dtm DESC
+		`;
+
+			const replacements = [
+				contractInfo.customerEsntlId,
+				contractInfo.customerEsntlId,
+				contractEsntlId,
+				contractInfo.gosiwonEsntlId,
+				contractInfo.roomEsntlId,
+				checkinName,
+				checkinPhone,
+				contractorName,
+				contractorPhone,
+			];
+			console.log('[depositAndExtra] deposit 쿼리 replacements:', replacements);
+
+			const depositRows = await mariaDBSequelize.query(depositQuery, {
+				replacements,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			});
+
+			console.log('[depositAndExtra] deposit 매칭 결과 건수:', depositRows?.length ?? 0);
+			if (depositRows?.length > 0) {
+				console.log('[depositAndExtra] deposit 첫 건:', depositRows[0]);
+			} else {
+				// 해당 방·고시원의 il_room_deposit 목록(이름 조건 없이) 조회해 비교용 로그
+				const debugRows = await mariaDBSequelize.query(
+					`SELECT rdp_eid, rom_eid, gsw_eid, rdp_customer_name, rdp_customer_phone, rdp_price, rdp_delete_dtm
+					 FROM il_room_deposit
+					 WHERE gsw_eid = ? AND rom_eid = ? AND rdp_delete_dtm IS NULL
+					 ORDER BY rdp_regist_dtm DESC
+					 LIMIT 10`,
+					{
+						replacements: [contractInfo.gosiwonEsntlId, contractInfo.roomEsntlId],
+						type: mariaDBSequelize.QueryTypes.SELECT,
+					}
+				);
+				console.log('[depositAndExtra] 해당 방 il_room_deposit (이름 조건 제외) 건수:', debugRows?.length ?? 0);
+				console.log('[depositAndExtra] 해당 방 il_room_deposit 샘플:', debugRows?.slice(0, 3) ?? []);
+			}
+
+			// 구 deposit 응답 필드명/타입 맞춤
+			depositList = (depositRows || []).map((row) => ({
+				esntlId: row.esntlId,
+				roomEsntlId: row.roomEsntlId,
+				gosiwonEsntlId: row.gosiwonEsntlId,
+				customerEsntlId: row.customerEsntlId,
+				contractorEsntlId: row.contractorEsntlId,
+				contractEsntlId: row.contractEsntlId,
+				type: row.type,
+				amount: row.amount != null ? Number(row.amount) : null,
+				paidAmount: row.paidAmount != null ? Number(row.paidAmount) : null,
+				unpaidAmount: row.unpaidAmount != null ? Number(row.unpaidAmount) : null,
+				accountBank: row.accountBank,
+				accountNumber: row.accountNumber,
+				accountHolder: row.accountHolder,
+				status: row.status || null,
+				manager: row.manager,
+				depositDate: row.depositDate,
+				returnDate: row.returnDate,
+				returnAmount: row.returnAmount != null ? Number(row.returnAmount) : null,
+				returnReason: row.returnReason,
+				memo: row.memo,
+				deleteYN: row.deleteYN,
+				deletedBy: row.deletedBy,
+				deletedAt: row.deletedAt,
+				createdAt: row.createdAt,
+				updatedAt: row.updatedAt,
+			}));
+		} else {
+			console.log('[depositAndExtra] 입실자/계약자 정보 없음 - deposit 조회 생략');
+		}
 
 		errorHandler.successThrow(res, '보증금 및 추가 결제 정보 조회 성공', {
 			contractEsntlId: contractInfo.contractEsntlId,

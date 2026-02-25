@@ -383,7 +383,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		}
 		const rrr_leave_type_cd = cancelReasonMap[cancelReason];
 
-		// 계약 정보 조회
+		// 계약 정보 조회 (deposit 테이블 제거, roomContractWho에서 계약자 정보 사용)
 		const contractInfo = await mariaDBSequelize.query(
 			`
 			SELECT 
@@ -393,14 +393,12 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				RCW.customerName AS customerName,
 				RCW.customerPhone AS customerPhone,
 				C.name AS customerNameFromCustomer,
-				D.contractorEsntlId,
-				CT.name AS contractorName
+				RC.customerEsntlId AS contractorEsntlId,
+				RCW.customerName AS contractorName
 			FROM roomContract RC
 			JOIN room R ON RC.roomEsntlId = R.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
-			LEFT JOIN deposit D ON D.contractEsntlId = RC.esntlId AND D.deleteYN = 'N'
-			LEFT JOIN customer CT ON D.contractorEsntlId = CT.esntlId
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`,
