@@ -78,6 +78,53 @@ router.get('/daily/roomMove', isAuthMiddleware.isAuthAdmin, roomMoveController.r
 
 /**
  * @swagger
+ * /v1/room/daily/statusEnd:
+ *   get:
+ *     summary: 방상태 종료·체납 정리 수동 실행
+ *     description: "roomStatus에서 statusEndDate가 기준일(또는 당일) 이전인 건을 대상으로, CHECKOUT_CONFIRMED인 경우 il_room_deposit(해당 방·계약자명·계약자 전화번호)의 rdp_return_dtm 여부에 따라 status를 END_DEPOSIT(미반환) 또는 END(반환완료)로, 그 외는 OVERDUE로 업데이트합니다. 매일 00:05 스케줄러는 당일 기준으로 자동 실행됩니다."
+ *     tags: [Room]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2026-02-24"
+ *         description: "기준일 (YYYY-MM-DD). statusEndDate가 이 날짜 이전인 건을 처리. 없으면 당일."
+ *     responses:
+ *       200:
+ *         description: 실행 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "방상태 종료·체납 정리 실행 완료"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     targetDate:
+ *                       type: string
+ *                       description: "기준일 (YYYY-MM-DD)"
+ *                     checkoutConfirmedProcessed:
+ *                       type: integer
+ *                       description: "CHECKOUT_CONFIRMED → END_DEPOSIT/END 처리 건수"
+ *                     overdueUpdated:
+ *                       type: integer
+ *                       description: "OVERDUE로 업데이트된 건수"
+ */
+router.get('/daily/statusEnd', isAuthMiddleware.isAuthAdmin, roomController.runDailyStatusEndAPI);
+
+/**
+ * @swagger
  * /v1/room/daily/reserveReminder:
  *   get:
  *     summary: 예약 리마인더(계약 링크 문자) 수동 실행

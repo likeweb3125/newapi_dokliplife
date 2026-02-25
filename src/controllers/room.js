@@ -2527,3 +2527,28 @@ exports.modifyStatus = async (req, res, next) => {
 	}
 };
 
+/**
+ * 방상태 종료·체납 정리 수동 실행 API (GET /v1/room/daily/statusEnd)
+ * query.date 없으면 당일 기준. 매일 00:05 스케줄러는 당일 기준 자동 실행.
+ */
+exports.runDailyStatusEndAPI = async (req, res, next) => {
+	try {
+		let dateStr = req.query.date;
+		if (dateStr != null && typeof dateStr === 'string') {
+			dateStr = dateStr.trim();
+			if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+				errorHandler.errorThrow(400, 'date는 YYYY-MM-DD 형식이어야 합니다.');
+			}
+		}
+		const dailyStatusEnd = require('../jobs/dailyStatusEnd');
+		const result = await dailyStatusEnd.run(dateStr || null);
+		res.status(200).json({
+			success: true,
+			message: '방상태 종료·체납 정리 실행 완료',
+			data: result,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
