@@ -682,7 +682,7 @@ router.put('/detail', roomContractController.updateContract);
  * /v1/roomContract/depositAndExtra:
  *   get:
  *     summary: 보증금 및 추가 결제 정보 조회
- *     description: "계약서 ID를 입력받아 고시원 ID, 방 ID, 계약서 ID를 기본으로 반환하고, extraPayment 테이블에서 결제 내역을 조회하며, il_room_deposit에서 계약 입실자/계약자/방id로 매칭된 보증금 정보를 조회합니다."
+ *     description: "계약서 ID를 입력받아 고시원 ID, 방 ID, 계약서 ID를 기본으로 반환하고, extraPayment 테이블에서 결제 내역을 조회하며, il_room_deposit에서 고시원 ID + 입실자/계약자(전화번호 필수)로 매칭된 보증금 정보를 조회합니다. 방 ID는 매칭 기준에서 제외됩니다."
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []

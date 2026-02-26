@@ -1045,8 +1045,9 @@ exports.getDepositAndExtra = async (req, res, next) => {
 		const checkinPhone = (contractInfo.checkinPhone && String(contractInfo.checkinPhone).trim()) || '';
 		const contractorName = (contractInfo.contractorName && String(contractInfo.contractorName).trim()) || '';
 		const contractorPhone = (contractInfo.contractorPhone && String(contractInfo.contractorPhone).trim()) || '';
-		const hasCheckin = checkinName || checkinPhone;
-		const hasContractor = contractorName || contractorPhone;
+		// 입실자/계약자 정보로 il_room_deposit 매칭 시 전화번호 필수
+		const hasCheckin = !!checkinPhone;
+		const hasContractor = !!contractorPhone;
 
 		// [depositAndExtra] 디버그 로그
 		console.log('[depositAndExtra] contractEsntlId:', contractEsntlId);
@@ -1095,7 +1096,6 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				(SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN') AS returnLastestTime
 			FROM il_room_deposit D
 			WHERE D.gsw_eid = ?
-				AND D.rom_eid = ?
 				AND D.rdp_delete_dtm IS NULL
 				AND (
 					(TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(IFNULL(D.rdp_customer_phone, '')), '-', ''), ' ', ''), '.', ''), '(', ''), ')', '') = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(IFNULL(?, '')), '-', ''), ' ', ''), '.', ''), '(', ''), ')', '')))
@@ -1106,7 +1106,6 @@ exports.getDepositAndExtra = async (req, res, next) => {
 
 			const replacements = [
 				contractInfo.gosiwonEsntlId,
-				contractInfo.roomEsntlId,
 				checkinName,
 				checkinPhone,
 				contractorName,
@@ -1127,16 +1126,16 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				const debugRows = await mariaDBSequelize.query(
 					`SELECT rdp_eid, rom_eid, gsw_eid, rdp_customer_name, rdp_customer_phone, rdp_price, rdp_delete_dtm
 					 FROM il_room_deposit
-					 WHERE gsw_eid = ? AND rom_eid = ? AND rdp_delete_dtm IS NULL
+					 WHERE gsw_eid = ? AND rdp_delete_dtm IS NULL
 					 ORDER BY rdp_regist_dtm DESC
 					 LIMIT 10`,
 					{
-						replacements: [contractInfo.gosiwonEsntlId, contractInfo.roomEsntlId],
+						replacements: [contractInfo.gosiwonEsntlId],
 						type: mariaDBSequelize.QueryTypes.SELECT,
 					}
 				);
-				console.log('[depositAndExtra] 해당 방 il_room_deposit (이름 조건 제외) 건수:', debugRows?.length ?? 0);
-				console.log('[depositAndExtra] 해당 방 il_room_deposit 샘플:', debugRows?.slice(0, 3) ?? []);
+				console.log('[depositAndExtra] 해당 고시원 il_room_deposit (이름·전화번호 조건 제외) 건수:', debugRows?.length ?? 0);
+				console.log('[depositAndExtra] 해당 고시원 il_room_deposit 샘플:', debugRows?.slice(0, 3) ?? []);
 			}
 
 			// depositList와 동일한 구조로 매핑
