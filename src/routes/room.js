@@ -407,7 +407,8 @@ router.get('/list', roomController.getRoomList);
  *                             description: 방 번호 (방이름)
  *                           status:
  *                             type: string
- *                             description: 예약 상태 (rtr_status)
+ *                             enum: [RESERVE, CANCEL_GOSIWON, ACCEPT, INVALID, CANCEL_USER]
+ *                             description: "예약 상태 (il_tour_reservation.rtr_status)"
  *                           tourDtm:
  *                             type: string
  *                             format: date-time

@@ -130,8 +130,12 @@ exports.getTourItems = async (req, res, next) => {
 			}
 		}
 
-		// 상태 필터
+		// 상태 필터 (RESERVE, CANCEL_GOSIWON, ACCEPT, INVALID, CANCEL_USER)
+		const VALID_TOUR_STATUS = ['RESERVE', 'CANCEL_GOSIWON', 'ACCEPT', 'INVALID', 'CANCEL_USER'];
 		if (status) {
+			if (!VALID_TOUR_STATUS.includes(status)) {
+				errorHandler.errorThrow(400, `status는 ${VALID_TOUR_STATUS.join(', ')} 중 하나여야 합니다.`);
+			}
 			whereClause += ' AND T.rtr_status = ?';
 			replacements.push(status);
 		}

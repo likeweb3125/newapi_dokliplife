@@ -44,8 +44,8 @@ const tourController = require('../controllers/tour');
  *         name: status
  *         schema:
  *           type: string
- *           enum: [ACCEPT, CANCEL_GOSIWON, CANCEL_USER, INVALID]
- *         description: "예약 상태 필터"
+ *           enum: [RESERVE, CANCEL_GOSIWON, ACCEPT, INVALID, CANCEL_USER]
+ *         description: "예약 상태 필터 (il_tour_reservation.rtr_status)"
  *       - in: query
  *         name: search
  *         schema:
@@ -130,6 +130,8 @@ const tourController = require('../controllers/tour');
  *                             description: "방문예약일련번호"
  *                           rtr_status:
  *                             type: string
+ *                             enum: [RESERVE, CANCEL_GOSIWON, ACCEPT, INVALID, CANCEL_USER]
+ *                             description: "예약 상태 (il_tour_reservation.rtr_status)"
  *                           rtr_tour_dtm:
  *                             type: string
  *                             description: "방문일시 (YYYY-MM-DD HH:mm:ss)"
