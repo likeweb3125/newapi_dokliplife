@@ -113,6 +113,20 @@ const options = {
 						},
 					},
 				},
+				Forbidden: {
+					description: '권한 없음 (해당 리소스에 대한 접근 권한이 없음)',
+					content: {
+						'application/json': {
+							schema: {
+								$ref: '#/components/schemas/StandardError',
+							},
+							example: {
+								statusCode: 403,
+								message: '권한이 없습니다.',
+							},
+						},
+					},
+				},
 				NotFound: {
 					description: '리소스를 찾을 수 없음',
 					content: {

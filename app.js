@@ -184,6 +184,9 @@ app.use('/v1/dashboard', dashboardRoutes);
 // 결제 Routes
 app.use('/v1/payment', paymentRoutes);
 
+// 방문 예약 Routes
+app.use('/v1/tour', require('./src/routes/tour'));
+
 app.get('/', (req, res) => {
 	res.send('Welcome to Doklip Life REST API');
 });
