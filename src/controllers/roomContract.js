@@ -927,7 +927,7 @@ exports.getDepositAndExtra = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'contractEsntlId를 입력해주세요.');
 		}
 
-		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id, monthlyRent, 입실자/계약자)
+		// 계약 기본 정보 조회 (고시원id, 방id, 계약서id, monthlyRent, 입실자/계약자, depositList용 필드)
 		const contractQuery = `
 			SELECT 
 				RC.esntlId AS contractEsntlId,
@@ -935,12 +935,27 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				RC.roomEsntlId,
 				RC.customerEsntlId,
 				RC.monthlyRent AS monthlyRent,
+				RC.startDate,
+				RC.endDate,
+				RC.status AS contractStatus,
 				RCW.checkinName,
 				RCW.checkinPhone,
 				RCW.customerName AS contractorName,
-				RCW.customerPhone AS contractorPhone
+				RCW.customerPhone AS contractorPhone,
+				R.roomNumber,
+				G.name AS gosiwonName,
+				C.name AS currentOccupantName,
+				R.customerEsntlId AS currentOccupantID,
+				ICR.cre_bank_name AS customerBank,
+				ICR.cre_account_number AS customerBankAccount,
+				TRIM(CONCAT(IFNULL(ICR.cre_bank_name,''), ' ', IFNULL(ICR.cre_account_number,''))) AS refundBankAccount
 			FROM roomContract RC
+			LEFT JOIN room R ON RC.roomEsntlId = R.esntlId AND RC.gosiwonEsntlId = R.gosiwonEsntlId
+			LEFT JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
+			LEFT JOIN customer C ON R.customerEsntlId = C.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+			LEFT JOIN il_customer_refund ICR ON ICR.cus_eid = RC.customerEsntlId AND ICR.cre_delete_dtm IS NULL
+				AND ICR.cre_regist_dtm = (SELECT MAX(cre_regist_dtm) FROM il_customer_refund i2 WHERE i2.cus_eid = RC.customerEsntlId AND i2.cre_delete_dtm IS NULL)
 			WHERE RC.esntlId = ?
 			LIMIT 1
 		`;
@@ -1054,37 +1069,30 @@ exports.getDepositAndExtra = async (req, res, next) => {
 
 		let depositList = [];
 		if (hasCheckin || hasContractor) {
+			// depositList와 동일한 구조로 조회
 			const depositQuery = `
 			SELECT
-				D.rdp_eid AS esntlId,
+				D.rdp_eid AS depositEsntlId,
 				D.rom_eid AS roomEsntlId,
 				D.gsw_eid AS gosiwonEsntlId,
-				? AS customerEsntlId,
-				? AS contractorEsntlId,
-				? AS contractEsntlId,
-				'DEPOSIT' AS type,
-				D.rdp_price AS amount,
-				(SELECT COALESCE(SUM(H.amount), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT') AS paidAmount,
-				GREATEST(0, D.rdp_price - (SELECT COALESCE(SUM(H.amount), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT')) AS unpaidAmount,
-				(SELECT H_lat.accountBank FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS accountBank,
-				(SELECT H_lat.accountNumber FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS accountNumber,
-				(SELECT H_lat.accountHolder FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS accountHolder,
+				D.rdp_price AS depositAmount,
 				CASE
 					WHEN D.rdp_delete_dtm IS NOT NULL THEN 'DELETED'
-					WHEN D.rdp_completed_dtm IS NOT NULL THEN 'COMPLETED'
+					WHEN (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1) IS NULL THEN NULL
+					WHEN (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1) = 'PENDING' THEN 'PENDING'
+					WHEN (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1) = 'PARTIAL' THEN 'PARTIAL'
+					WHEN (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1) = 'DELETED' THEN 'DELETED'
+					WHEN (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1) IN ('COMPLETED', 'RETURN_COMPLETED') THEN 'COMPLETE'
+					WHEN D.rdp_completed_dtm IS NOT NULL THEN 'COMPLETE'
 					ELSE (SELECT H_s.status FROM il_room_deposit_history H_s WHERE H_s.depositEsntlId = D.rdp_eid AND H_s.type = 'DEPOSIT' ORDER BY H_s.createdAt DESC LIMIT 1)
-				END AS status,
-				(SELECT H_lat.manager FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS manager,
-				(SELECT H_lat.depositDate FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS depositDate,
-				D.rdp_return_dtm AS returnDate,
-				(SELECT COALESCE(SUM(H.amount + COALESCE(H.deductionAmount, 0)), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'RETURN' AND H.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')) AS returnAmount,
-				NULL AS returnReason,
-				(SELECT H_lat.memo FROM il_room_deposit_history H_lat WHERE H_lat.depositEsntlId = D.rdp_eid AND H_lat.type = 'DEPOSIT' ORDER BY H_lat.createdAt DESC LIMIT 1) AS memo,
-				CASE WHEN D.rdp_delete_dtm IS NOT NULL THEN 'Y' ELSE 'N' END AS deleteYN,
-				D.rdp_deleter_id AS deletedBy,
-				D.rdp_delete_dtm AS deletedAt,
-				D.rdp_regist_dtm AS createdAt,
-				D.rdp_update_dtm AS updatedAt
+				END AS depositStatus,
+				(SELECT COALESCE(SUM(H.amount), 0) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT') AS depositLastestAmount,
+				(SELECT DATE_FORMAT(MAX(H.createdAt), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT') AS depositLastestTime,
+				(SELECT H_ret.status FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' ORDER BY COALESCE(H_ret.refundDate, H_ret.createdAt) DESC, H_ret.createdAt DESC LIMIT 1) AS refundStatus,
+				(SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN') AS refundCreatedAt,
+				(SELECT H_ret.status FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' ORDER BY COALESCE(H_ret.refundDate, H_ret.createdAt) DESC, H_ret.createdAt DESC LIMIT 1) AS returnStatus,
+				(SELECT COALESCE(SUM(H_ret.amount + COALESCE(H_ret.deductionAmount, 0)), 0) FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' AND H_ret.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')) AS returnLastestAmount,
+				(SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN') AS returnLastestTime
 			FROM il_room_deposit D
 			WHERE D.gsw_eid = ?
 				AND D.rom_eid = ?
@@ -1097,9 +1105,6 @@ exports.getDepositAndExtra = async (req, res, next) => {
 		`;
 
 			const replacements = [
-				contractInfo.customerEsntlId,
-				contractInfo.customerEsntlId,
-				contractEsntlId,
 				contractInfo.gosiwonEsntlId,
 				contractInfo.roomEsntlId,
 				checkinName,
@@ -1134,33 +1139,35 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				console.log('[depositAndExtra] 해당 방 il_room_deposit 샘플:', debugRows?.slice(0, 3) ?? []);
 			}
 
-			// 구 deposit 응답 필드명/타입 맞춤
+			// depositList와 동일한 구조로 매핑
 			depositList = (depositRows || []).map((row) => ({
-				esntlId: row.esntlId,
+				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
-				gosiwonEsntlId: row.gosiwonEsntlId,
-				customerEsntlId: row.customerEsntlId,
-				contractorEsntlId: row.contractorEsntlId,
-				contractEsntlId: row.contractEsntlId,
-				type: row.type,
-				amount: row.amount != null ? Number(row.amount) : null,
-				paidAmount: row.paidAmount != null ? Number(row.paidAmount) : null,
-				unpaidAmount: row.unpaidAmount != null ? Number(row.unpaidAmount) : null,
-				accountBank: row.accountBank,
-				accountNumber: row.accountNumber,
-				accountHolder: row.accountHolder,
-				status: row.status || null,
-				manager: row.manager,
-				depositDate: row.depositDate,
-				returnDate: row.returnDate,
-				returnAmount: row.returnAmount != null ? Number(row.returnAmount) : null,
-				returnReason: row.returnReason,
-				memo: row.memo,
-				deleteYN: row.deleteYN,
-				deletedBy: row.deletedBy,
-				deletedAt: row.deletedAt,
-				createdAt: row.createdAt,
-				updatedAt: row.updatedAt,
+				gosiwonEsntlId: row.gosiwonEsntlId || null,
+				gosiwonName: contractInfo.gosiwonName || null,
+				roomNumber: contractInfo.roomNumber,
+				currentOccupantName: contractInfo.currentOccupantName || null,
+				currentOccupantID: contractInfo.currentOccupantID || null,
+				customerBank: contractInfo.customerBank || null,
+				customerBankAccount: contractInfo.customerBankAccount || null,
+				refundBankAccount: (contractInfo.refundBankAccount && String(contractInfo.refundBankAccount).trim()) || null,
+				checkinName: contractInfo.checkinName || null,
+				checkinPhone: contractInfo.checkinPhone || null,
+				contractorName: contractInfo.contractorName || null,
+				contractorPhone: contractInfo.contractorPhone || null,
+				depositAmount: row.depositAmount || null,
+				contractEsntlId: contractInfo.contractEsntlId || null,
+				moveInDate: contractInfo.startDate ? String(contractInfo.startDate).slice(0, 10) : null,
+				moveOutDate: contractInfo.endDate ? String(contractInfo.endDate).slice(0, 10) : null,
+				contractStatus: contractInfo.contractStatus || null,
+				depositStatus: row.depositStatus || null,
+				depositLastestAmount: row.depositLastestAmount != null ? Number(row.depositLastestAmount) : null,
+				depositLastestTime: row.depositLastestTime || null,
+				refundStatus: row.refundStatus || null,
+				refundCreatedAt: row.refundCreatedAt || null,
+				returnStatus: row.returnStatus || null,
+				returnLastestAmount: row.returnLastestAmount != null ? Number(row.returnLastestAmount) : null,
+				returnLastestTime: row.returnLastestTime || null,
 			}));
 		} else {
 			console.log('[depositAndExtra] 입실자/계약자 정보 없음 - deposit 조회 생략');

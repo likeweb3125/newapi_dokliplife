@@ -814,85 +814,68 @@ router.put('/detail', roomContractController.updateContract);
  *                             description: 수정일
  *                     depositData:
  *                       type: array
- *                       description: "il_room_deposit 기반 보증금 정보 목록 (입실자/계약자/방id 매칭, 구 deposit 응답 포맷 유지)"
+ *                       description: "/v1/deposit/depositList와 동일한 구조"
  *                       items:
  *                         type: object
  *                         properties:
- *                           esntlId:
+ *                           depositEsntlId:
  *                             type: string
- *                             description: 보증금 고유 아이디
+ *                             description: 보증금 고유 아이디 (il_room_deposit.rdp_eid)
  *                           roomEsntlId:
  *                             type: string
- *                             description: 방 고유 아이디
  *                           gosiwonEsntlId:
  *                             type: string
- *                             description: 고시원 고유 아이디
- *                           customerEsntlId:
+ *                           gosiwonName:
  *                             type: string
- *                             description: 예약자/입실자 고유아이디
- *                           contractorEsntlId:
+ *                           roomNumber:
  *                             type: string
- *                             description: 계약자 고유아이디
+ *                           currentOccupantName:
+ *                             type: string
+ *                           currentOccupantID:
+ *                             type: string
+ *                           customerBank:
+ *                             type: string
+ *                           customerBankAccount:
+ *                             type: string
+ *                           refundBankAccount:
+ *                             type: string
+ *                           checkinName:
+ *                             type: string
+ *                           checkinPhone:
+ *                             type: string
+ *                           contractorName:
+ *                             type: string
+ *                           contractorPhone:
+ *                             type: string
+ *                           depositAmount:
+ *                             type: integer
  *                           contractEsntlId:
  *                             type: string
- *                             description: 방계약 고유아이디
- *                           type:
+ *                           moveInDate:
  *                             type: string
- *                             description: '타입 (RESERVATION: 예약금, DEPOSIT: 보증금)'
- *                           amount:
+ *                             format: date
+ *                           moveOutDate:
+ *                             type: string
+ *                             format: date
+ *                           contractStatus:
+ *                             type: string
+ *                           depositStatus:
+ *                             type: string
+ *                             description: "PENDING, COMPLETE, PARTIAL, DELETED"
+ *                           depositLastestAmount:
  *                             type: integer
- *                             description: 금액 (예약금 또는 보증금)
- *                           paidAmount:
+ *                           depositLastestTime:
+ *                             type: string
+ *                           refundStatus:
+ *                             type: string
+ *                           refundCreatedAt:
+ *                             type: string
+ *                           returnStatus:
+ *                             type: string
+ *                           returnLastestAmount:
  *                             type: integer
- *                             description: 입금액
- *                           unpaidAmount:
- *                             type: integer
- *                             description: 미납금액
- *                           accountBank:
+ *                           returnLastestTime:
  *                             type: string
- *                             description: 은행명
- *                           accountNumber:
- *                             type: string
- *                             description: 계좌번호
- *                           accountHolder:
- *                             type: string
- *                             description: 예금주명
- *                           status:
- *                             type: string
- *                             description: 입금상태
- *                           manager:
- *                             type: string
- *                             description: 담당자
- *                           depositDate:
- *                             type: string
- *                             description: 입금일
- *                           returnDate:
- *                             type: string
- *                             description: 반환일
- *                           returnAmount:
- *                             type: integer
- *                             description: 반환금액
- *                           returnReason:
- *                             type: string
- *                             description: 반환사유
- *                           memo:
- *                             type: string
- *                             description: 메모
- *                           deleteYN:
- *                             type: string
- *                             description: 삭제여부
- *                           deletedBy:
- *                             type: string
- *                             description: 삭제한 관리자 ID
- *                           deletedAt:
- *                             type: string
- *                             description: 삭제 시간
- *                           createdAt:
- *                             type: string
- *                             description: 생성일
- *                           updatedAt:
- *                             type: string
- *                             description: 수정일
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
