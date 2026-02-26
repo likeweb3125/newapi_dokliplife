@@ -1090,8 +1090,8 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				AND D.rom_eid = ?
 				AND D.rdp_delete_dtm IS NULL
 				AND (
-					(TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR TRIM(IFNULL(D.rdp_customer_phone, '')) = ?))
-					OR (TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR TRIM(IFNULL(D.rdp_customer_phone, '')) = ?))
+					(TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(IFNULL(D.rdp_customer_phone, '')), '-', ''), ' ', ''), '.', ''), '(', ''), ')', '') = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(IFNULL(?, '')), '-', ''), ' ', ''), '.', ''), '(', ''), ')', '')))
+					OR (TRIM(IFNULL(D.rdp_customer_name, '')) = ? AND (TRIM(IFNULL(D.rdp_customer_phone, '')) = '' OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(IFNULL(D.rdp_customer_phone, '')), '-', ''), ' ', ''), '.', ''), '(', ''), ')', '') = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(IFNULL(?, '')), '-', ''), ' ', ''), '.', ''), '(', ''), ')', '')))
 				)
 			ORDER BY D.rdp_regist_dtm DESC
 		`;
