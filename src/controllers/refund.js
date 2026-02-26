@@ -347,6 +347,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			proratedRent,
 			penalty,
 			totalRefundAmount,
+			directRefundConfirm, // true면 환불 요청을 APPROVAL로 즉시 승인 (processReason: 다이렉트 환불 승인 완료)
 			check_basic_sell,
 			unableCheckInReason,
 			check_room_only_config,
@@ -486,6 +487,23 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			}
 		);
 		const rrrSno = refundInsertResult?.insertId || refundInsertResult;
+
+		// directRefundConfirm=true면 환불 요청을 즉시 APPROVAL로 승인 (구 updateStatus APPROVAL 처리와 동일)
+		if (directRefundConfirm === true) {
+			await mariaDBSequelize.query(
+				`UPDATE il_room_refund_request 
+				 SET rrr_process_status_cd = 'APPROVAL',
+				     rrr_process_reason = '다이렉트 환불 승인 완료',
+				     rrr_update_dtm = NOW(),
+				     rrr_updater_id = ?
+				 WHERE ctt_eid = ?`,
+				{
+					replacements: [writerAdminId, contractEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
 
 		// 해당 계약의 마지막 CONTRACT 상태 행을 찾아 CHECKOUT_CONFIRMED로 변경. statusEndDate는 cancelDate 사용
 		const lastContractRows = await mariaDBSequelize.query(
@@ -908,58 +926,6 @@ exports.getRefundRequestList = async (req, res, next) => {
 
 		return errorHandler.successThrow(res, '환불 요청 목록 조회 성공', result);
 	} catch (error) {
-		next(error);
-	}
-};
-
-// 환불 요청 상태 업데이트
-exports.updateRefundRequestStatus = async (req, res, next) => {
-	const transaction = await mariaDBSequelize.transaction();
-	try {
-		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = getWriterAdminId(decodedToken);
-
-		const { status, processReason, cttEid } = req.body;
-
-		if (!status) {
-			errorHandler.errorThrow(400, 'status는 필수입니다.');
-		}
-		if (!cttEid) {
-			errorHandler.errorThrow(400, 'cttEid는 필수입니다.');
-		}
-
-		// 상태 유효성 검증
-		const validStatuses = ['REQUEST', 'APPROVAL', 'REJECT', 'CANCELLATION'];
-		if (!validStatuses.includes(status)) {
-			errorHandler.errorThrow(
-				400,
-				`status는 ${validStatuses.join(', ')} 중 하나여야 합니다.`
-			);
-		}
-
-		const query = `
-			UPDATE il_room_refund_request 
-			SET rrr_process_status_cd = ?,
-				rrr_process_reason = ?,
-				rrr_update_dtm = NOW(),
-				rrr_updater_id = ?
-			WHERE ctt_eid = ?
-		`;
-
-		await mariaDBSequelize.query(
-			query,
-			{
-				replacements: [status, processReason || null, writerAdminId, cttEid],
-				type: mariaDBSequelize.QueryTypes.UPDATE,
-				transaction,
-			}
-		);
-
-		await transaction.commit();
-
-		return errorHandler.successThrow(res, '환불 요청 상태 업데이트 성공');
-	} catch (error) {
-		await transaction.rollback();
 		next(error);
 	}
 };

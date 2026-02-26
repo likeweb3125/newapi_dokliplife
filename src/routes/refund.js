@@ -79,6 +79,10 @@ const refundController = require('../controllers/refund');
  *                 type: integer
  *                 description: 총환불금액
  *                 example: 70000
+ *               directRefundConfirm:
+ *                 type: boolean
+ *                 description: "다이렉트 환불 승인 여부. true면 il_room_refund_request를 즉시 APPROVAL로 업데이트(processReason: 다이렉트 환불 승인 완료), false면 기존 유지"
+ *                 example: false
  *               check_basic_sell:
  *                 type: boolean
  *                 description: '기본 판매 설정 사용 여부 (true: 기본 설정 사용, false: 사용자 지정 날짜 사용)'
@@ -360,50 +364,6 @@ router.post('/refundInsert', refundController.refundInsert);
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/list', refundController.getRefundRequestList);
-
-/**
- * @swagger
- * /v1/refund/updateStatus:
- *   put:
- *     summary: 환불 요청 상태 업데이트
- *     description: '환불 요청의 처리 상태를 업데이트합니다. 상태는 REQUEST(요청), APPROVAL(승인), REJECT(반려), CANCELLATION(취소) 중 하나여야 합니다.'
- *     tags: [환불관리]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *               - cttEid
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [REQUEST, APPROVAL, REJECT, CANCELLATION]
- *                 description: '처리 상태 (REQUEST: 요청, APPROVAL: 승인, REJECT: 반려, CANCELLATION: 취소)'
- *                 example: 'APPROVAL'
- *               processReason:
- *                 type: string
- *                 description: 처리 사유
- *                 example: '환불 승인 완료'
- *               cttEid:
- *                 type: string
- *                 description: 계약 고유 아이디
- *                 example: 'RCTT0000000001'
- *     responses:
- *       200:
- *         description: 환불 요청 상태 업데이트 성공
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- */
-router.put('/updateStatus', refundController.updateRefundRequestStatus);
 
 /**
  * @swagger
