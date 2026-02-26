@@ -11,6 +11,7 @@ const {
 const jwt = require('jsonwebtoken');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
+const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 
 // 공통 토큰 검증 함수
@@ -272,6 +273,28 @@ exports.createDeposit = async (req, res, next) => {
 			);
 		}
 
+		// history 상세 기록
+		try {
+			const historyContent = `보증금 추가 입금: 보증금ID ${depositEsntlIdVal}, 금액 ${finalAmount.toLocaleString()}원, 입금자 ${(depositorName || '-').trim()}, 전화번호 ${(depositorPhone || '-').trim()}, 상태 ${depositStatus}, 누적입금 ${totalPaidAfter.toLocaleString()}원/${targetAmount.toLocaleString()}원, 미납액 ${unpaidAmount.toLocaleString()}원`;
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: existingDeposit.gosiwonEsntlId || null,
+					roomEsntlId: existingDeposit.roomEsntlId || null,
+					contractEsntlId: contractEsntlId || null,
+					etcEsntlId: depositEsntlIdVal,
+					content: historyContent,
+					category: 'DEPOSIT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: getWriterAdminId(decodedToken),
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[createDeposit] history 기록 실패:', historyErr);
+		}
+
 		await transaction.commit();
 
 		return errorHandler.successThrow(res, '보증금 등록 성공', {
@@ -425,6 +448,28 @@ exports.updateDeposit = async (req, res, next) => {
 				},
 				{ transaction }
 			);
+
+			// history 상세 기록
+			try {
+				const historyContent = `보증금 정보 수정: 보증금ID ${esntlId}, 변경사항 [${changes.join(' | ')}]`;
+				await historyController.createHistoryRecord(
+					{
+						gosiwonEsntlId: depositInfo.gosiwonEsntlId || null,
+						roomEsntlId: depositInfo.roomEsntlId || null,
+						contractEsntlId: contractEsntlId !== undefined ? contractEsntlId : (depositInfo.contractEsntlId || null),
+						etcEsntlId: esntlId,
+						content: historyContent,
+						category: 'DEPOSIT',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: getWriterAdminId(decodedToken),
+						writerType: 'ADMIN',
+					},
+					transaction
+				);
+			} catch (historyErr) {
+				console.error('[updateDeposit] history 기록 실패:', historyErr);
+			}
 		}
 
 		await transaction.commit();
@@ -472,6 +517,28 @@ exports.deleteDeposit = async (req, res, next) => {
 				transaction,
 			}
 		);
+
+		// history 상세 기록 (reservationDelete)
+		try {
+			const historyContent = `예약금/보증금 삭제: 보증금ID ${depositEsntlId}, 입금자 ${(depositInfo.customerName || '-').trim()}, 금액 ${(depositInfo.amount || 0).toLocaleString()}원`;
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: depositInfo.gosiwonEsntlId || null,
+					roomEsntlId: depositInfo.roomEsntlId || null,
+					contractEsntlId: null,
+					etcEsntlId: depositEsntlId,
+					content: historyContent,
+					category: 'DEPOSIT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: getWriterAdminId(decodedToken),
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[deleteDeposit] history 기록 실패:', historyErr);
+		}
 
 		await transaction.commit();
 
@@ -533,6 +600,28 @@ exports.deleteDepositOnly = async (req, res, next) => {
 			},
 			{ transaction }
 		);
+
+		// history 상세 기록 (deleteDepositOnly)
+		try {
+			const historyContent = `보증금 정보 삭제: 보증금ID ${esntlId}, 입금자 ${(depositInfo.customerName || '-').trim()}, 금액 ${(depositInfo.amount || 0).toLocaleString()}원`;
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: depositInfo.gosiwonEsntlId || null,
+					roomEsntlId: depositInfo.roomEsntlId || null,
+					contractEsntlId: depositInfo.contractEsntlId || null,
+					etcEsntlId: esntlId,
+					content: historyContent,
+					category: 'DEPOSIT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: getWriterAdminId(decodedToken),
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[deleteDepositOnly] history 기록 실패:', historyErr);
+		}
 
 		await transaction.commit();
 
@@ -649,6 +738,28 @@ exports.registerDeposit = async (req, res, next) => {
 			},
 			{ transaction }
 		);
+
+		// history 상세 기록 (입금 등록 = 예약금 최초 등록)
+		try {
+			const historyContent = `보증금/예약금 등록: 보증금ID ${newDepositId}, 금액 ${finalAmount.toLocaleString()}원, 입금자 ${(customerNameVal || '-').trim()}, 전화번호 ${(customerPhoneVal || '-').trim()}${checkInDateVal ? `, 입실예정일 ${checkInDateVal}` : ''}`;
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: finalGosiwonEsntlId,
+					roomEsntlId: finalRoomEsntlId,
+					contractEsntlId: finalContractEsntlId,
+					etcEsntlId: newDepositId,
+					content: historyContent,
+					category: 'DEPOSIT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: managerId,
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[registerDeposit] history 기록 실패:', historyErr);
+		}
 
 		await transaction.commit();
 
@@ -1952,6 +2063,29 @@ exports.createDepositRefund = async (req, res, next) => {
 				},
 				{ where: { esntlId: depositEsntlId }, transaction }
 			);
+		}
+
+		// history 상세 기록 (보증금 환불 등록)
+		try {
+			const bankInfo = accountBank && accountNumber ? `${accountBank} ${accountNumber}` : '-';
+			const historyContent = `보증금 환불 등록: 보증금ID ${depositEsntlId}, 환불 ${refundAmount.toLocaleString()}원, 차감 ${deductionAmount.toLocaleString()}원, 합계 ${thisReturnTotal.toLocaleString()}원, 상태 ${status}, 누적반환 ${totalAfter.toLocaleString()}원, 환불계좌 ${bankInfo}`;
+			await historyController.createHistoryRecord(
+				{
+					gosiwonEsntlId: deposit.gosiwonEsntlId || null,
+					roomEsntlId: deposit.roomEsntlId || null,
+					contractEsntlId: contractEsntlId || null,
+					etcEsntlId: depositEsntlId,
+					content: historyContent,
+					category: 'DEPOSIT',
+					priority: 'NORMAL',
+					publicRange: 0,
+					writerAdminId: getWriterAdminId(decodedToken),
+					writerType: 'ADMIN',
+				},
+				transaction
+			);
+		} catch (historyErr) {
+			console.error('[createDepositRefund] history 기록 실패:', historyErr);
 		}
 
 		await transaction.commit();

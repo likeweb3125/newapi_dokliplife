@@ -600,7 +600,7 @@ exports.getWeeklyRanking = async (req, res, next) => {
 
 /**
  * GET /v1/dashboard/tourReservationStats
- * il_tour_reservation에서 기준일(또는 당일) 포함 과거 7일간 통계. notConfirm/confirmed/취소·무효 건수.
+ * il_tour_reservation에서 기준일(또는 당일) 포함 과거 7일간 통계 (rtr_regist_dtm 기준). notConfirm/confirmed/취소·무효 건수.
  */
 exports.getTourReservationStats = async (req, res, next) => {
 	try {
@@ -616,7 +616,7 @@ exports.getTourReservationStats = async (req, res, next) => {
 				SUM(CASE WHEN rtr_status = 'CANCEL_USER' THEN 1 ELSE 0 END) AS cancelUser,
 				SUM(CASE WHEN rtr_status = 'INVALID' THEN 1 ELSE 0 END) AS invalid
 			FROM il_tour_reservation
-			WHERE rtr_tour_dtm >= ? AND rtr_tour_dtm < ?
+			WHERE rtr_regist_dtm >= ? AND rtr_regist_dtm < ?
 		`;
 		const [row] = await mariaDBSequelize.query(query, {
 			replacements: [startDtm, endDtm],

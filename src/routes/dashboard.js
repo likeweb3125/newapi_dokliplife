@@ -261,7 +261,7 @@ router.get('/weeklyRanking', isAuthMiddleware.isAuthAdmin, dashboardController.g
  * /v1/dashboard/tourReservationStats:
  *   get:
  *     summary: 룸투어 예약 주간 통계
- *     description: "il_tour_reservation 테이블에서 기준일(또는 당일) 포함 과거 7일간(rtr_tour_dtm 기준) 통계를 반환합니다. notConfirm(rtr_confirm_dtm 없음), weekTotal(한 주 총 건수), confirmed(rtr_confirm_dtm 있음), cancelGosiwon/cancelUser/invalid(rtr_status별 건수)를 집계합니다."
+ *     description: "il_tour_reservation 테이블에서 기준일(또는 당일) 포함 과거 7일간(rtr_regist_dtm 기준) 통계를 반환합니다. notConfirm(rtr_confirm_dtm 없음), weekTotal(한 주 총 건수), confirmed(rtr_confirm_dtm 있음), cancelGosiwon/cancelUser/invalid(rtr_status별 건수)를 집계합니다."
  *     tags: [dashboard]
  *     security:
  *       - bearerAuth: []

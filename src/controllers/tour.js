@@ -60,6 +60,161 @@ const verifyPartnerGosiwonAccess = async (gosiwonEsntlId, decodedToken) => {
 };
 
 /**
+ * 룸투어 리스트 조회 (페이징 지원)
+ * GET /v1/tour/items
+ * query: startDate, endDate, gswEid, status, search, page, limit
+ */
+exports.getTourItems = async (req, res, next) => {
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const startDate = req.query.startDate || '';
+		const endDate = req.query.endDate || '';
+		const gswEid = req.query.gswEid || '';
+		const status = req.query.status || '';
+		const search = req.query.search || '';
+		const page = parseInt(req.query.page) || 1;
+		const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+		const offset = (page - 1) * limit;
+
+		let whereClause = 'WHERE 1 = 1';
+		const replacements = [];
+
+		// 날짜 필터 (rtr_tour_dtm 기준). 날짜 미지정 시 7일 전 ~ 6개월 후
+		if (startDate) {
+			whereClause += ' AND DATE(T.rtr_tour_dtm) >= DATE(?)';
+			replacements.push(startDate);
+		} else {
+			whereClause += ' AND T.rtr_tour_dtm >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)';
+		}
+		if (endDate) {
+			whereClause += ' AND DATE(T.rtr_tour_dtm) <= DATE(?)';
+			replacements.push(endDate);
+		} else if (!startDate) {
+			whereClause += ' AND T.rtr_tour_dtm <= DATE_ADD(CURDATE(), INTERVAL 6 MONTH)';
+		}
+
+		// 고시원 필터
+		if (gswEid) {
+			const hasAccess = await verifyPartnerGosiwonAccess(gswEid, decodedToken);
+			if (!hasAccess) {
+				errorHandler.errorThrow(403, '해당 고시원에 대한 권한이 없습니다.');
+			}
+			whereClause += ' AND T.gsw_eid = ?';
+			replacements.push(gswEid);
+		} else if (decodedToken.partner) {
+			// partner인데 gswEid 없으면, 해당 partner가 관리하는 고시원만
+			if (decodedToken.partner.match(/^GOSI/)) {
+				whereClause += ' AND T.gsw_eid = ?';
+				replacements.push(decodedToken.partner);
+			} else {
+				whereClause += ' AND EXISTS (SELECT 1 FROM gosiwon G WHERE G.esntlId = T.gsw_eid AND G.adminEsntlId = ?)';
+				replacements.push(decodedToken.partner);
+			}
+		}
+
+		// 상태 필터
+		if (status) {
+			whereClause += ' AND T.rtr_status = ?';
+			replacements.push(status);
+		}
+
+		// 검색 필터 (이름, 전화번호, 방번호, 고시원명)
+		if (search) {
+			whereClause += ' AND (LOWER(C.name) LIKE LOWER(?) OR LOWER(C.phone) LIKE LOWER(?) OR LOWER(R.roomNumber) LIKE LOWER(?) OR LOWER(G.name) LIKE LOWER(?))';
+			const searchPattern = `%${search}%`;
+			replacements.push(searchPattern, searchPattern, searchPattern, searchPattern);
+		}
+
+		const listReplacements = [...replacements, limit, offset];
+
+		const listQuery = `
+			SELECT
+				T.rtr_eid AS rtr_eid,
+				T.rtr_status AS rtr_status,
+				DATE_FORMAT(T.rtr_tour_dtm, '%Y-%m-%d %H:%i:%s') AS rtr_tour_dtm,
+				T.rtr_message AS rtr_message,
+				T.rtr_join_date AS rtr_join_date,
+				T.rtr_stay_period AS rtr_stay_period,
+				T.rtr_user_bizcall AS rtr_user_bizcall,
+				DATE_FORMAT(T.rtr_regist_dtm, '%Y-%m-%d %H:%i:%s') AS rtr_regist_dtm,
+				DATE_FORMAT(T.rtr_confirm_dtm, '%Y-%m-%d %H:%i:%s') AS rtr_confirm_dtm,
+				C.name AS name,
+				C.birth AS birth,
+				C.gender AS gender,
+				C.phone AS phone,
+				G.name AS gsw_name,
+				G.esntlId AS gsw_eid,
+				G.serviceNumber AS serviceNumber,
+				R.roomNumber AS roomNumber,
+				R.status AS roomStatus,
+				R.endDate AS roomEndDate,
+				IGC.gsc_payment_able_start_date AS paymentAbleStartDate
+			FROM il_tour_reservation T
+			LEFT JOIN customer C ON T.cus_eid = C.esntlId
+			LEFT JOIN gosiwon G ON T.gsw_eid = G.esntlId
+			LEFT JOIN room R ON T.rom_eid = R.esntlId
+			LEFT JOIN il_gosiwon_config IGC ON G.esntlId = IGC.gsw_eid
+			${whereClause}
+			ORDER BY T.rtr_tour_dtm DESC
+			LIMIT ? OFFSET ?
+		`;
+
+		const countQuery = `
+			SELECT COUNT(*) AS total
+			FROM il_tour_reservation T
+			LEFT JOIN customer C ON T.cus_eid = C.esntlId
+			LEFT JOIN gosiwon G ON T.gsw_eid = G.esntlId
+			LEFT JOIN room R ON T.rom_eid = R.esntlId
+			${whereClause}
+		`;
+
+		const [rows, countResult] = await Promise.all([
+			mariaDBSequelize.query(listQuery, {
+				replacements: listReplacements,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+			mariaDBSequelize.query(countQuery, {
+				replacements,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}),
+		]);
+
+		const total = countResult?.[0]?.total != null ? parseInt(countResult[0].total, 10) : 0;
+		const data = (rows || []).map((row) => ({
+			rtr_eid: row.rtr_eid ?? null,
+			rtr_status: row.rtr_status ?? null,
+			rtr_tour_dtm: row.rtr_tour_dtm ?? null,
+			rtr_message: row.rtr_message ?? null,
+			rtr_join_date: row.rtr_join_date ?? null,
+			rtr_stay_period: row.rtr_stay_period ?? null,
+			rtr_user_bizcall: row.rtr_user_bizcall ?? null,
+			rtr_regist_dtm: row.rtr_regist_dtm ?? null,
+			rtr_confirm_dtm: row.rtr_confirm_dtm ?? null,
+			name: row.name ?? null,
+			birth: row.birth ?? null,
+			gender: row.gender ?? null,
+			phone: row.phone ?? null,
+			gsw_name: row.gsw_name ?? null,
+			gsw_eid: row.gsw_eid ?? null,
+			serviceNumber: row.serviceNumber ?? null,
+			roomNumber: row.roomNumber ?? null,
+			roomStatus: row.roomStatus ?? null,
+			roomEndDate: row.roomEndDate ?? null,
+			paymentAbleStartDate: row.paymentAbleStartDate ?? null,
+		}));
+
+		errorHandler.successThrow(res, '룸투어 리스트 조회 성공', {
+			total,
+			page,
+			limit,
+			data,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+/**
  * 방문 예약 수락
  * POST /v1/tour/accept
  */

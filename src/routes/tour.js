@@ -12,6 +12,143 @@ const tourController = require('../controllers/tour');
 
 /**
  * @swagger
+ * /v1/tour/items:
+ *   get:
+ *     summary: 룸투어 리스트 조회
+ *     description: "il_tour_reservation 기준 룸투어 예약 목록을 조회합니다. 페이징(page, limit), 날짜 미지정 시 7일 전~6개월 후, 먼날짜 순(DESC) 정렬."
+ *     tags: [Tour]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2026-02-20"
+ *         description: "방문일 시작 (YYYY-MM-DD). 미입력 시 7일 전부터"
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2026-02-26"
+ *         description: "방문일 종료 (YYYY-MM-DD). 미입력 시 6개월 후까지"
+ *       - in: query
+ *         name: gswEid
+ *         schema:
+ *           type: string
+ *           example: "GOSI0000002130"
+ *         description: "고시원 ID 필터"
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [CONFIRMED, CANCEL_GOSIWON, CANCEL_USER, INVALID]
+ *         description: "예약 상태 필터"
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: "이름·전화번호·방번호·고시원명 검색 (부분 일치)"
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: "페이지 번호"
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: "페이지당 건수 (최대 100)"
+ *     responses:
+ *       200:
+ *         description: 룸투어 리스트 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: "룸투어 리스트 조회 성공"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: "전체 건수"
+ *                     page:
+ *                       type: integer
+ *                       description: "현재 페이지"
+ *                     limit:
+ *                       type: integer
+ *                       description: "페이지당 건수"
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           rtr_eid:
+ *                             type: string
+ *                             description: "방문예약일련번호"
+ *                           rtr_status:
+ *                             type: string
+ *                           rtr_tour_dtm:
+ *                             type: string
+ *                             description: "방문일시 (YYYY-MM-DD HH:mm:ss)"
+ *                           rtr_message:
+ *                             type: string
+ *                           rtr_join_date:
+ *                             type: string
+ *                           rtr_stay_period:
+ *                             type: string
+ *                           rtr_user_bizcall:
+ *                             type: string
+ *                           rtr_regist_dtm:
+ *                             type: string
+ *                           rtr_confirm_dtm:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                             description: "예약자명"
+ *                           birth:
+ *                             type: string
+ *                           gender:
+ *                             type: string
+ *                           phone:
+ *                             type: string
+ *                           gsw_name:
+ *                             type: string
+ *                             description: "고시원명"
+ *                           gsw_eid:
+ *                             type: string
+ *                           serviceNumber:
+ *                             type: string
+ *                           roomNumber:
+ *                             type: string
+ *                           roomStatus:
+ *                             type: string
+ *                           roomEndDate:
+ *                             type: string
+ *                           paymentAbleStartDate:
+ *                             type: string
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/items', tourController.getTourItems);
+
+/**
+ * @swagger
  * /v1/tour/accept:
  *   post:
  *     summary: 방문 예약 수락
