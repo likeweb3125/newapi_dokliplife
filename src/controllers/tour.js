@@ -280,8 +280,8 @@ exports.acceptTourReservation = async (req, res, next) => {
 			errorHandler.errorThrow(404, '해당 방문 예약을 찾을 수 없습니다.');
 		}
 
-		// 이미 확정된 경우
-		if (tourRow.rtr_status === 'CONFIRMED') {
+		// 이미 확정된 경우 (ACCEPT 및 기존 CONFIRMED 호환)
+		if (['ACCEPT', 'CONFIRMED'].includes(tourRow.rtr_status)) {
 			errorHandler.errorThrow(400, '이미 수락된 예약입니다.');
 		}
 		// 이미 취소된 경우
@@ -334,7 +334,7 @@ exports.acceptTourReservation = async (req, res, next) => {
 		// il_tour_reservation 업데이트 (수락)
 		await mariaDBSequelize.query(
 			`UPDATE il_tour_reservation 
-			 SET rtr_status = 'CONFIRMED', rtr_confirm_dtm = NOW(), rtr_user_bizcall = ? 
+			 SET rtr_status = 'ACCEPT', rtr_confirm_dtm = NOW(), rtr_user_bizcall = ? 
 			 WHERE rtr_eid = ?`,
 			{
 				replacements: [customerPhoneNumber || null, rtr_eid],
@@ -402,7 +402,7 @@ exports.acceptTourReservation = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '방문 예약 수락 완료', {
 			rtr_eid,
-			status: 'CONFIRMED',
+			status: 'ACCEPT',
 		});
 	} catch (err) {
 		next(err);

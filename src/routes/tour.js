@@ -44,7 +44,7 @@ const tourController = require('../controllers/tour');
  *         name: status
  *         schema:
  *           type: string
- *           enum: [CONFIRMED, CANCEL_GOSIWON, CANCEL_USER, INVALID]
+ *           enum: [ACCEPT, CANCEL_GOSIWON, CANCEL_USER, INVALID]
  *         description: "예약 상태 필터"
  *       - in: query
  *         name: search
@@ -183,7 +183,7 @@ router.get('/items', tourController.getTourItems);
  * /v1/tour/accept:
  *   post:
  *     summary: 방문 예약 수락
- *     description: "il_tour_reservation 기준으로 방문 예약을 수락합니다. rtr_status를 CONFIRMED로, rtr_confirm_dtm을 NOW()로, rtr_user_bizcall에 비즈콜 가상번호(또는 원번호)를 저장합니다. 고객(customer.phone)과 관리자(gosiwonAdmin.hp)에게 수락 안내 문자를 발송합니다 (알림톡 대체)."
+ *     description: "il_tour_reservation 기준으로 방문 예약을 수락합니다. rtr_status를 ACCEPT로, rtr_confirm_dtm을 NOW()로, rtr_user_bizcall에 비즈콜 가상번호(또는 원번호)를 저장합니다. 고객(customer.phone)과 관리자(gosiwonAdmin.hp)에게 수락 안내 문자를 발송합니다 (알림톡 대체)."
  *     tags: [Tour]
  *     security:
  *       - bearerAuth: []
@@ -222,7 +222,7 @@ router.get('/items', tourController.getTourItems);
  *                       description: 방문예약일련번호
  *                     status:
  *                       type: string
- *                       example: CONFIRMED
+ *                       example: ACCEPT
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
