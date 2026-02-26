@@ -6,6 +6,7 @@ const historyController = require('./history');
 const enumConfig = require('../middleware/enum');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
+const { phoneToRaw, phoneToDisplay } = require('../utils/phoneHelper');
 
 const CLEAN_DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -168,6 +169,11 @@ exports.getGosiwonInfo = async (req, res, next) => {
 		// useCheckInTime, useCheckOutTime을 boolean으로 변환
 		gosiwonInfo.useCheckInTime = gosiwonInfo.useCheckInTime === 1 || gosiwonInfo.useCheckInTime === true || gosiwonInfo.useCheckInTime === '1' ? true : false;
 		gosiwonInfo.useCheckOutTime = gosiwonInfo.useCheckOutTime === 1 || gosiwonInfo.useCheckOutTime === true || gosiwonInfo.useCheckOutTime === '1' ? true : false;
+
+		// 전화번호 반환 시 " - " 구분자 포맷
+		gosiwonInfo.keeperHp = phoneToDisplay(gosiwonInfo.keeperHp) ?? gosiwonInfo.keeperHp;
+		gosiwonInfo.phone = phoneToDisplay(gosiwonInfo.phone) ?? gosiwonInfo.phone;
+		if (gosiwonInfo.adminHP != null) gosiwonInfo.adminHP = phoneToDisplay(gosiwonInfo.adminHP) ?? gosiwonInfo.adminHP;
 
 		// /v1/gosiwon/names와 동일한 형식의 추가 정보 추가
 		gosiwonInfo.address = gosiwonInfo.address || '';
@@ -514,8 +520,8 @@ exports.createGosiwon = async (req, res, next) => {
 				youtube: youtube || null,
 				gsw_metaport: gsw_metaport || null,
 				keeperName: keeperName || null,
-				keeperHp: keeperHp || null,
-				phone: phone || null,
+				keeperHp: keeperHp ? (phoneToRaw(keeperHp) ?? keeperHp) : null,
+				phone: phone ? (phoneToRaw(phone) ?? phone) : null,
 				tag: tag || null,
 				email: email || null,
 				subway: subway || null,
@@ -784,8 +790,8 @@ exports.updateGosiwon = async (req, res, next) => {
 		if (req.body.youtube !== undefined) updateData.youtube = req.body.youtube;
 		if (req.body.gsw_metaport !== undefined) updateData.gsw_metaport = req.body.gsw_metaport;
 		if (req.body.keeperName !== undefined) updateData.keeperName = req.body.keeperName;
-		if (req.body.keeperHp !== undefined) updateData.keeperHp = req.body.keeperHp;
-		if (req.body.phone !== undefined) updateData.phone = req.body.phone;
+		if (req.body.keeperHp !== undefined) updateData.keeperHp = phoneToRaw(req.body.keeperHp) ?? req.body.keeperHp;
+		if (req.body.phone !== undefined) updateData.phone = phoneToRaw(req.body.phone) ?? req.body.phone;
 		if (req.body.tag !== undefined) updateData.tag = req.body.tag;
 		if (req.body.email !== undefined) updateData.email = req.body.email;
 		if (req.body.subway !== undefined) updateData.subway = req.body.subway;

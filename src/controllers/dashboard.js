@@ -599,13 +599,26 @@ exports.getWeeklyRanking = async (req, res, next) => {
 };
 
 /**
- * GET /v1/dashboard/tourReservationStats
- * il_tour_reservation에서 기준일(또는 당일) 포함 과거 7일간 통계 (rtr_regist_dtm 기준). notConfirm/confirmed/취소·무효 건수.
+ * 룸투어 예약 통계 데이터 조회 (재사용용)
+ * @param {string} [dateStr] YYYY-MM-DD - dashboard용: 기준일 포함 과거 7일간 (rtr_regist_dtm 기준)
+ * @param {{ startDate: string, endDate: string }} [range] - tour/items용: startDate~endDate 구간 (rtr_tour_dtm 기준, 리스트와 동일)
+ * @returns {Promise<{ date?, from, to, weekTotal, notConfirm, confirmed, cancelGosiwon, cancelUser, invalid }>}
  */
-exports.getTourReservationStats = async (req, res, next) => {
-	try {
-		const dateStr = isValidDateString(req.query.date) ? req.query.date : getTodayDateString();
-		const { startDtm, endDtm } = getWeekRange(dateStr);
+exports.fetchTourReservationStatsData = async (dateStr, range) => {
+	const today = getTodayDateString();
+	let startDtm;
+	let endDtm;
+	let fromDate;
+	let toDate;
+
+	if (range && range.startDate != null && range.endDate != null && isValidDateString(range.startDate) && isValidDateString(range.endDate)) {
+		// tour/items: startDate~endDate 구간, rtr_tour_dtm 기준 (리스트와 동일)
+		startDtm = range.startDate + ' 00:00:00';
+		const end = new Date(range.endDate + 'T00:00:00');
+		end.setDate(end.getDate() + 1);
+		endDtm = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0') + ' 00:00:00';
+		fromDate = range.startDate;
+		toDate = range.endDate;
 
 		const query = `
 			SELECT
@@ -616,29 +629,71 @@ exports.getTourReservationStats = async (req, res, next) => {
 				SUM(CASE WHEN rtr_status = 'CANCEL_USER' THEN 1 ELSE 0 END) AS cancelUser,
 				SUM(CASE WHEN rtr_status = 'INVALID' THEN 1 ELSE 0 END) AS invalid
 			FROM il_tour_reservation
-			WHERE rtr_regist_dtm >= ? AND rtr_regist_dtm < ?
+			WHERE rtr_tour_dtm >= ? AND rtr_tour_dtm < ?
 		`;
 		const [row] = await mariaDBSequelize.query(query, {
 			replacements: [startDtm, endDtm],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
+		return {
+			from: fromDate,
+			to: toDate,
+			weekTotal: Number(row?.weekTotal) || 0,
+			notConfirm: Number(row?.notConfirm) || 0,
+			confirmed: Number(row?.confirmed) || 0,
+			cancelGosiwon: Number(row?.cancelGosiwon) || 0,
+			cancelUser: Number(row?.cancelUser) || 0,
+			invalid: Number(row?.invalid) || 0,
+		};
+	}
 
-		const fromDate = startDtm.slice(0, 10);
+	// dashboard용: 기준일 포함 과거 7일간 (rtr_regist_dtm 기준)
+	const targetDate = isValidDateString(dateStr) ? dateStr : today;
+	const range7 = getWeekRange(targetDate);
+	startDtm = range7.startDtm;
+	endDtm = range7.endDtm;
+	fromDate = startDtm.slice(0, 10);
+	toDate = targetDate;
 
+	const query = `
+		SELECT
+			COUNT(*) AS weekTotal,
+			SUM(CASE WHEN rtr_confirm_dtm IS NULL THEN 1 ELSE 0 END) AS notConfirm,
+			SUM(CASE WHEN rtr_confirm_dtm IS NOT NULL THEN 1 ELSE 0 END) AS confirmed,
+			SUM(CASE WHEN rtr_status = 'CANCEL_GOSIWON' THEN 1 ELSE 0 END) AS cancelGosiwon,
+			SUM(CASE WHEN rtr_status = 'CANCEL_USER' THEN 1 ELSE 0 END) AS cancelUser,
+			SUM(CASE WHEN rtr_status = 'INVALID' THEN 1 ELSE 0 END) AS invalid
+		FROM il_tour_reservation
+		WHERE rtr_regist_dtm >= ? AND rtr_regist_dtm < ?
+	`;
+	const [row] = await mariaDBSequelize.query(query, {
+		replacements: [startDtm, endDtm],
+		type: mariaDBSequelize.QueryTypes.SELECT,
+	});
+	return {
+		date: targetDate,
+		from: fromDate,
+		to: toDate,
+		weekTotal: Number(row?.weekTotal) || 0,
+		notConfirm: Number(row?.notConfirm) || 0,
+		confirmed: Number(row?.confirmed) || 0,
+		cancelGosiwon: Number(row?.cancelGosiwon) || 0,
+		cancelUser: Number(row?.cancelUser) || 0,
+		invalid: Number(row?.invalid) || 0,
+	};
+};
+
+/**
+ * GET /v1/dashboard/tourReservationStats
+ * il_tour_reservation에서 기준일(또는 당일) 포함 과거 7일간 통계 (rtr_regist_dtm 기준). notConfirm/confirmed/취소·무효 건수.
+ */
+exports.getTourReservationStats = async (req, res, next) => {
+	try {
+		const data = await exports.fetchTourReservationStatsData(req.query.date);
 		return res.status(200).json({
 			statusCode: 200,
 			message: '룸투어 예약 주간 통계 조회 성공',
-			data: {
-				date: dateStr,
-				from: fromDate,
-				to: dateStr,
-				weekTotal: Number(row?.weekTotal) || 0,
-				notConfirm: Number(row?.notConfirm) || 0,
-				confirmed: Number(row?.confirmed) || 0,
-				cancelGosiwon: Number(row?.cancelGosiwon) || 0,
-				cancelUser: Number(row?.cancelUser) || 0,
-				invalid: Number(row?.invalid) || 0,
-			},
+			data,
 		});
 	} catch (err) {
 		next(err);

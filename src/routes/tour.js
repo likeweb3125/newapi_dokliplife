@@ -89,6 +89,37 @@ const tourController = require('../controllers/tour');
  *                     limit:
  *                       type: integer
  *                       description: "페이지당 건수"
+ *                     tourReservationStats:
+ *                       type: object
+ *                       description: "룸투어 예약 통계 (startDate~endDate 구간, 리스트와 동일)"
+ *                       properties:
+ *                         date:
+ *                           type: string
+ *                           description: "요청 기준일 (YYYY-MM-DD)"
+ *                         from:
+ *                           type: string
+ *                           description: "집계 구간 시작일"
+ *                         to:
+ *                           type: string
+ *                           description: "집계 구간 종료일"
+ *                         weekTotal:
+ *                           type: integer
+ *                           description: "한 주간 총 예약 건수"
+ *                         notConfirm:
+ *                           type: integer
+ *                           description: "미확인 건수 (rtr_confirm_dtm 없음)"
+ *                         confirmed:
+ *                           type: integer
+ *                           description: "확인됨 건수"
+ *                         cancelGosiwon:
+ *                           type: integer
+ *                           description: "고시원 취소 건수"
+ *                         cancelUser:
+ *                           type: integer
+ *                           description: "사용자 취소 건수"
+ *                         invalid:
+ *                           type: integer
+ *                           description: "무효 건수"
  *                     data:
  *                       type: array
  *                       items:

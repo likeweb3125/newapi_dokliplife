@@ -6,6 +6,7 @@
 const { mariaDBSequelize } = require('../models');
 const { next: idsNext } = require('./idsNext');
 const aligoSMS = require('../module/aligo/sms');
+const { phoneToRaw } = require('./phoneHelper');
 
 /**
  * 계약 링크 문자 발송 (receiver 번호로, messageSmsHistory 저장)
@@ -20,22 +21,23 @@ async function sendContractLinkSMS(receiverPhone, roomEsntlId, writerAdminId, go
 		const link = `https://doklipuser.likeweb.co.kr/v2?page=contract&rom_eid=${roomEsntlId}`;
 		const title = '[독립생활] 계약 요청 안내';
 		const message = `아래 링크에서 계약을 진행해주세요.\n${link}`;
-		await aligoSMS.send({ receiver: receiverPhone.trim(), title, message });
+		const firstReceiver = String(receiverPhone).trim().split(',')[0]?.trim() || String(receiverPhone).trim();
+		const firstReceiverRaw = phoneToRaw(firstReceiver) ?? firstReceiver;
+		await aligoSMS.send({ receiver: firstReceiverRaw, title, message });
 
 		const historyEsntlId = await idsNext('messageSmsHistory');
-		const firstReceiver = String(receiverPhone).trim().split(',')[0]?.trim() || String(receiverPhone).trim();
 		const userRows = await mariaDBSequelize.query(
 			`SELECT C.esntlId FROM customer C
 			 INNER JOIN roomContract RC ON RC.customerEsntlId = C.esntlId AND RC.status = 'USED'
 			 WHERE C.phone = :receiverPhone ORDER BY RC.contractDate DESC LIMIT 1`,
-			{ replacements: { receiverPhone: firstReceiver }, type: mariaDBSequelize.QueryTypes.SELECT }
+			{ replacements: { receiverPhone: firstReceiverRaw }, type: mariaDBSequelize.QueryTypes.SELECT }
 		);
 		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0 ? userRows[0].esntlId : null;
 		await mariaDBSequelize.query(
 			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy, createdAt, updatedAt)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 			{
-				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiver, writerAdminId || null],
+				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiverRaw, writerAdminId || null],
 				type: mariaDBSequelize.QueryTypes.INSERT,
 			}
 		);

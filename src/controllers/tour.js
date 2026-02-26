@@ -12,6 +12,8 @@ const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const aligoSMS = require('../module/aligo/sms');
 const { next: idsNext } = require('../utils/idsNext');
+const { phoneToDisplay } = require('../utils/phoneHelper');
+const dashboardController = require('./dashboard');
 
 // 공통 토큰 검증 함수 (관리자/파트너)
 const verifyAdminToken = (req) => {
@@ -70,6 +72,22 @@ exports.getTourItems = async (req, res, next) => {
 		const startDate = req.query.startDate || '';
 		const endDate = req.query.endDate || '';
 		const gswEid = req.query.gswEid || '';
+
+		// 통계용 effective date range (리스트와 동일: rtr_tour_dtm 기준)
+		const today = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+		const pad = (n) => String(n).padStart(2, '0');
+		const addDays = (dStr, days) => {
+			const d = new Date(dStr + 'T00:00:00');
+			d.setDate(d.getDate() + days);
+			return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		};
+		const addMonths = (dStr, m) => {
+			const d = new Date(dStr + 'T00:00:00');
+			d.setMonth(d.getMonth() + m);
+			return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		};
+		const statsStart = startDate || addDays(today, -7);
+		const statsEnd = endDate || addMonths(startDate || today, 6);
 		const status = req.query.status || '';
 		const search = req.query.search || '';
 		const page = parseInt(req.query.page) || 1;
@@ -168,7 +186,7 @@ exports.getTourItems = async (req, res, next) => {
 			${whereClause}
 		`;
 
-		const [rows, countResult] = await Promise.all([
+		const [rows, countResult, tourReservationStats] = await Promise.all([
 			mariaDBSequelize.query(listQuery, {
 				replacements: listReplacements,
 				type: mariaDBSequelize.QueryTypes.SELECT,
@@ -177,6 +195,7 @@ exports.getTourItems = async (req, res, next) => {
 				replacements,
 				type: mariaDBSequelize.QueryTypes.SELECT,
 			}),
+			dashboardController.fetchTourReservationStatsData(null, { startDate: statsStart, endDate: statsEnd }),
 		]);
 
 		const total = countResult?.[0]?.total != null ? parseInt(countResult[0].total, 10) : 0;
@@ -193,7 +212,7 @@ exports.getTourItems = async (req, res, next) => {
 			name: row.name ?? null,
 			birth: row.birth ?? null,
 			gender: row.gender ?? null,
-			phone: row.phone ?? null,
+			phone: phoneToDisplay(row.phone) ?? row.phone ?? null,
 			gsw_name: row.gsw_name ?? null,
 			gsw_eid: row.gsw_eid ?? null,
 			serviceNumber: row.serviceNumber ?? null,
@@ -208,6 +227,7 @@ exports.getTourItems = async (req, res, next) => {
 			page,
 			limit,
 			data,
+			tourReservationStats,
 		});
 	} catch (err) {
 		next(err);

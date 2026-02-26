@@ -13,6 +13,7 @@ const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
+const { phoneToRaw, phoneToDisplay } = require('../utils/phoneHelper');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -701,7 +702,7 @@ exports.registerDeposit = async (req, res, next) => {
 
 		// il_room_deposit 메인 레코드 생성 (예약금 입력 = 보증금으로 등록). 컬럼: rdp_customer_name, rdp_customer_phone, rdp_check_in_date
 		const customerNameVal = (depositorName != null && String(depositorName).trim()) ? String(depositorName).trim() : null;
-		const customerPhoneVal = (depositorPhone != null && String(depositorPhone).trim()) ? String(depositorPhone).trim() : null;
+		const customerPhoneVal = (depositorPhone != null && String(depositorPhone).trim()) ? (phoneToRaw(depositorPhone) ?? String(depositorPhone).trim()) : null;
 		const checkInDateVal = checkInDate ? (typeof checkInDate === 'string' ? checkInDate.split('T')[0] : null) : null;
 
 		// il_room_deposit 등록 시 rdp_completed_dtm(completedDtm)은 입력하지 않음
@@ -936,7 +937,7 @@ exports.getDepositGroupByDepositor = async (req, res, next) => {
 					amount: row.amount,
 					checkInDate: row.checkInDate || null,
 					checkinName: row.checkinName || null,
-					checkinPhone: row.checkinPhone || null,
+					checkinPhone: phoneToDisplay(row.checkinPhone) ?? row.checkinPhone ?? null,
 				},
 				manager: row.manager || null,
 				recordDate: row.recordDate || null,
@@ -1563,9 +1564,9 @@ exports.getReservationList = async (req, res, next) => {
 				gosiwonName: row.gosiwonName || null,
 				roomStatus: row.roomStatus || null,
 				reservationName: row.reservationName || null,
-				reservationPhone: row.reservationPhone || null,
+				reservationPhone: phoneToDisplay(row.reservationPhone) ?? row.reservationPhone ?? null,
 				contractorName: row.contractorName || null,
-				contractorPhone: row.contractorPhone || null,
+				contractorPhone: phoneToDisplay(row.contractorPhone) ?? row.contractorPhone ?? null,
 				checkInDate: row.checkInDate || null,
 				checkOutDate: row.checkOutDate || null,
 				depositStatus: row.depositStatus || null,
@@ -1612,7 +1613,7 @@ exports.getReservationList = async (req, res, next) => {
 							amount: row.amount,
 							checkInDate: row.checkInDate || null,
 							checkinName: row.checkinName || null,
-							checkinPhone: row.checkinPhone || null,
+							checkinPhone: phoneToDisplay(row.checkinPhone) ?? row.checkinPhone ?? null,
 						},
 						manager: null,
 						recordDate: row.recordDate || null,
@@ -1897,9 +1898,9 @@ exports.getDepositList = async (req, res, next) => {
 				customerBankAccount: row.customerBankAccount || null,
 				refundBankAccount: (row.refundBankAccount && String(row.refundBankAccount).trim()) || null,
 				checkinName: row.checkinName || null,
-				checkinPhone: row.checkinPhone || null,
+							checkinPhone: phoneToDisplay(row.checkinPhone) ?? row.checkinPhone ?? null,
 				contractorName: row.contractorName || null,
-				contractorPhone: row.contractorPhone || null,
+				contractorPhone: phoneToDisplay(row.contractorPhone) ?? row.contractorPhone ?? null,
 				depositAmount: row.depositAmount || null,
 				contractEsntlId: row.contractEsntlId || null,
 				moveInDate: row.moveInDate || null,

@@ -9,6 +9,7 @@ const { closeOpenStatusesForRoom, syncRoomFromRoomStatus, ROOM_STATUS_TO_RS_STAT
 const { dateToYmd } = require('../utils/dateHelper');
 const formatAge = require('../utils/formatAge');
 const { sendContractLinkSMS } = require('../utils/contractLinkSms');
+const { phoneToRaw, phoneToDisplay } = require('../utils/phoneHelper');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -1360,7 +1361,7 @@ exports.roomReserve = async (req, res, next) => {
 				roomEsntlId,
 				deposit,
 				monthlyRentToStore,
-				receiver,
+				phoneToRaw(receiver) ?? receiver,
 				checkInDate,
 				userSn,
 				userSn,
@@ -2096,7 +2097,7 @@ exports.getTourReservationList = async (req, res, next) => {
 			registrantId: row.registrantId ?? null,
 			confirmDtm: row.confirmDtm ?? null,
 			applicantName: row.applicantName ?? null,
-			applicantPhone: row.applicantPhone ?? null,
+			applicantPhone: phoneToDisplay(row.applicantPhone) ?? row.applicantPhone ?? null,
 			applicantGender: row.applicantGender ?? null,
 			applicantAge: formatAge(row.applicantBirth),
 		}));

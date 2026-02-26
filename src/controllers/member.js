@@ -11,6 +11,7 @@ const isAuthControllers = require('../controllers/auth');
 const db = require('../models');
 const { getWriterAdminId } = require('../utils/auth');
 const formatAge = require('../utils/formatAge');
+const { phoneToRaw, phoneToDisplay } = require('../utils/phoneHelper');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -171,7 +172,7 @@ exports.postCustomerRegister = async (req, res, next) => {
 				id: id,
 				pass: hashedPass,
 				name: name,
-				phone: phone,
+				phone: phone ? (phoneToRaw(phone) ?? phone) : null,
 				gender: normalizeGender(gender),
 				regDate: regDate,
 				isByAdmin: isByAdminValue,
@@ -281,7 +282,7 @@ exports.putCustomerUpdate = async (req, res, next) => {
 			if (typeof phone !== 'string') {
 				errorHandler.errorThrow(400, '휴대폰 번호는 문자열 형태(예: 01012345678)로 입력해주세요.');
 			}
-			updateFields.phone = phone;
+			updateFields.phone = phoneToRaw(phone) ?? phone;
 		}
 		if (id !== undefined) {
 			updateFields.id = id;
@@ -436,7 +437,7 @@ const MEMBER_TYPE_OCCUPANT = 'occupant';
 const toPerson = (esntlId, name, phone, gender, age, roomNumber, startDate, endDate) => ({
 	esntlId,
 	name: name ?? null,
-	phone: phone ?? null,
+	phone: phoneToDisplay(phone) ?? null,
 	gender: gender ?? null,
 	age: age != null ? Number(age) : null,
 	roomNumber: roomNumber ?? null,

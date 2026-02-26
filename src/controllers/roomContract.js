@@ -4,6 +4,7 @@ const { getWriterAdminId } = require('../utils/auth');
 const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 const formatAge = require('../utils/formatAge');
+const { phoneToRaw, phoneToDisplay } = require('../utils/phoneHelper');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -230,7 +231,12 @@ exports.getContractList = async (req, res, next) => {
 		});
 
 		const totalCount = countResult[0]?.total || 0;
-		const resultList = Array.isArray(mainResult) ? mainResult : [];
+		const resultList = (Array.isArray(mainResult) ? mainResult : []).map((row) => ({
+			...row,
+			customerPhone: phoneToDisplay(row.customerPhone) ?? row.customerPhone,
+			checkinPhone: phoneToDisplay(row.checkinPhone) ?? row.checkinPhone,
+			contractCustomerPhone: phoneToDisplay(row.contractCustomerPhone) ?? row.contractCustomerPhone,
+		}));
 
 		// 응답 데이터 구성
 		const response = {
@@ -326,6 +332,10 @@ exports.getContractDetail = async (req, res, next) => {
 
 		// 나이: 생년월일 기준 계산 (formatAge), 없으면 RCW 저장값 사용
 		contractInfo.contractCustomerAge = formatAge(contractInfo.customerBirth) ?? contractInfo.contractCustomerAge ?? null;
+		// 전화번호 포맷팅 (반환 시 " - " 구분자)
+		contractInfo.customerPhone = phoneToDisplay(contractInfo.customerPhone) ?? contractInfo.customerPhone;
+		contractInfo.checkinPhone = phoneToDisplay(contractInfo.checkinPhone) ?? contractInfo.checkinPhone;
+		contractInfo.contractCustomerPhone = phoneToDisplay(contractInfo.contractCustomerPhone) ?? contractInfo.contractCustomerPhone;
 
 		// 연동 결제 내역 조회 (paymentLog, extrapayEsntlId 값 없음 = 일반 연장 결제)
 		const paymentLogQuery = `
@@ -662,7 +672,7 @@ exports.updateContract = async (req, res, next) => {
 			);
 		}
 		if (checkinPhone !== undefined && checkinPhone !== contract.checkinPhone) {
-			whoUpdateData.checkinPhone = checkinPhone;
+			whoUpdateData.checkinPhone = phoneToRaw(checkinPhone) ?? checkinPhone;
 			changes.push(
 				`체크인한 사람 연락처: ${contract.checkinPhone || '없음'} → ${checkinPhone || '없음'}`
 			);
@@ -686,7 +696,7 @@ exports.updateContract = async (req, res, next) => {
 			);
 		}
 		if (contractCustomerPhone !== undefined && contractCustomerPhone !== contract.customerPhone) {
-			whoUpdateData.customerPhone = contractCustomerPhone;
+			whoUpdateData.customerPhone = phoneToRaw(contractCustomerPhone) ?? contractCustomerPhone;
 			changes.push(
 				`고객 연락처: ${contract.customerPhone || '없음'} → ${contractCustomerPhone || '없음'}`
 			);
@@ -728,7 +738,7 @@ exports.updateContract = async (req, res, next) => {
 			changes.push(`입주자명: ${customerInfo.name || '없음'} → ${customerName}`);
 		}
 		if (customerPhone !== undefined && customerPhone !== customerInfo.phone) {
-			customerUpdateData.phone = customerPhone;
+			customerUpdateData.phone = phoneToRaw(customerPhone) ?? customerPhone;
 			changes.push(
 				`입주자 연락처: ${customerInfo.phone || '없음'} → ${customerPhone}`
 			);
@@ -817,7 +827,7 @@ exports.updateContract = async (req, res, next) => {
 					contractorPhone !== undefined &&
 					contractorPhone !== contractorInfo.phone
 				) {
-					contractorUpdateData.phone = contractorPhone;
+					contractorUpdateData.phone = phoneToRaw(contractorPhone) ?? contractorPhone;
 					changes.push(
 						`계약자 연락처: ${contractorInfo.phone || '없음'} → ${contractorPhone}`
 					);
@@ -1138,7 +1148,7 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				console.log('[depositAndExtra] 해당 고시원 il_room_deposit 샘플:', debugRows?.slice(0, 3) ?? []);
 			}
 
-			// depositList와 동일한 구조로 매핑
+			// depositList와 동일한 구조로 매핑 (전화번호 반환 시 " - " 포맷)
 			depositList = (depositRows || []).map((row) => ({
 				depositEsntlId: row.depositEsntlId || null,
 				roomEsntlId: row.roomEsntlId,
@@ -1151,9 +1161,9 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				customerBankAccount: contractInfo.customerBankAccount || null,
 				refundBankAccount: (contractInfo.refundBankAccount && String(contractInfo.refundBankAccount).trim()) || null,
 				checkinName: contractInfo.checkinName || null,
-				checkinPhone: contractInfo.checkinPhone || null,
+				checkinPhone: phoneToDisplay(contractInfo.checkinPhone) ?? contractInfo.checkinPhone ?? null,
 				contractorName: contractInfo.contractorName || null,
-				contractorPhone: contractInfo.contractorPhone || null,
+				contractorPhone: phoneToDisplay(contractInfo.contractorPhone) ?? contractInfo.contractorPhone ?? null,
 				depositAmount: row.depositAmount || null,
 				contractEsntlId: contractInfo.contractEsntlId || null,
 				moveInDate: contractInfo.startDate ? String(contractInfo.startDate).slice(0, 10) : null,

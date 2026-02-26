@@ -14,6 +14,7 @@ const enumConfig = require('../middleware/enum');
 const { QueryTypes } = require('sequelize');
 const logs = require('../models/logs');
 const formatAge = require('../utils/formatAge');
+const { phoneToDisplay } = require('../utils/phoneHelper');
 
 // 전체통계
 // 2023.09.12 ash
@@ -885,11 +886,11 @@ exports.getRealTimeList = async (req, res, next) => {
 				deposit: deposit,
 				// 입실자/계약자 정보 (roomContractWho)
 				checkinName: checkinName ?? null,
-				checkinPhone: checkinPhone ?? null,
+				checkinPhone: phoneToDisplay(checkinPhone) ?? checkinPhone ?? null,
 				checkinGender: checkinGender ?? null,
 				checkinAge: checkinAge != null ? Number(checkinAge) : null,
 				contractCustomerName: contractCustomerName ?? null,
-				contractCustomerPhone: contractCustomerPhone ?? null,
+				contractCustomerPhone: phoneToDisplay(contractCustomerPhone) ?? contractCustomerPhone ?? null,
 				contractCustomerGender: contractCustomerGender ?? null,
 				contractCustomerAge: contractCustomerAge != null ? Number(contractCustomerAge) : null,
 				isRefund,

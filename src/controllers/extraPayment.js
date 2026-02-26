@@ -13,6 +13,7 @@ const historyController = require('./history');
 const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const aligoSMS = require('../module/aligo/sms');
+const { phoneToRaw } = require('../utils/phoneHelper');
 
 const EXTR_PREFIX = 'EXTR';
 const EXTR_PADDING = 10;
@@ -71,20 +72,21 @@ const sendExtraPaymentLinkSMS = async (receiverPhone, extEid, writerAdminId, gos
 		const link = `https://doklipuser.likeweb.co.kr/v2?page=extraPay&ext_eid=${extEid}`;
 		const title = '[독립생활]추가결제 안내';
 		const message = `다음 링크에서 결제해주세요\n${link}`;
-		await aligoSMS.send({ receiver: receiverPhone.trim(), title, message });
+		const firstReceiver = String(receiverPhone).trim().split(',')[0]?.trim() || String(receiverPhone).trim();
+		const firstReceiverRaw = phoneToRaw(firstReceiver) ?? firstReceiver;
+		await aligoSMS.send({ receiver: firstReceiverRaw, title, message });
 
 		const historyEsntlId = await idsNext('messageSmsHistory');
-		const firstReceiver = String(receiverPhone).trim().split(',')[0]?.trim() || String(receiverPhone).trim();
 		const userRows = await mariaDBSequelize.query(
 			`SELECT C.esntlId FROM customer C WHERE C.phone = :receiverPhone LIMIT 1`,
-			{ replacements: { receiverPhone: firstReceiver }, type: mariaDBSequelize.QueryTypes.SELECT }
+			{ replacements: { receiverPhone: firstReceiverRaw }, type: mariaDBSequelize.QueryTypes.SELECT }
 		);
 		const resolvedUserEsntlId = Array.isArray(userRows) && userRows.length > 0 ? userRows[0].esntlId : customerEsntlId || null;
 		await mariaDBSequelize.query(
 			`INSERT INTO messageSmsHistory (esntlId, title, content, gosiwonEsntlId, userEsntlId, receiverPhone, createdBy, createdAt, updatedAt)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 			{
-				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiver, writerAdminId || null],
+				replacements: [historyEsntlId, title, message, gosiwonEsntlId || null, resolvedUserEsntlId, firstReceiverRaw, writerAdminId || null],
 				type: mariaDBSequelize.QueryTypes.INSERT,
 			}
 		);

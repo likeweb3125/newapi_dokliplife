@@ -1,6 +1,7 @@
 const { mariaDBSequelize } = require('../models');
 const errorHandler = require('../middleware/error');
 const formatAge = require('../utils/formatAge');
+const { phoneToDisplay } = require('../utils/phoneHelper');
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -770,7 +771,8 @@ exports.mngChartMain = async (req, res, next) => {
 					const gn = row.checkinName || row.customerName || '';
 					const ga = row.checkinAge ?? computedCustomerAge ?? '';
 					const gg = row.checkinGender ?? row.customerGender ?? '';
-					const gp = row.checkinPhone ?? row.customerPhone ?? '';
+					const gpRaw = row.checkinPhone ?? row.customerPhone ?? '';
+					const gp = phoneToDisplay(gpRaw) ?? gpRaw;
 					reserveOverrides.currentGuest = gn;
 					reserveOverrides.guestPhone = gp || null;
 					reserveOverrides.customerGender = row.customerGender ?? null;
@@ -779,7 +781,8 @@ exports.mngChartMain = async (req, res, next) => {
 					reserveOverrides.checkinAge = row.checkinAge ?? null;
 					reserveOverrides.guest = `${gn} / ${ga} / ${gg}(${gp})`;
 				} else if (row.status === 'RESERVE_PENDING' && row.rorSn) {
-					const rorHp = row.rorHpNo || '';
+					const rorHpRaw = row.rorHpNo || '';
+					const rorHp = phoneToDisplay(rorHpRaw) ?? rorHpRaw;
 					reserveOverrides.guestPhone = rorHp || null;
 					reserveOverrides.guest = rorHp ? `- / - / -(${rorHp})` : null;
 				}
@@ -787,7 +790,8 @@ exports.mngChartMain = async (req, res, next) => {
 					const cn = row.contractorName || row.customerName || '';
 					const ca = row.contractorAge ?? computedCustomerAge ?? '';
 					const cg = row.contractorGender ?? row.customerGender ?? '';
-					const cp = row.contractorPhone ?? row.customerPhone ?? '';
+					const cpRaw = row.contractorPhone ?? row.customerPhone ?? '';
+					const cp = phoneToDisplay(cpRaw) ?? cpRaw;
 					reserveOverrides.contractPerson = `${cn} / ${ca} / ${cg}(${cp})`;
 					if (row.customerBank && row.customerBankAccount) {
 						reserveOverrides.accountInfo = `${row.customerBank} ${row.customerBankAccount} ${cn}`;
@@ -820,13 +824,15 @@ exports.mngChartMain = async (req, res, next) => {
 					const guestName = row.checkinName || row.customerName || '';
 					const guestAge = row.checkinAge || computedCustomerAge || '';
 					const guestGender = row.checkinGender || row.customerGender || '';
-					const guestPhone = row.checkinPhone || row.customerPhone || '';
+					const guestPhoneRaw = row.checkinPhone || row.customerPhone || '';
+					const guestPhone = phoneToDisplay(guestPhoneRaw) ?? guestPhoneRaw;
 					const guest = `${guestName} / ${guestAge} / ${guestGender}(${guestPhone})`;
 
 					const contractorName = row.contractorName || row.customerName || '';
 					const contractorAge = row.contractorAge || computedCustomerAge || '';
 					const contractorGender = row.contractorGender || row.customerGender || '';
-					const contractorPhone = row.contractorPhone || row.customerPhone || '';
+					const contractorPhoneRaw = row.contractorPhone || row.customerPhone || '';
+					const contractorPhone = phoneToDisplay(contractorPhoneRaw) ?? contractorPhoneRaw;
 					const contractor = `${contractorName} / ${contractorAge} / ${contractorGender}(${contractorPhone})`;
 
 					const accountInfo = row.customerBank && row.customerBankAccount
@@ -872,13 +878,15 @@ exports.mngChartMain = async (req, res, next) => {
 				if (hasContract) {
 					const guestName = row.checkinName || row.customerName || '';
 					const contractorName = row.contractorName || row.customerName || '';
-					const guest = guestName ? `${guestName} / ${row.checkinAge || computedCustomerAge || ''} / ${row.checkinGender || row.customerGender || ''}(${row.checkinPhone || row.customerPhone || ''})` : '';
-					const contractor = contractorName ? `${contractorName} / ${row.contractorAge || computedCustomerAge || ''} / ${row.contractorGender || row.customerGender || ''}(${row.contractorPhone || row.customerPhone || ''})` : '';
+					const guestPhoneFmt = phoneToDisplay(row.checkinPhone || row.customerPhone || '') ?? (row.checkinPhone || row.customerPhone || '');
+					const contractorPhoneFmt = phoneToDisplay(row.contractorPhone || row.customerPhone || '') ?? (row.contractorPhone || row.customerPhone || '');
+					const guest = guestName ? `${guestName} / ${row.checkinAge || computedCustomerAge || ''} / ${row.checkinGender || row.customerGender || ''}(${guestPhoneFmt})` : '';
+					const contractor = contractorName ? `${contractorName} / ${row.contractorAge || computedCustomerAge || ''} / ${row.contractorGender || row.customerGender || ''}(${contractorPhoneFmt})` : '';
 					checkoutOverrides.contractStart = contractStart;
 					checkoutOverrides.contractEnd = contractEnd;
 					checkoutOverrides.period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
 					checkoutOverrides.currentGuest = guestName;
-					checkoutOverrides.guestPhone = row.checkinPhone || row.customerPhone || null;
+					checkoutOverrides.guestPhone = guestPhoneFmt || null;
 					checkoutOverrides.customerGender = row.customerGender ?? null;
 					checkoutOverrides.customerAge = computedCustomerAge ?? null;
 					checkoutOverrides.checkinGender = row.checkinGender ?? null;

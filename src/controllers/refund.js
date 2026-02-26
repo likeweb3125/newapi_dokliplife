@@ -12,6 +12,7 @@ const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
 const { dateToYmd } = require('../utils/dateHelper');
 const formatAge = require('../utils/formatAge');
+const { phoneToDisplay } = require('../utils/phoneHelper');
 
 const REFUND_PREFIX = 'RFND';
 const REFUND_PADDING = 10;
@@ -912,6 +913,9 @@ exports.getRefundRequestList = async (req, res, next) => {
 		const data = (Array.isArray(rows) ? rows : []).map((row) => ({
 			...row,
 			age: formatAge(row.birth) ?? null,
+			phone: phoneToDisplay(row.phone) ?? row.phone,
+			checkinPhone: phoneToDisplay(row.checkinPhone) ?? row.checkinPhone,
+			contractCustomerPhone: phoneToDisplay(row.contractCustomerPhone) ?? row.contractCustomerPhone,
 		}));
 
 		// 페이지 기반 형식으로 응답
@@ -1263,7 +1267,14 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 		const result = {
 			...baseRow,
 			contractInfo: contractInfo
-				? { ...contractInfo, customerAge: formatAge(contractInfo.customerBirth) ?? null }
+				? {
+						...contractInfo,
+						customerAge: formatAge(contractInfo.customerBirth) ?? null,
+						adminPhone: phoneToDisplay(contractInfo.adminPhone) ?? contractInfo.adminPhone,
+						customerPhone: phoneToDisplay(contractInfo.customerPhone) ?? contractInfo.customerPhone,
+						checkinPhone: phoneToDisplay(contractInfo.checkinPhone) ?? contractInfo.checkinPhone,
+						contractorPhone: phoneToDisplay(contractInfo.contractorPhone) ?? contractInfo.contractorPhone,
+				  }
 				: null,
 			paymentInfo: Array.isArray(paymentInfo) ? paymentInfo : [],
 			settlementInfo,
