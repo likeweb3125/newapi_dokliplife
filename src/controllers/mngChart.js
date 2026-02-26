@@ -69,7 +69,6 @@ const getContractType = (contractDate, startDate) => {
 const STATUS_MAP = {
 	'BEFORE_SALES': { color: '#9B9B9B', label: '판매신청전' },
 	'ON_SALE': { color: '#27A644', label: '판매중' },
-	'PENDING': { color: '#FFB800', label: '입금대기중' },
 	'VBANK_PENDING': { color: '#FFB800', label: '입실로 입금대기중' },
 	'RESERVE_PENDING': { color: '#FFB800', label: '입실료 결제대기중' },
 	'RESERVED': { color: '#35BB88', label: '예약중' },
@@ -357,9 +356,8 @@ exports.mngChartMain = async (req, res, next) => {
 									WHEN 'CHECKOUT_ONSALE' THEN 8
 									WHEN 'END_DEPOSIT' THEN 9
 									WHEN 'END' THEN 10
-									WHEN 'PENDING' THEN 11
-									WHEN 'VBANK_PENDING' THEN 12
-									WHEN 'RESERVE_PENDING' THEN 13
+									WHEN 'VBANK_PENDING' THEN 11
+									WHEN 'RESERVE_PENDING' THEN 12
 									WHEN 'CAN_CHECKIN' THEN 14
 									WHEN 'BEFORE_SALES' THEN 15
 									ELSE 16
@@ -479,7 +477,7 @@ exports.mngChartMain = async (req, res, next) => {
 			roomIdToGroupIndex[group.id] = index; // group.id는 esntlId
 		});
 
-		// 2. Items 데이터 조회 (roomStatus: CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_*, PENDING)
+		// 2. Items 데이터 조회 (roomStatus: CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_*)
 		const roomStatusItemsQuery = `
 			SELECT 
 				RS.esntlId AS id,
@@ -493,6 +491,7 @@ exports.mngChartMain = async (req, res, next) => {
 				RS.etcStartDate,
 				RS.etcEndDate,
 				RS.contractEsntlId,
+				RS.reservationEsntlId,
 				RS.createdAt AS roomStatusCreatedAt,
 				R.roomNumber,
 				RC.esntlId AS contractEsntlIdVal,
@@ -563,9 +562,19 @@ exports.mngChartMain = async (req, res, next) => {
 							))
 						)
 					ORDER BY D.rdp_completed_dtm DESC, D.rdp_regist_dtm DESC LIMIT 1
-				) ELSE NULL END AS depositPrice
+				) ELSE NULL END AS depositPrice,
+				RR.ror_sn AS rorSn,
+				RR.ror_hp_no AS rorHpNo,
+				RR.ror_deposit AS rorDeposit,
+				RR.ror_monthlyRent AS rorMonthlyRent,
+				RR.ror_check_in_date AS rorCheckInDate,
+				RR.ror_period AS rorPeriod,
+				RR.ror_contract_start_date AS rorContractStartDate,
+				RR.ror_contract_end_date AS rorContractEndDate,
+				RR.ror_pay_method AS rorPayMethod
 			FROM roomStatus RS
 			JOIN room R ON RS.roomEsntlId = R.esntlId
+			LEFT JOIN il_room_reservation RR ON RS.reservationEsntlId = RR.ror_sn AND RR.ror_status_cd = 'WAIT'
 			LEFT JOIN gosiwon G ON RS.gosiwonEsntlId = G.esntlId
 			LEFT JOIN gosiwonAdmin GA ON G.adminEsntlId = GA.esntlId
 			LEFT JOIN roomContract RC ON RS.contractEsntlId = RC.esntlId
@@ -586,7 +595,7 @@ exports.mngChartMain = async (req, res, next) => {
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 				AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N')
-				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE', 'RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING')
+				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE', 'RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING')
 				AND (
 					(RS.status IN ('CONTRACT', 'OVERDUE', 'ROOM_MOVE')
 						AND RS.statusStartDate <= ?
@@ -600,7 +609,7 @@ exports.mngChartMain = async (req, res, next) => {
 							OR (COALESCE(RS.etcStartDate, RS.statusEndDate) < ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) >= ?)
 						))
 					OR
-					(RS.status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING')
+					(RS.status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING')
 						AND COALESCE(RS.statusStartDate, RS.etcStartDate, RS.createdAt) <= ?
 						AND (COALESCE(RS.statusEndDate, RS.etcEndDate) >= ? OR (RS.statusEndDate IS NULL AND RS.etcEndDate IS NULL))
 					)
@@ -677,7 +686,7 @@ exports.mngChartMain = async (req, res, next) => {
 			if (row.status === 'CHECKOUT_REQUESTED') {
 				statusStartRaw = row.etcStartDate || row.statusEndDate;
 				statusEndRaw = row.etcEndDate;
-			} else if (['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING'].includes(row.status)) {
+			} else if (['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING'].includes(row.status)) {
 				statusStartRaw = row.statusStartDate || row.etcStartDate || row.createdAt;
 				statusEndRaw = row.statusEndDate || row.etcEndDate;
 			} else {
@@ -735,15 +744,27 @@ exports.mngChartMain = async (req, res, next) => {
 				...overrides,
 			});
 
-			const isReserveType = ['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING', 'PENDING'].includes(row.status);
+			const isReserveType = ['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING'].includes(row.status);
 			if (isReserveType) {
-				// RESERVE_PENDING, RESERVED, VBANK_PENDING, PENDING → contract 형식 (계약 있으면 포함, 없으면 null)
+				// RESERVE_PENDING, RESERVED, VBANK_PENDING → contract 형식 (계약 있으면 roomContract/RCW, 없고 RESERVE_PENDING이면 il_room_reservation 기준)
 				const reserveOverrides = {};
 				if (hasContract) {
 					reserveOverrides.contractStart = contractStart;
 					reserveOverrides.contractEnd = contractEnd;
 					reserveOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
 					reserveOverrides.periodType = row.month ? `${row.month}개월` : '';
+				} else if (row.status === 'RESERVE_PENDING' && row.rorSn) {
+					// RESERVE_PENDING이고 계약서 없을 때: il_room_reservation 기준으로 반환값 채움
+					const rrContractStart = row.rorContractStartDate ? formatDateTime(formatDateOnly(row.rorContractStartDate)) : null;
+					const rrContractEnd = row.rorContractEndDate ? formatDateTime(formatDateOnly(row.rorContractEndDate) + ' 23:59:59') : null;
+					reserveOverrides.contractNumber = row.reservationEsntlId || row.rorSn;
+					reserveOverrides.contractStart = rrContractStart;
+					reserveOverrides.contractEnd = rrContractEnd;
+					if (row.rorPeriod === 'PART' && row.rorContractStartDate && row.rorContractEndDate) {
+						reserveOverrides.periodType = `${formatDateOnly(row.rorContractStartDate).slice(5, 7)}-${formatDateOnly(row.rorContractStartDate).slice(8, 10)} ~ ${formatDateOnly(row.rorContractEndDate).slice(5, 7)}-${formatDateOnly(row.rorContractEndDate).slice(8, 10)}`;
+					} else {
+						reserveOverrides.periodType = row.rorPeriod === 'MONTH' ? '1개월' : (row.rorPeriod || '');
+					}
 				}
 				if (hasContract && (row.checkinName || row.customerName)) {
 					const gn = row.checkinName || row.customerName || '';
@@ -757,6 +778,10 @@ exports.mngChartMain = async (req, res, next) => {
 					reserveOverrides.checkinGender = row.checkinGender ?? null;
 					reserveOverrides.checkinAge = row.checkinAge ?? null;
 					reserveOverrides.guest = `${gn} / ${ga} / ${gg}(${gp})`;
+				} else if (row.status === 'RESERVE_PENDING' && row.rorSn) {
+					const rorHp = row.rorHpNo || '';
+					reserveOverrides.guestPhone = rorHp || null;
+					reserveOverrides.guest = rorHp ? `- / - / -(${rorHp})` : null;
 				}
 				if (hasContract && (row.contractorName || row.customerName)) {
 					const cn = row.contractorName || row.customerName || '';
@@ -769,13 +794,19 @@ exports.mngChartMain = async (req, res, next) => {
 					}
 				}
 				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
+				else if (row.status === 'RESERVE_PENDING' && row.rorSn && row.rorMonthlyRent != null && row.rorMonthlyRent !== '') reserveOverrides.entryFee = `${row.rorMonthlyRent}`;
 				if (hasContract && (parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
+				else if (row.status === 'RESERVE_PENDING' && row.rorSn) reserveOverrides.paymentAmount = '0';
 				if (hasContract && (parseInt(row.paymentPoint) || 0) > 0) reserveOverrides.paymentPoint = parseInt(row.paymentPoint) || 0;
 				if (hasContract && (parseInt(row.paymentCoupon) || 0) > 0) reserveOverrides.paymentCoupon = parseInt(row.paymentCoupon) || 0;
 				if (hasContract && (parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
+				else if (row.status === 'RESERVE_PENDING' && row.rorSn && (parseInt(row.rorDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.rorDeposit) || 0).toLocaleString()} 원`;
 				if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') reserveOverrides.depositEsntlId = row.depositEsntlId;
 				if (row.depositCompleteDate != null) reserveOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
 				if (row.depositPrice != null) reserveOverrides.depositPrice = row.depositPrice;
+				if (row.status === 'RESERVE_PENDING' && row.rorSn && row.rorPayMethod) {
+					reserveOverrides.additionalPaymentOption = `결제방법: ${row.rorPayMethod}`;
+				}
 				items.push(baseItem(reserveOverrides));
 				pushStatusLine(row.roomEsntlId, row);
 			} else if (row.status !== 'CHECKOUT_REQUESTED') {

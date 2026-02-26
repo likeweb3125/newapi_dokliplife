@@ -234,7 +234,7 @@ exports.getDashboardCnt = async (req, res, next) => {
 			),
 			status_counts AS (
 				SELECT
-					SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
+					SUM(CASE WHEN status = 'RESERVE_PENDING' THEN 1 ELSE 0 END) AS pending,
 					SUM(CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END) AS reserved,
 					SUM(CASE WHEN status = 'CONTRACT' THEN 1 ELSE 0 END) AS inUse,
 					SUM(CASE WHEN status = 'OVERDUE' THEN 1 ELSE 0 END) AS overdue,

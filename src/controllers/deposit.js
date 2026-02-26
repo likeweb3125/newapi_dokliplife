@@ -1876,7 +1876,22 @@ exports.createDepositRefund = async (req, res, next) => {
 		if (!deposit.roomEsntlId) {
 			errorHandler.errorThrow(400, '보증금에 방 정보가 없어 환불 이력을 등록할 수 없습니다.');
 		}
-		const targetAmount = Number(deposit.amount) || 0;
+		const depositTargetAmount = Number(deposit.amount) || 0;
+
+		// DEPOSIT의 실제 입금액 (COMPLETED/PARTIAL 합계) = 환불·차감 판단 기준. PENDING만 있으면 0
+		const [paidResult] = await mariaDBSequelize.query(
+			`SELECT COALESCE(SUM(amount), 0) AS totalPaid
+			 FROM il_room_deposit_history
+			 WHERE depositEsntlId = ? AND type = 'DEPOSIT' AND status IN ('COMPLETED', 'PARTIAL')`,
+			{
+				replacements: [depositEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		const totalPaidFromDeposit = parseInt(paidResult?.totalPaid || 0, 10);
+		// 환불 완료 판단 기준: 실제 입금액이 있으면 그 금액, 없으면 보증금 목표액(il_room_deposit.amount)
+		const targetAmountForStatus = totalPaidFromDeposit > 0 ? totalPaidFromDeposit : depositTargetAmount;
 
 		// 기존 RETURN 이력의 (amount + deductionAmount) 합계
 		const [sumResult] = await mariaDBSequelize.query(
@@ -1893,16 +1908,17 @@ exports.createDepositRefund = async (req, res, next) => {
 		const thisReturnTotal = refundAmount + deductionAmount;
 		const totalAfter = existingReturnSum + thisReturnTotal;
 
-		if (targetAmount > 0 && totalAfter > targetAmount) {
+		// 검증: 환불+차감 합계는 보증금 목표액(il_room_deposit.amount)을 초과할 수 없음
+		if (depositTargetAmount > 0 && totalAfter > depositTargetAmount) {
 			errorHandler.errorThrow(
 				400,
-				`환불+차감 합계가 보증금 금액을 초과합니다. (보증금: ${targetAmount.toLocaleString()}, 기존 반환 합계: ${existingReturnSum.toLocaleString()}, 이번 환불+차감: ${thisReturnTotal.toLocaleString()}, 최대 가능: ${(targetAmount - existingReturnSum).toLocaleString()})`
+				`환불+차감 합계가 보증금 금액을 초과합니다. (보증금: ${depositTargetAmount.toLocaleString()}, 기존 반환 합계: ${existingReturnSum.toLocaleString()}, 이번 환불+차감: ${thisReturnTotal.toLocaleString()}, 최대 가능: ${(depositTargetAmount - existingReturnSum).toLocaleString()})`
 			);
 		}
 
-		// status: 환불+차감 합계가 il_room_deposit 금액과 동일하면 COMPLETED, 아니면 PARTIAL (보증금 등록과 동일)
+		// status: 실제 입금액(또는 보증금 목표액) 대비 환불+차감 합계로 PARTIAL/COMPLETED 판단 (DEPOSIT의 PARTIAL/COMPLETED와 동일한 방식)
 		const status =
-			targetAmount <= 0 || totalAfter >= targetAmount ? 'COMPLETED' : 'PARTIAL';
+			targetAmountForStatus <= 0 || totalAfter >= targetAmountForStatus ? 'COMPLETED' : 'PARTIAL';
 
 		const historyId = await generateIlRoomDepositHistoryId(transaction);
 		await ilRoomDepositHistory.create(
@@ -1927,7 +1943,7 @@ exports.createDepositRefund = async (req, res, next) => {
 		);
 
 		// 전액 반환 완료 시 il_room_deposit.rdp_return_dtm 갱신
-		if (status === 'COMPLETED' && targetAmount > 0) {
+		if (status === 'COMPLETED' && depositTargetAmount > 0) {
 			await ilRoomDeposit.update(
 				{
 					returnDtm: mariaDBSequelize.literal('CURRENT_TIMESTAMP'),

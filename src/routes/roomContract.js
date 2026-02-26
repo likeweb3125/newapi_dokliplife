@@ -47,8 +47,8 @@ const roomContractController = require('../controllers/roomContract');
  *         required: false
  *         schema:
  *           type: string
- *           enum: [PENDING, RESERVED, CONTRACT, OVERDUE, CHECKOUT_CONFIRMED, UNPAID]
- *         description: 방 상태 필터 (입금대기중(PENDING), 예약중(RESERVED), 이용중(CONTRACT), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID))
+ *           enum: [RESERVE_PENDING, RESERVED, CONTRACT, OVERDUE, CHECKOUT_CONFIRMED, UNPAID]
+ *         description: "방 상태 필터 (입금대기중(RESERVE_PENDING), 예약중(RESERVED), 이용중(CONTRACT), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID))"
  *       - in: query
  *         name: startDate
  *         required: false

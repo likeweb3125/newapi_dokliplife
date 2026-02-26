@@ -511,7 +511,7 @@ router.post('/addEventDirectly', roomController.addEventDirectly);
  * /v1/room/dashboardCnt:
  *   get:
  *     summary: 계약현황용 대시보드 집계 조회
- *     description: "total은 roomContract 테이블 전체 건수, 그 외 값은 roomStatus를 계약서(contractEsntlId)별로 그룹화한 뒤 각 계약당 최신 1건(updatedAt·esntlId 기준)의 status로 집계한 건수입니다. 입금대기중(PENDING), 예약중(RESERVED), 이용중(CONTRACT), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID)."
+ *     description: "total은 roomContract 테이블 전체 건수, 그 외 값은 roomStatus를 계약서(contractEsntlId)별로 그룹화한 뒤 각 계약당 최신 1건(updatedAt·esntlId 기준)의 status로 집계한 건수입니다. 입금대기중(RESERVE_PENDING), 예약중(RESERVED), 이용중(CONTRACT), 체납상태(OVERDUE), 퇴실확정(CHECKOUT_CONFIRMED), 보증금 미납(UNPAID)."
  *     tags: [계약현황]
  *     security:
  *       - bearerAuth: []
@@ -538,7 +538,7 @@ router.post('/addEventDirectly', roomController.addEventDirectly);
  *                       example: 500
  *                     pending:
  *                       type: integer
- *                       description: 입금대기중 (status = PENDING)
+ *                       description: "입금대기중 (status = RESERVE_PENDING)"
  *                       example: 10
  *                     reserved:
  *                       type: integer

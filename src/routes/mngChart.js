@@ -139,7 +139,7 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                                 description: 상태 텍스트 색상
  *                     items:
  *                       type: array
- *                       description: "roomStatus 전체 값 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_*, PENDING, ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED). 계약서 없으면 계약 관련 필드는 null, className은 timeline-item 고정"
+ *                       description: "roomStatus 전체 값 (CONTRACT, OVERDUE, CHECKOUT_REQUESTED, ROOM_MOVE, RESERVE_*, ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED). 계약서 없으면 계약 관련 필드는 null, className은 timeline-item 고정"
  *                       items:
  *                         type: object
  *                         properties:
