@@ -1204,6 +1204,7 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			SELECT 
 				esntlId,
 				contractEsntlId,
+				extrapayEsntlId,
 				pDate,
 				pTime,
 				paymentType,
@@ -1219,10 +1220,21 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				AND calculateStatus = 'SUCCESS'
 			ORDER BY pDate DESC, pTime DESC
 		`;
-		const paymentInfo = await mariaDBSequelize.query(paymentInfoQuery, {
+		const paymentInfoRaw = await mariaDBSequelize.query(paymentInfoQuery, {
 			replacements: [cttEid],
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
+		// isExtra, extrapayEsntlId 추가 (extrapayEsntlId 있으면 isExtra=true, extrapayEsntlId 반환, 없으면 false, null)
+		const paymentInfo = Array.isArray(paymentInfoRaw)
+			? paymentInfoRaw.map((p) => {
+					const extId = p.extrapayEsntlId != null && String(p.extrapayEsntlId).trim() !== '' ? p.extrapayEsntlId : null;
+					return {
+						...p,
+						isExtra: extId != null,
+						extrapayEsntlId: extId,
+					};
+			  })
+			: [];
 
 		// 4. 정산정보 (il_daily_selling_closing: 해당 고시원·결제일 기준 PAYMENT 마감 행 1건)
 		let settlementInfo = null;

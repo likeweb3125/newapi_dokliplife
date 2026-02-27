@@ -710,6 +710,13 @@ router.get('/data', refundController.getRefundRequestData);
  *                             type: string
  *                           paymentAmount:
  *                             type: string
+ *                           isExtra:
+ *                             type: boolean
+ *                             description: "추가 결제 여부 (extrapayEsntlId 있으면 true, 없으면 false)"
+ *                           extrapayEsntlId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "추가 결제 시 extraPayment.esntlId, 일반 결제 시 null"
  *                     settlementInfo:
  *                       type: object
  *                       nullable: true
