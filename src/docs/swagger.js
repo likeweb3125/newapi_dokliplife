@@ -52,6 +52,11 @@ const options = {
 						checkOutTime: { type: 'string', nullable: true, description: '퇴실시간' },
 						useCheckInTime: { type: 'boolean', description: '체크인 시간 사용 여부', example: false },
 						useCheckOutTime: { type: 'boolean', description: '체크아웃 시간 사용 여부', example: false },
+						commision: { type: 'string', description: '수수료율 (기본값 7)' },
+						use_sale_commision: { type: 'boolean', description: '할인 수수료 사용 여부' },
+						saleCommisionStartDate: { type: 'string', nullable: true, description: '할인 수수료 시작일' },
+						saleCommisionEndDate: { type: 'string', nullable: true, description: '할인 수수료 종료일' },
+						saleCommision: { type: 'integer', nullable: true, description: '할인 수수료율' },
 						// gosiwonUse, gosiwonBuilding, gosiwonFacilities, gosiwonAdmin 테이블 필드들
 						// 실제 컬럼명은 동적으로 포함됨
 					},
