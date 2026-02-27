@@ -1715,9 +1715,9 @@ exports.startRoomSell = async (req, res, next) => {
 					finalEtcEndDate = etcEndDate;
 				}
 
-				// 기존 ON_SALE 레코드 확인 (해당 방의 ON_SALE 행만 대상)
+				// 기존 ON_SALE 레코드 확인 (해당 방의 ON_SALE 행만 대상, deleteYN='Y'는 제외)
 				const [existingOnSale] = await mariaDBSequelize.query(
-					`SELECT esntlId, status FROM roomStatus WHERE roomEsntlId = ? AND status = 'ON_SALE' LIMIT 1`,
+					`SELECT esntlId, status FROM roomStatus WHERE roomEsntlId = ? AND status = 'ON_SALE' AND (deleteYN IS NULL OR deleteYN = 'N') LIMIT 1`,
 					{
 						replacements: [singleRoomId],
 						type: mariaDBSequelize.QueryTypes.SELECT,
@@ -1755,7 +1755,7 @@ exports.startRoomSell = async (req, res, next) => {
 					console.log('[roomSell/start] ON_SALE UPDATE 완료, statusEndDate=', finalStatusEndDate);
 					// CAN_CHECKIN: 입실가능 기간(기존 etc)으로 업데이트 또는 삽입
 					const [existingCanCheckin] = await mariaDBSequelize.query(
-						`SELECT esntlId FROM roomStatus WHERE roomEsntlId = ? AND status = 'CAN_CHECKIN' LIMIT 1`,
+						`SELECT esntlId FROM roomStatus WHERE roomEsntlId = ? AND status = 'CAN_CHECKIN' AND (deleteYN IS NULL OR deleteYN = 'N') LIMIT 1`,
 						{
 							replacements: [singleRoomId],
 							type: mariaDBSequelize.QueryTypes.SELECT,
@@ -1841,9 +1841,9 @@ exports.startRoomSell = async (req, res, next) => {
 						esntlId: existingOnSale.esntlId,
 					});
 				} else {
-					// 해당 방에 ON_SALE이 없으면 판매 시작 불가 (BEFORE_SALES 등만 있는 경우)
+					// 해당 방에 ON_SALE이 없으면 판매 시작 불가 (BEFORE_SALES 등만 있는 경우). deleteYN='Y'는 제외
 					const [anyStatus] = await mariaDBSequelize.query(
-						`SELECT status FROM roomStatus WHERE roomEsntlId = ? LIMIT 1`,
+						`SELECT status FROM roomStatus WHERE roomEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N') LIMIT 1`,
 						{
 							replacements: [singleRoomId],
 							type: mariaDBSequelize.QueryTypes.SELECT,
