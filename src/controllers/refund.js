@@ -441,77 +441,74 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			usePeriodDays = diffDays < 0 ? 0 : diffDays;
 		}
 
-		// il_room_refund_request 테이블에 환불 정보 저장 (totalRefundAmount > 0일 때만)
-		let rrrSno = null;
-		if (!isZeroRefund) {
-			const leaveReason =
-				cancelMemo ||
-				(cancelReasonMap[cancelReason]
-					? `${cancelReasonMap[cancelReason]} 퇴실`
-					: '퇴실 처리');
-			const [refundInsertResult] = await mariaDBSequelize.query(
-				`
-				INSERT INTO il_room_refund_request (
-					gsw_eid,
-					rom_eid,
-					mbr_eid,
-					ctt_eid,
+		// il_room_refund_request 테이블에 환불 정보 저장 (totalRefundAmount 0원 포함 항상 저장)
+		const leaveReason =
+			cancelMemo ||
+			(cancelReasonMap[cancelReason]
+				? `${cancelReasonMap[cancelReason]} 퇴실`
+				: '퇴실 처리');
+		const [refundInsertResult] = await mariaDBSequelize.query(
+			`
+			INSERT INTO il_room_refund_request (
+				gsw_eid,
+				rom_eid,
+				mbr_eid,
+				ctt_eid,
+				rrr_leave_type_cd,
+				rrr_leave_date,
+				rrr_leave_reason,
+				rrr_liability_reason,
+				rrr_contacted_owner,
+				rrr_payment_amt,
+				rrr_use_period,
+				rrr_use_amt,
+				rrr_penalty_amt,
+				rrr_refund_total_amt,
+				rrr_registrant_id,
+				rrr_update_dtm,
+				rrr_updater_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+			`,
+			{
+				replacements: [
+					contract.gosiwonEsntlId,
+					contract.roomEsntlId,
+					contract.customerEsntlId,
+					contractEsntlId,
 					rrr_leave_type_cd,
-					rrr_leave_date,
-					rrr_leave_reason,
-					rrr_liability_reason,
-					rrr_contacted_owner,
-					rrr_payment_amt,
-					rrr_use_period,
-					rrr_use_amt,
-					rrr_penalty_amt,
-					rrr_refund_total_amt,
-					rrr_registrant_id,
-					rrr_update_dtm,
-					rrr_updater_id
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-				`,
+					cancelDate,
+					leaveReason,
+					liabilityReason || null,
+					contactedOwner ? 1 : 0, // rrr_contacted_owner: 0 미연락, 1 연락완료
+					paymentAmount || 0,
+					usePeriodDays, // rrr_use_period: 입실 시작일부터 현재일까지 일수
+					proratedRent || 0,
+					penalty || 0,
+					refundAmt,
+					writerAdminId,
+					writerAdminId,
+				],
+				type: mariaDBSequelize.QueryTypes.INSERT,
+				transaction,
+			}
+		);
+		const rrrSno = refundInsertResult?.insertId || refundInsertResult;
+
+		// directRefundConfirm=true면 환불 요청을 즉시 APPROVAL로 승인 (구 updateStatus APPROVAL 처리와 동일)
+		if (directRefundConfirm === true) {
+			await mariaDBSequelize.query(
+				`UPDATE il_room_refund_request 
+				 SET rrr_process_status_cd = 'APPROVAL',
+				     rrr_process_reason = '다이렉트 환불 승인 완료',
+				     rrr_update_dtm = NOW(),
+				     rrr_updater_id = ?
+				 WHERE ctt_eid = ?`,
 				{
-					replacements: [
-						contract.gosiwonEsntlId,
-						contract.roomEsntlId,
-						contract.customerEsntlId,
-						contractEsntlId,
-						rrr_leave_type_cd,
-						cancelDate,
-						leaveReason,
-						liabilityReason || null,
-						contactedOwner ? 1 : 0, // rrr_contacted_owner: 0 미연락, 1 연락완료
-						paymentAmount || 0,
-						usePeriodDays, // rrr_use_period: 입실 시작일부터 현재일까지 일수
-						proratedRent || 0,
-						penalty || 0,
-						refundAmt,
-						writerAdminId,
-						writerAdminId,
-					],
-					type: mariaDBSequelize.QueryTypes.INSERT,
+					replacements: [writerAdminId, contractEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
 					transaction,
 				}
 			);
-			rrrSno = refundInsertResult?.insertId || refundInsertResult;
-
-			// directRefundConfirm=true면 환불 요청을 즉시 APPROVAL로 승인 (구 updateStatus APPROVAL 처리와 동일)
-			if (directRefundConfirm === true) {
-				await mariaDBSequelize.query(
-					`UPDATE il_room_refund_request 
-					 SET rrr_process_status_cd = 'APPROVAL',
-					     rrr_process_reason = '다이렉트 환불 승인 완료',
-					     rrr_update_dtm = NOW(),
-					     rrr_updater_id = ?
-					 WHERE ctt_eid = ?`,
-					{
-						replacements: [writerAdminId, contractEsntlId],
-						type: mariaDBSequelize.QueryTypes.UPDATE,
-						transaction,
-					}
-				);
-			}
 		}
 
 		// 해당 계약의 마지막 CONTRACT 상태 행을 찾아 CHECKOUT_CONFIRMED로 변경. statusEndDate는 cancelDate 사용
@@ -655,7 +652,7 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				contractEsntlId: contractEsntlId,
-				etcEsntlId: rrrSno != null ? String(rrrSno) : contractEsntlId,
+				etcEsntlId: String(rrrSno),
 				content: historyContent,
 				category: 'REFUND',
 				priority: 'NORMAL',
@@ -810,7 +807,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 		const offset = (safePage - 1) * safeLimit;
 
 		// WHERE 조건 구성 (환불 요청 1건당 1행만 나오도록 paymentLog 조인 제거)
-		let whereClause = 'WHERE 1=1';
+		let whereClause = 'WHERE 1=1 AND COALESCE(RRR.rrr_payment_amt, 0) != 0';
 		const replacements = [];
 
 		// 고시원 ID 필터 (GOSI로 시작하는 경우만)
@@ -909,7 +906,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 전체 개수 조회 (필터 없음, paymentLog 미조인)
+		// 전체 개수 조회 (rrr_payment_amt != 0 포함, paymentLog 미조인)
 		const totalCountQuery = `
 			SELECT COUNT(*) AS total
 			FROM il_room_refund_request RRR
@@ -917,6 +914,7 @@ exports.getRefundRequestList = async (req, res, next) => {
 			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
 			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
 			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
+			WHERE COALESCE(RRR.rrr_payment_amt, 0) != 0
 		`;
 
 		const [countResult, totalCountResult] = await Promise.all([
