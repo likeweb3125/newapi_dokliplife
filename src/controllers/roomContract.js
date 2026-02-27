@@ -113,6 +113,7 @@ exports.getContractList = async (req, res, next) => {
 		const mainQuery = `
 			SELECT 
 				RC.esntlId,
+				RC.roomEsntlId,
 				SUBSTRING_INDEX(SUBSTRING_INDEX(G.address, ' ', 2), ' ', -2) AS region,
 				RC.contractDate,
 				COALESCE(PL.pTime, '') AS pTime,
@@ -125,6 +126,7 @@ exports.getContractList = async (req, res, next) => {
 				RC.contract,
 				RC.spacialContract,
 				R.roomNumber,
+				R.deposit AS gosiwonDeposit,
 				R.roomType,
 				R.window,
 				C.name AS customerName,

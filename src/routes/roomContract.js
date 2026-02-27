@@ -127,6 +127,9 @@ const roomContractController = require('../controllers/roomContract');
  *                           esntlId:
  *                             type: string
  *                             description: 계약 고유 아이디
+ *                           roomEsntlId:
+ *                             type: string
+ *                             description: 방 고유 아이디
  *                           region:
  *                             type: string
  *                             description: 지역 (주소에서 추출)
@@ -163,6 +166,10 @@ const roomContractController = require('../controllers/roomContract');
  *                           roomNumber:
  *                             type: string
  *                             description: 방 번호
+ *                           gosiwonDeposit:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: "고시원보증금 (room.deposit)"
  *                           roomType:
  *                             type: string
  *                             description: 방 타입
