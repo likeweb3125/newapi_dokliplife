@@ -10,6 +10,7 @@ const { getWriterAdminId } = require('../utils/auth');
 const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
+const { syncGosiwonParkingUse } = require('./parkingManagement');
 const { dateToYmd } = require('../utils/dateHelper');
 const formatAge = require('../utils/formatAge');
 const { phoneToDisplay } = require('../utils/phoneHelper');
@@ -579,11 +580,11 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			}
 		);
 
-		// 해당 계약서의 extraPayment 항목을 취소 처리 (paymentStatus = 'CANCEL')
+		// 해당 계약서의 extraPayment 항목을 만료 처리 (paymentStatus = 'FIN')
 		await mariaDBSequelize.query(
 			`
 			UPDATE extraPayment
-			SET paymentStatus = 'CANCEL', updatedAt = NOW()
+			SET paymentStatus = 'FIN', updatedAt = NOW()
 			WHERE contractEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N')
 		`,
 			{
@@ -592,6 +593,19 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 				transaction,
 			}
 		);
+
+		// parkStatus: 해당 계약의 주차 상태를 ENDED로 변경
+		await mariaDBSequelize.query(
+			`UPDATE parkStatus SET status = 'ENDED', updatedAt = NOW() WHERE contractEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N')`,
+			{
+				replacements: [contractEsntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+				transaction,
+			}
+		);
+
+		// gosiwonParking: autoUse, bikeUse 동기화 (ENDED로 변경된 parkStatus 제외하고 재계산)
+		await syncGosiwonParkingUse(contract.gosiwonEsntlId, transaction);
 
 		// roomAfterUse 함수 호출
 		if (

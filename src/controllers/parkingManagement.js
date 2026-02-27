@@ -129,6 +129,8 @@ const syncGosiwonParkingUse = async (gosiwonEsntlId, transaction) => {
 		);
 	}
 };
+// parkStatus 기준으로 gosiwonParking.autoUse, bikeUse 동기화 (외부 호출용)
+exports.syncGosiwonParkingUse = syncGosiwonParkingUse;
 
 // 주차 등록 (Create)
 exports.createParking = async (req, res, next) => {

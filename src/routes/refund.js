@@ -17,7 +17,7 @@ const refundController = require('../controllers/refund');
  * /v1/refund/process:
  *   post:
  *     summary: 환불 및 퇴실처리
- *     description: "계약에 대한 환불 및 퇴실처리를 수행합니다. totalRefundAmount가 0인 경우 il_room_refund_request에 저장하지 않고 roomContract.status=CANCEL, extraPayment.paymentStatus=CANCEL로 처리합니다. totalRefundAmount가 0 초과인 경우 환불 요청을 il_room_refund_request에 저장하고, roomStatus를 CHECKOUT_CONFIRMED로 업데이트하며, extraPayment는 paymentStatus=CANCEL로 변경합니다. 취소사유 (FULL: 만기퇴실, INTERIM: 중도퇴실, CANCEL: 계약취소, ETC: 기타), liabilityReason: 귀책사유 (OWNER: 사장님, OCCUPANT: 입실자). check_basic_sell이 true인 경우 기본 판매 설정을 사용하고, false인 경우 unableCheckInReason이 있으면 BEFORE_SALES 상태로 설정하며, 없으면 사용자 지정 날짜를 사용합니다."
+ *     description: "계약에 대한 환불 및 퇴실처리를 수행합니다. totalRefundAmount가 0인 경우 il_room_refund_request에 저장하지 않고 roomContract.status=CANCEL, extraPayment.paymentStatus=FIN으로 처리합니다. totalRefundAmount가 0 초과인 경우 환불 요청을 il_room_refund_request에 저장하고, roomStatus를 CHECKOUT_CONFIRMED로 업데이트하며, extraPayment는 paymentStatus=FIN, parkStatus는 ENDED, gosiwonParking autoUse/bikeUse 동기화를 수행합니다. 취소사유 (FULL: 만기퇴실, INTERIM: 중도퇴실, CANCEL: 계약취소, ETC: 기타), liabilityReason: 귀책사유 (OWNER: 사장님, OCCUPANT: 입실자). check_basic_sell이 true인 경우 기본 판매 설정을 사용하고, false인 경우 unableCheckInReason이 있으면 BEFORE_SALES 상태로 설정하며, 없으면 사용자 지정 날짜를 사용합니다."
  *     tags: [환불관리]
  *     security:
  *       - bearerAuth: []
@@ -77,7 +77,7 @@ const refundController = require('../controllers/refund');
  *                 example: 30000
  *               totalRefundAmount:
  *                 type: integer
- *                 description: "총환불금액. 0인 경우 il_room_refund_request에 저장하지 않고 roomContract.status=CANCEL, extraPayment.paymentStatus=CANCEL로 처리됨"
+ *                 description: "총환불금액. 0인 경우 il_room_refund_request에 저장하지 않고 roomContract.status=CANCEL, extraPayment.paymentStatus=FIN으로 처리됨"
  *                 example: 70000
  *               directRefundConfirm:
  *                 type: boolean
