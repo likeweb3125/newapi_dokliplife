@@ -622,7 +622,7 @@ router.get('/data', refundController.getRefundRequestData);
  * /v1/refund/dataWithDetail:
  *   get:
  *     summary: 계약서 기반 환불 데이터(상세) 조회
- *     description: "계약 ID(cttEid)로 기존 /data 리턴값에 계약정보(roomContract), 결제정보(paymentLog), 정산정보(il_daily_selling_closing)를 추가하여 반환합니다."
+ *     description: "계약 ID(cttEid)로 기존 /data 리턴값에 계약정보(roomContract), 결제정보(paymentLog), settlementInfo(입실 계약서 4개 필드)를 추가하여 반환합니다."
  *     tags: [환불관리]
  *     security:
  *       - bearerAuth: []
@@ -650,7 +650,7 @@ router.get('/data', refundController.getRefundRequestData);
  *                   example: 환불 데이터(상세) 조회 성공
  *                 data:
  *                   type: object
- *                   description: "기존 /data 필드 + contractInfo, paymentInfo, settlementInfo"
+ *                   description: "기존 /data 필드 + contractInfo, paymentInfo, settlementInfo (입실 계약서 4개 필드)"
  *                   properties:
  *                     contractInfo:
  *                       type: object
@@ -718,22 +718,24 @@ router.get('/data', refundController.getRefundRequestData);
  *                             description: "추가 결제 시 extraPayment.esntlId, 일반 결제 시 null"
  *                     settlementInfo:
  *                       type: object
- *                       nullable: true
- *                       description: "정산정보 (il_daily_selling_closing, 결제일·PAYMENT 기준 1건)"
+ *                       description: "입실 계약서 결제 기준 4개 필드 (paymentLog extrapayEsntlId 없는 건)"
  *                       properties:
- *                         dsc_sno:
- *                           type: integer
- *                         dsc_closing_date:
- *                           type: string
- *                         dsc_selling_total_amt:
- *                           type: integer
- *                         dsc_fee_total_amt:
- *                           type: integer
- *                         dsc_calculation_total_amt:
- *                           type: integer
- *                         dsc_complete_dtm:
+ *                         paymentAmount:
  *                           type: string
  *                           nullable: true
+ *                           description: "입실 계약서 결제 금액"
+ *                         cPercent:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "수수료율(%)"
+ *                         cAmount:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "수수료 금액"
+ *                         finalPayment:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: "paymentAmount - cAmount"
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

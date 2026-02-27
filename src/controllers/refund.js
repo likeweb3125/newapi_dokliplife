@@ -11,7 +11,6 @@ const historyController = require('./history');
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
 const { syncGosiwonParkingUse } = require('./parkingManagement');
-const { dateToYmd } = require('../utils/dateHelper');
 const formatAge = require('../utils/formatAge');
 const { phoneToDisplay } = require('../utils/phoneHelper');
 
@@ -1248,52 +1247,27 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			  })
 			: [];
 
-		// 4. 정산정보 (il_daily_selling_closing: 해당 고시원·결제일 기준 PAYMENT 마감 행 1건)
-		let settlementInfo = null;
-		if (baseRow?.gswId && Array.isArray(paymentInfo) && paymentInfo.length > 0) {
-			const pDateRaw = paymentInfo[0].pDate;
-			let firstPaymentDate = null;
-			if (pDateRaw) {
-				firstPaymentDate = dateToYmd(pDateRaw);
-			}
-			if (firstPaymentDate) {
-				const settlementQuery = `
-					SELECT 
-						dsc_sno,
-						gsw_eid,
-						dsc_closing_date,
-						dsc_selling_type_cd,
-						dsc_selling_cnt,
-						dsc_goods_total_amt,
-						dsc_gosiwon_coupon_total_amt,
-						dsc_selling_total_amt,
-						dsc_fee_total_amt,
-						dsc_average_fee_percent,
-						dsc_expected_payment_total_amt,
-						dsc_refund_base_date,
-						dsc_use_coupon_total_amt,
-						dsc_use_point_total_amt,
-						dsc_payment_total_amt,
-						dsc_coupon_refund_amt,
-						dsc_point_refund_amt,
-						dsc_fee_refund_amt,
-						dsc_business_support_amt,
-						dsc_calculation_total_amt,
-						dsc_complete_dtm,
-						dsc_regist_dtm
-					FROM il_daily_selling_closing
-					WHERE gsw_eid = ?
-						AND dsc_closing_date = ?
-						AND dsc_selling_type_cd = 'PAYMENT'
-					LIMIT 1
-				`;
-				const [settlementRow] = await mariaDBSequelize.query(settlementQuery, {
-					replacements: [baseRow.gswId, firstPaymentDate],
-					type: mariaDBSequelize.QueryTypes.SELECT,
-				});
-				settlementInfo = settlementRow || null;
-			}
-		}
+		// 4. 입실 계약서 결제 (paymentLog에서 extrapayEsntlId 없는 값 1건) → paymentAmount, cPercent, cAmount, finalPayment
+		const entryPaymentQuery = `
+			SELECT paymentAmount, cPercent, cAmount
+			FROM paymentLog
+			WHERE contractEsntlId = ?
+				AND (extrapayEsntlId IS NULL OR extrapayEsntlId = '')
+				AND (withdrawalStatus IS NULL OR withdrawalStatus != 'WITHDRAWAL')
+				AND calculateStatus = 'SUCCESS'
+			ORDER BY pDate ASC, pTime ASC
+			LIMIT 1
+		`;
+		const [entryPayment] = await mariaDBSequelize.query(entryPaymentQuery, {
+			replacements: [cttEid],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		});
+		const paymentAmount = entryPayment?.paymentAmount ?? null;
+		const cPercent = entryPayment?.cPercent ?? null;
+		const cAmount = entryPayment?.cAmount ?? null;
+		const payAmtNum = paymentAmount != null ? parseInt(String(paymentAmount).replace(/,/g, ''), 10) : 0;
+		const cAmtNum = cAmount != null ? parseInt(String(cAmount).replace(/,/g, ''), 10) : 0;
+		const finalPayment = !Number.isNaN(payAmtNum) && !Number.isNaN(cAmtNum) ? payAmtNum - cAmtNum : null;
 
 		const result = {
 			...baseRow,
@@ -1308,7 +1282,12 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				  }
 				: null,
 			paymentInfo: Array.isArray(paymentInfo) ? paymentInfo : [],
-			settlementInfo,
+			settlementInfo: {
+				paymentAmount,
+				cPercent,
+				cAmount,
+				finalPayment,
+			},
 		};
 
 		return errorHandler.successThrow(res, '환불 데이터(상세) 조회 성공', result);
