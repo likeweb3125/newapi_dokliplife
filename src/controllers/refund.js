@@ -385,6 +385,10 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		}
 		const rrr_leave_type_cd = cancelReasonMap[cancelReason];
 
+		// totalRefundAmount 파싱 (0 미만이면 0으로 처리)
+		const refundAmt = Math.max(0, parseInt(totalRefundAmount, 10) || 0);
+		const isZeroRefund = refundAmt === 0;
+
 		// 계약 정보 조회 (deposit 테이블 제거, roomContractWho에서 계약자 정보 사용)
 		const contractInfo = await mariaDBSequelize.query(
 			`
@@ -436,74 +440,77 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			usePeriodDays = diffDays < 0 ? 0 : diffDays;
 		}
 
-		// il_room_refund_request 테이블에 환불 정보 저장 (refund 테이블 사용 안 함)
-		const leaveReason =
-			cancelMemo ||
-			(cancelReasonMap[cancelReason]
-				? `${cancelReasonMap[cancelReason]} 퇴실`
-				: '퇴실 처리');
-		const [refundInsertResult] = await mariaDBSequelize.query(
-			`
-			INSERT INTO il_room_refund_request (
-				gsw_eid,
-				rom_eid,
-				mbr_eid,
-				ctt_eid,
-				rrr_leave_type_cd,
-				rrr_leave_date,
-				rrr_leave_reason,
-				rrr_liability_reason,
-				rrr_contacted_owner,
-				rrr_payment_amt,
-				rrr_use_period,
-				rrr_use_amt,
-				rrr_penalty_amt,
-				rrr_refund_total_amt,
-				rrr_registrant_id,
-				rrr_update_dtm,
-				rrr_updater_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-			`,
-			{
-				replacements: [
-					contract.gosiwonEsntlId,
-					contract.roomEsntlId,
-					contract.customerEsntlId,
-					contractEsntlId,
+		// il_room_refund_request 테이블에 환불 정보 저장 (totalRefundAmount > 0일 때만)
+		let rrrSno = null;
+		if (!isZeroRefund) {
+			const leaveReason =
+				cancelMemo ||
+				(cancelReasonMap[cancelReason]
+					? `${cancelReasonMap[cancelReason]} 퇴실`
+					: '퇴실 처리');
+			const [refundInsertResult] = await mariaDBSequelize.query(
+				`
+				INSERT INTO il_room_refund_request (
+					gsw_eid,
+					rom_eid,
+					mbr_eid,
+					ctt_eid,
 					rrr_leave_type_cd,
-					cancelDate,
-					leaveReason,
-					liabilityReason || null,
-					contactedOwner ? 1 : 0, // rrr_contacted_owner: 0 미연락, 1 연락완료
-					paymentAmount || 0,
-					usePeriodDays, // rrr_use_period: 입실 시작일부터 현재일까지 일수
-					proratedRent || 0,
-					penalty || 0,
-					totalRefundAmount || 0,
-					writerAdminId,
-					writerAdminId,
-				],
-				type: mariaDBSequelize.QueryTypes.INSERT,
-				transaction,
-			}
-		);
-		const rrrSno = refundInsertResult?.insertId || refundInsertResult;
-
-		// directRefundConfirm=true면 환불 요청을 즉시 APPROVAL로 승인 (구 updateStatus APPROVAL 처리와 동일)
-		if (directRefundConfirm === true) {
-			await mariaDBSequelize.query(
-				`UPDATE il_room_refund_request 
-				 SET rrr_process_status_cd = 'APPROVAL',
-				     rrr_process_reason = '다이렉트 환불 승인 완료',
-				     rrr_update_dtm = NOW(),
-				     rrr_updater_id = ?
-				 WHERE ctt_eid = ?`,
+					rrr_leave_date,
+					rrr_leave_reason,
+					rrr_liability_reason,
+					rrr_contacted_owner,
+					rrr_payment_amt,
+					rrr_use_period,
+					rrr_use_amt,
+					rrr_penalty_amt,
+					rrr_refund_total_amt,
+					rrr_registrant_id,
+					rrr_update_dtm,
+					rrr_updater_id
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+				`,
 				{
-					replacements: [writerAdminId, contractEsntlId],
-					type: mariaDBSequelize.QueryTypes.UPDATE,
+					replacements: [
+						contract.gosiwonEsntlId,
+						contract.roomEsntlId,
+						contract.customerEsntlId,
+						contractEsntlId,
+						rrr_leave_type_cd,
+						cancelDate,
+						leaveReason,
+						liabilityReason || null,
+						contactedOwner ? 1 : 0, // rrr_contacted_owner: 0 미연락, 1 연락완료
+						paymentAmount || 0,
+						usePeriodDays, // rrr_use_period: 입실 시작일부터 현재일까지 일수
+						proratedRent || 0,
+						penalty || 0,
+						refundAmt,
+						writerAdminId,
+						writerAdminId,
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
 					transaction,
 				}
 			);
+			rrrSno = refundInsertResult?.insertId || refundInsertResult;
+
+			// directRefundConfirm=true면 환불 요청을 즉시 APPROVAL로 승인 (구 updateStatus APPROVAL 처리와 동일)
+			if (directRefundConfirm === true) {
+				await mariaDBSequelize.query(
+					`UPDATE il_room_refund_request 
+					 SET rrr_process_status_cd = 'APPROVAL',
+					     rrr_process_reason = '다이렉트 환불 승인 완료',
+					     rrr_update_dtm = NOW(),
+					     rrr_updater_id = ?
+					 WHERE ctt_eid = ?`,
+					{
+						replacements: [writerAdminId, contractEsntlId],
+						type: mariaDBSequelize.QueryTypes.UPDATE,
+						transaction,
+					}
+				);
+			}
 		}
 
 		// 해당 계약의 마지막 CONTRACT 상태 행을 찾아 CHECKOUT_CONFIRMED로 변경. statusEndDate는 cancelDate 사용
@@ -557,8 +564,8 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 		);
 
 		// roomContract 테이블의 status 업데이트
-		// cancelReason이 CONTRACT_CANCEL이면 CANCEL, 그 외에는 FIN
-		const contractStatus = cancelReason === 'CANCEL' ? 'CANCEL' : 'FIN';
+		// totalRefundAmount가 0이면 환불 없음 → status=CANCEL. 0 초과면 cancelReason 기준 (CANCEL→CANCEL, 그 외 FIN)
+		const contractStatus = isZeroRefund ? 'CANCEL' : cancelReason === 'CANCEL' ? 'CANCEL' : 'FIN';
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomContract 
@@ -572,11 +579,11 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			}
 		);
 
-		// 해당 계약서의 extraPayment 항목을 만료 처리 (paymentStatus = 'FIN')
+		// 해당 계약서의 extraPayment 항목을 취소 처리 (paymentStatus = 'CANCEL')
 		await mariaDBSequelize.query(
 			`
 			UPDATE extraPayment
-			SET paymentStatus = 'FIN', updatedAt = NOW()
+			SET paymentStatus = 'CANCEL', updatedAt = NOW()
 			WHERE contractEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N')
 		`,
 			{
@@ -627,14 +634,14 @@ exports.processRefundAndCheckout = async (req, res, next) => {
 			liabilityReason
 				? `, 귀책사유: ${liabilityReasonText[liabilityReason] || liabilityReason}`
 				: ''
-		}${totalRefundAmount ? `, 총환불금액: ${totalRefundAmount.toLocaleString()}원` : ''}`;
+		}${refundAmt > 0 ? `, 총환불금액: ${refundAmt.toLocaleString()}원` : ''}`;
 
 		const newHistory = await historyController.createHistoryRecord(
 			{
 				gosiwonEsntlId: contract.gosiwonEsntlId,
 				roomEsntlId: contract.roomEsntlId,
 				contractEsntlId: contractEsntlId,
-				etcEsntlId: String(rrrSno),
+				etcEsntlId: rrrSno != null ? String(rrrSno) : contractEsntlId,
 				content: historyContent,
 				category: 'REFUND',
 				priority: 'NORMAL',
