@@ -285,6 +285,13 @@ module.exports = (sequelize, DataTypes) => {
 				defaultValue: 0,
 				comment: '최소 위약금',
 			},
+			useDoklipPenaltyRule: {
+				type: DataTypes.TINYINT(1),
+				allowNull: false,
+				defaultValue: 1,
+				field: 'useDoklipPenaltyRule',
+				comment: '독립생활 환불 룰 사용여부 (0: false, 1: true)',
+			},
 			use_deposit: {
 				type: DataTypes.TINYINT(1),
 				allowNull: false,

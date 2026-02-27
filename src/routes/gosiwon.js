@@ -220,6 +220,10 @@ router.get('/info', gosiwonController.getGosiwonInfo);
  *                 type: integer
  *                 description: 최소 위약금
  *                 example: 50000
+ *               useDoklipPenaltyRule:
+ *                 type: boolean
+ *                 description: "독립생활 환불 룰 사용여부"
+ *                 example: true
  *               qrPoint:
  *                 type: string
  *                 description: QR 포인트
@@ -492,6 +496,10 @@ router.post('/info', gosiwonController.createGosiwon);
  *                 type: integer
  *                 description: 최소 위약금
  *                 example: 50000
+ *               useDoklipPenaltyRule:
+ *                 type: boolean
+ *                 description: "독립생활 환불 룰 사용여부"
+ *                 example: true
  *               qrPoint:
  *                 type: string
  *                 description: QR 포인트

@@ -69,6 +69,7 @@ const convertTinyIntToBoolean = (obj) => {
 		'use_settlement',
 		'is_controlled',
 		'is_favorite',
+		'useDoklipPenaltyRule',
 	];
 	
 	booleanFields.forEach((field) => {
@@ -119,7 +120,7 @@ exports.getGosiwonInfo = async (req, res, next) => {
 
 		// 여러 테이블을 조인하여 고시원 정보 조회
 		const query = `
-                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason,G.is_controlled,G.is_favorite,G.penaltyRate,G.penaltyMin, G.contract
+                SELECT G.esntlId,G.address,G.address2,G.address3,G.longitude,G.latitude,G.name,G.keeperName,G.keeperHp,G.blog,G.homepage,G.youtube,G.tag,G.phone,G.subway,G.college,G.description,G.qrPoint,G.bank,G.bankAccount,G.accountHolder,G.email,G.corpNumber,G.gsw_metaport,G.serviceNumber,G.use_deposit,G.use_sale_commision,G.saleCommisionStartDate,G.saleCommisionEndDate,G.saleCommision,G.use_settlement,G.settlementReason,G.is_controlled,G.is_favorite,G.penaltyRate,G.penaltyMin,G.useDoklipPenaltyRule,G.contract
                     ,GA.hp adminHP, GA.ceo admin
                     ,GF.safety,GF.fire,GF.vicinity,GF.temp,GF.internet,GF.meal,GF.equipment,GF.sanitation,GF.kitchen,GF.wash,GF.rest,GF.orderData
                     ,GB.floorInfo,GB.useFloor,GB.wallMaterial,GB.elevator,GB.parking
@@ -471,6 +472,7 @@ exports.createGosiwon = async (req, res, next) => {
 			is_controlled,
 			penaltyRate,
 			penaltyMin,
+			useDoklipPenaltyRule,
 			qrPoint,
 			use_deposit,
 			use_sale_commision,
@@ -560,6 +562,9 @@ exports.createGosiwon = async (req, res, next) => {
 					penaltyMin !== undefined && penaltyMin !== ''
 						? parseInt(penaltyMin, 10) || 0
 						: 0,
+				useDoklipPenaltyRule: useDoklipPenaltyRule !== undefined
+					? (useDoklipPenaltyRule === true || useDoklipPenaltyRule === 'true' || useDoklipPenaltyRule === 1 ? 1 : 0)
+					: 1,
 				qrPoint: qrPoint || null,
 				use_deposit: use_deposit !== undefined ? (use_deposit === true || use_deposit === 'true' || use_deposit === 1 ? 1 : 0) : 0,
 				use_sale_commision: use_sale_commision !== undefined ? (use_sale_commision === true || use_sale_commision === 'true' || use_sale_commision === 1 ? 1 : 0) : 0,
@@ -838,6 +843,9 @@ exports.updateGosiwon = async (req, res, next) => {
 				const parsedMin = parseInt(req.body.penaltyMin, 10);
 				updateData.penaltyMin = Number.isNaN(parsedMin) ? 0 : parsedMin;
 			}
+		}
+		if (req.body.useDoklipPenaltyRule !== undefined) {
+			updateData.useDoklipPenaltyRule = req.body.useDoklipPenaltyRule === true || req.body.useDoklipPenaltyRule === 'true' || req.body.useDoklipPenaltyRule === 1 ? 1 : 0;
 		}
 		if (req.body.qrPoint !== undefined) updateData.qrPoint = req.body.qrPoint;
 		if (req.body.use_deposit !== undefined) {

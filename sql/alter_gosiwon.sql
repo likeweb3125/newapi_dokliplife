@@ -18,6 +18,7 @@ ALTER TABLE `gosiwon` ADD COLUMN `use_settlement` TINYINT(1) NOT NULL DEFAULT 0 
 ALTER TABLE `gosiwon` ADD COLUMN `settlementReason` VARCHAR(100) NULL DEFAULT NULL COMMENT '정상사용유무 사유' AFTER `use_settlement`;
 ALTER TABLE `gosiwon` ADD COLUMN `penaltyRate` INT(3) NULL COMMENT '위약금 비율' AFTER `settlementReason`;
 ALTER TABLE `gosiwon` ADD COLUMN `penaltyMin` INT NULL DEFAULT 0 COMMENT '최소 위약금' AFTER `penaltyRate`;
+ALTER TABLE `gosiwon` ADD COLUMN `useDoklipPenaltyRule` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '독립생활 환불 룰 사용여부 (0: false, 1: true)' AFTER `penaltyMin`;
 CREATE INDEX `idx_gosiwon_use_deposit` ON `gosiwon` (`use_deposit`);
 CREATE INDEX `idx_gosiwon_use_sale_commision` ON `gosiwon` (`use_sale_commision`);
 CREATE INDEX `idx_gosiwon_use_settlement` ON `gosiwon` (`use_settlement`);
