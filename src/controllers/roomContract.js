@@ -63,10 +63,10 @@ exports.getContractList = async (req, res, next) => {
 
 			if (searchString) {
 				conditions.push(
-					'(G.esntlId LIKE ? OR G.name LIKE ? OR C.name LIKE ? OR C.phone LIKE ?)'
+					'(G.esntlId LIKE ? OR G.name LIKE ? OR C.name LIKE ? OR C.phone LIKE ? OR RCW.checkinName LIKE ? OR RCW.customerName LIKE ? OR RCW.checkinPhone LIKE ? OR RCW.customerPhone LIKE ?)'
 				);
 				const searchPattern = `%${searchString}%`;
-				values.push(searchPattern, searchPattern, searchPattern, searchPattern);
+				values.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
 			}
 
 			if (roomEsntlId) {
@@ -220,12 +220,13 @@ exports.getContractList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 전체 개수 조회 (페이징 없이)
+		// 전체 개수 조회 (페이징 없이, searchString 시 roomContractWho 조인 필요)
 		const countQuery = `
 			SELECT COUNT(*) AS total
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
+			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			WHERE ${whereClause}
 		`;
 

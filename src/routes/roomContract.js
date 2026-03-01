@@ -73,7 +73,7 @@ const roomContractController = require('../controllers/roomContract');
  *         schema:
  *           type: string
  *           default: 'GOSI0000000199'
- *         description: 검색어 (고시원 ID, 고시원명, 고객명, 고객 전화번호)
+ *         description: "검색어 (고시원 ID, 고시원명, 고객명, 고객 전화번호, roomContractWho 입실자명/계약자명/입실자연락처/계약자연락처)"
  *         example: GOSI0000000199
  *       - in: query
  *         name: roomEsntlId
