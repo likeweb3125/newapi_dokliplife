@@ -718,7 +718,7 @@ router.get('/data', refundController.getRefundRequestData);
  *                             description: "추가 결제 시 extraPayment.esntlId, 일반 결제 시 null"
  *                     settlementInfo:
  *                       type: object
- *                       description: "입실 계약서 결제 기준 4개 필드 (paymentLog extrapayEsntlId 없는 건)"
+ *                       description: "입실 계약서 결제 기준 필드 (paymentLog extrapayEsntlId 없는 건)"
  *                       properties:
  *                         paymentAmount:
  *                           type: string
@@ -735,7 +735,15 @@ router.get('/data', refundController.getRefundRequestData);
  *                         finalPayment:
  *                           type: integer
  *                           nullable: true
- *                           description: "paymentAmount - cAmount"
+ *                           description: "정산금액 (paymentAmount - cAmount)"
+ *                         paymentStatus:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "결제 상태 (paymentLog.calculateStatus)"
+ *                         settlementDate:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "예상 정산일 (paymentLog.pyl_expected_settlement_date)"
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

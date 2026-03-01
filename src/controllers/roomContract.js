@@ -126,7 +126,8 @@ exports.getContractList = async (req, res, next) => {
 				RC.contract,
 				RC.spacialContract,
 				R.roomNumber,
-				R.deposit AS gosiwonDeposit,
+				R.deposit AS roomDeposit,
+				GU.deposit AS gosiwonDeposit,
 				R.roomType,
 				R.window,
 				C.name AS customerName,
@@ -192,6 +193,7 @@ exports.getContractList = async (req, res, next) => {
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
 			JOIN room R ON RC.roomEsntlId = R.esntlId
+			LEFT JOIN gosiwonUse GU ON RC.gosiwonEsntlId = GU.esntlId
 			LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
 			LEFT JOIN (
 				SELECT 

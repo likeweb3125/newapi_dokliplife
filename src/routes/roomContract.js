@@ -166,10 +166,14 @@ const roomContractController = require('../controllers/roomContract');
  *                           roomNumber:
  *                             type: string
  *                             description: 방 번호
+ *                           roomDeposit:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: "방 보증금 (room.deposit)"
  *                           gosiwonDeposit:
  *                             type: integer
  *                             nullable: true
- *                             description: "고시원보증금 (room.deposit)"
+ *                             description: "고시원 보증금 (gosiwonUse.deposit)"
  *                           roomType:
  *                             type: string
  *                             description: 방 타입

@@ -1247,9 +1247,9 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 			  })
 			: [];
 
-		// 4. 입실 계약서 결제 (paymentLog에서 extrapayEsntlId 없는 값 1건) → paymentAmount, cPercent, cAmount, finalPayment
+		// 4. 입실 계약서 결제 (paymentLog에서 extrapayEsntlId 없는 값 1건) → paymentAmount, cPercent, cAmount, finalPayment, paymentStatus, settlementDate
 		const entryPaymentQuery = `
-			SELECT paymentAmount, cPercent, cAmount
+			SELECT paymentAmount, cPercent, cAmount, calculateStatus, pyl_expected_settlement_date
 			FROM paymentLog
 			WHERE contractEsntlId = ?
 				AND (extrapayEsntlId IS NULL OR extrapayEsntlId = '')
@@ -1287,6 +1287,8 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				cPercent,
 				cAmount,
 				finalPayment,
+				paymentStatus: entryPayment?.calculateStatus ?? null,
+				settlementDate: entryPayment?.pyl_expected_settlement_date ?? null,
 			},
 		};
 
