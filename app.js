@@ -57,6 +57,7 @@ const adminMaintenanceRoutes = require('./src/routes/maintenance');
 
 const mailGunRoutes = require('./src/routes/mailGun');
 const gosiwonRoutes = require('./src/routes/gosiwon');
+const gosiwonRegistRoutes = require('./src/routes/gosiwonRegist');
 const roomRoutes = require('./src/routes/room');
 const depositRoutes = require('./src/routes/deposit');
 const memoRoutes = require('./src/routes/memo');
@@ -138,6 +139,9 @@ app.use('/v1/mailGun', mailGunRoutes);
 
 // 고시원 Routes
 app.use('/v1/gosiwon', gosiwonRoutes);
+
+// 고시원 등록 관리 Routes (가입 관리)
+app.use('/v1/gosiwonRegist', gosiwonRegistRoutes);
 
 // 방 Routes
 app.use('/v1/room', roomRoutes);

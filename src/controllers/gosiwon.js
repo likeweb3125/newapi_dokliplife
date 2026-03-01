@@ -1041,6 +1041,9 @@ exports.updateGosiwon = async (req, res, next) => {
 					}
 				);
 			} else {
+				// INSERT 시: gsc_registrant_id 필수 (로그인한 관리자 ID)
+				const registrantId = decodedToken.admin || decodedToken.partner || writerAdminId;
+				configData.gsc_registrant_id = registrantId;
 				const configColumns = Object.keys(configData)
 					.map((key) => `\`${key}\``)
 					.join(', ');

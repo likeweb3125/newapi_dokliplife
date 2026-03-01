@@ -11,8 +11,8 @@ CREATE INDEX `idx_gosiwon_is_favorite` ON `gosiwon` (`is_favorite`);
 
 ALTER TABLE `gosiwon` ADD COLUMN `use_deposit` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '보증금 사용 여부' AFTER `is_controlled`;
 ALTER TABLE `gosiwon` ADD COLUMN `use_sale_commision` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '할인 수수료 적용 여부' AFTER `use_deposit`;
-ALTER TABLE `gosiwon` ADD COLUMN `saleCommisionStartDate` VARCHAR(20) NULL DEFAULT NULL COMMENT '할인수수료 시작일' AFTER `use_sale_commision`;
-ALTER TABLE `gosiwon` ADD COLUMN `saleCommisionEndDate` VARCHAR(20) NULL DEFAULT NULL COMMENT '할인수수료 끝나는날' AFTER `saleCommisionStartDate`;
+ALTER TABLE `gosiwon` ADD COLUMN `saleCommisionStartDate` DATETIME NULL DEFAULT NULL COMMENT '할인수수료 시작일' AFTER `use_sale_commision`;
+ALTER TABLE `gosiwon` ADD COLUMN `saleCommisionEndDate` DATETIME NULL DEFAULT NULL COMMENT '할인수수료 끝나는날' AFTER `saleCommisionStartDate`;
 ALTER TABLE `gosiwon` ADD COLUMN `saleCommision` INT(2) NULL DEFAULT NULL COMMENT '할인 수수료 숫자' AFTER `saleCommisionEndDate`;
 ALTER TABLE `gosiwon` ADD COLUMN `use_settlement` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '정산 사용유무' AFTER `is_favorite`;
 ALTER TABLE `gosiwon` ADD COLUMN `settlementReason` VARCHAR(100) NULL DEFAULT NULL COMMENT '정상사용유무 사유' AFTER `use_settlement`;
