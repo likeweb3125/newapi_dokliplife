@@ -1715,18 +1715,23 @@ exports.startRoomSell = async (req, res, next) => {
 					finalEtcEndDate = etcEndDate;
 				}
 
-				// 기존 ON_SALE 레코드 확인 (해당 방의 ON_SALE 행만 대상, deleteYN='Y'는 제외)
+				// 기존 ON_SALE 중 '업데이트할 판매시작일'이 그 판매기간에 포함되는 행만 대상 (statusStartDate <= 새시작일 <= statusEndDate)
 				const [existingOnSale] = await mariaDBSequelize.query(
-					`SELECT esntlId, status FROM roomStatus WHERE roomEsntlId = ? AND status = 'ON_SALE' AND (deleteYN IS NULL OR deleteYN = 'N') LIMIT 1`,
+					`SELECT esntlId, status FROM roomStatus
+					WHERE roomEsntlId = ? AND gosiwonEsntlId = ? AND status = 'ON_SALE'
+					  AND (deleteYN IS NULL OR deleteYN = 'N')
+					  AND DATE(statusStartDate) <= DATE(?)
+					  AND (statusEndDate IS NULL OR DATE(statusEndDate) >= DATE(?))
+					ORDER BY esntlId DESC LIMIT 1`,
 					{
-						replacements: [singleRoomId],
+						replacements: [singleRoomId, roomInfo.gosiwonEsntlId, statusStartDate, statusStartDate],
 						type: mariaDBSequelize.QueryTypes.SELECT,
 						transaction,
 					}
 				);
 
 				if (existingOnSale) {
-					// ON_SALE 업데이트: 판매 기간만 저장 (statusStartDate, statusEndDate / etc는 동일)
+					// ON_SALE 업데이트: 판매 기간만 저장 (찾은 행 1건만 esntlId로 수정)
 					await mariaDBSequelize.query(
 						`UPDATE roomStatus 
 						SET status = 'ON_SALE',
@@ -1736,7 +1741,7 @@ exports.startRoomSell = async (req, res, next) => {
 							etcStartDate = ?,
 							etcEndDate = ?,
 							updatedAt = NOW()
-						WHERE roomEsntlId = ? AND status = 'ON_SALE'`,
+						WHERE esntlId = ?`,
 						{
 							replacements: [
 								roomInfo.gosiwonEsntlId,
@@ -1744,7 +1749,7 @@ exports.startRoomSell = async (req, res, next) => {
 								finalStatusEndDate,
 								statusStartDate, // etcStartDate: ON_SALE은 판매 기간과 동일
 								finalStatusEndDate, // etcEndDate
-								singleRoomId,
+								existingOnSale.esntlId,
 							],
 							type: mariaDBSequelize.QueryTypes.UPDATE,
 							transaction,

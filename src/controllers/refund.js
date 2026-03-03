@@ -101,42 +101,75 @@ const roomAfterUse = async (
 			);
 		}
 
-		// ON_SALE 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
-		await closeOpenStatusesForRoom(roomEsntlId, sell_able_start_date, transaction);
-		const onSaleId = await idsNext('roomStatus', undefined, transaction);
-		createdStatusIds.push(onSaleId);
+		// ON_SALE: 해당 방에 이미 ON_SALE이 있으면 INSERT 대신 기존 행의 날짜만 수정
 		const onSaleStartDate = new Date(sell_able_start_date);
 		const onSaleEndDate = new Date(sell_able_end_date);
-		await mariaDBSequelize.query(
+		// 기존 ON_SALE 중 '업데이트할 판매시작일'이 그 판매기간에 포함되는 행만 대상 (statusStartDate <= 새시작일 <= statusEndDate)
+		const [existingOnSale] = await mariaDBSequelize.query(
 			`
-			INSERT INTO roomStatus (
-				esntlId,
-				roomEsntlId,
-				gosiwonEsntlId,
-				status,
-				statusStartDate,
-				statusEndDate,
-				etcStartDate,
-				etcEndDate,
-				createdAt,
-				updatedAt
-			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())
+			SELECT esntlId FROM roomStatus
+			WHERE roomEsntlId = ? AND gosiwonEsntlId = ? AND status = 'ON_SALE'
+			  AND (deleteYN IS NULL OR deleteYN = 'N')
+			  AND DATE(statusStartDate) <= DATE(?)
+			  AND (statusEndDate IS NULL OR DATE(statusEndDate) >= DATE(?))
+			ORDER BY esntlId DESC LIMIT 1
 			`,
 			{
-				replacements: [
-					onSaleId,
-					roomEsntlId,
-					gosiwonEsntlId,
-					onSaleStartDate,
-					onSaleEndDate,
-					onSaleStartDate, // etcStartDate: statusStartDate와 동일
-					onSaleEndDate, // etcEndDate: statusEndDate와 동일
-				],
-				type: mariaDBSequelize.QueryTypes.INSERT,
+				replacements: [roomEsntlId, gosiwonEsntlId, onSaleStartDate, onSaleStartDate],
+				type: mariaDBSequelize.QueryTypes.SELECT,
 				transaction,
 			}
 		);
-		await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
+		if (existingOnSale && existingOnSale.esntlId) {
+			await mariaDBSequelize.query(
+				`
+				UPDATE roomStatus
+				SET statusStartDate = ?, statusEndDate = ?, etcStartDate = ?, etcEndDate = ?, updatedAt = NOW()
+				WHERE esntlId = ?
+				`,
+				{
+					replacements: [onSaleStartDate, onSaleEndDate, onSaleStartDate, onSaleEndDate, existingOnSale.esntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+			createdStatusIds.push(existingOnSale.esntlId);
+			await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
+		} else {
+			await closeOpenStatusesForRoom(roomEsntlId, sell_able_start_date, transaction);
+			const onSaleId = await idsNext('roomStatus', undefined, transaction);
+			createdStatusIds.push(onSaleId);
+			await mariaDBSequelize.query(
+				`
+				INSERT INTO roomStatus (
+					esntlId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					status,
+					statusStartDate,
+					statusEndDate,
+					etcStartDate,
+					etcEndDate,
+					createdAt,
+					updatedAt
+				) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())
+				`,
+				{
+					replacements: [
+						onSaleId,
+						roomEsntlId,
+						gosiwonEsntlId,
+						onSaleStartDate,
+						onSaleEndDate,
+						onSaleStartDate, // etcStartDate: statusStartDate와 동일
+						onSaleEndDate, // etcEndDate: statusEndDate와 동일
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
+					transaction,
+				}
+			);
+			await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
+		}
 
 		// CAN_CHECKIN 상태 레코드 생성 (closeOpenStatusesForRoom 생략: 위 sell_able_start_date로 이미 처리됨. 재호출 시 방금 넣은 ON_SALE의 statusEndDate가 덮어씌워질 수 있음)
 		const canCheckinId = await idsNext('roomStatus', undefined, transaction);
@@ -243,40 +276,73 @@ const roomAfterUse = async (
 		);
 		await syncRoomFromRoomStatus(roomEsntlId, 'CAN_CHECKIN', {}, transaction);
 
-		// ON_SALE 상태 레코드 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
-		await closeOpenStatusesForRoom(roomEsntlId, sellStartDate, transaction);
-		const onSaleId = await idsNext('roomStatus', undefined, transaction);
-		createdStatusIds.push(onSaleId);
-		await mariaDBSequelize.query(
+		// ON_SALE: 해당 방에 이미 ON_SALE이 있으면 INSERT 대신 기존 행의 날짜만 수정
+		// 기존 ON_SALE 중 '업데이트할 판매시작일'이 그 판매기간에 포함되는 행만 대상 (statusStartDate <= 새시작일 <= statusEndDate)
+		const [existingOnSaleBasic] = await mariaDBSequelize.query(
 			`
-			INSERT INTO roomStatus (
-				esntlId,
-				roomEsntlId,
-				gosiwonEsntlId,
-				status,
-				statusStartDate,
-				statusEndDate,
-				etcStartDate,
-				etcEndDate,
-				createdAt,
-				updatedAt
-			) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())
+			SELECT esntlId FROM roomStatus
+			WHERE roomEsntlId = ? AND gosiwonEsntlId = ? AND status = 'ON_SALE'
+			  AND (deleteYN IS NULL OR deleteYN = 'N')
+			  AND DATE(statusStartDate) <= DATE(?)
+			  AND (statusEndDate IS NULL OR DATE(statusEndDate) >= DATE(?))
+			ORDER BY esntlId DESC LIMIT 1
 			`,
 			{
-				replacements: [
-					onSaleId,
-					roomEsntlId,
-					gosiwonEsntlId,
-					sellStartDate,
-					sellEndDate,
-					sellStartDate, // etcStartDate: statusStartDate와 동일
-					sellEndDate, // etcEndDate: statusEndDate와 동일
-				],
-				type: mariaDBSequelize.QueryTypes.INSERT,
+				replacements: [roomEsntlId, gosiwonEsntlId, sellStartDate, sellStartDate],
+				type: mariaDBSequelize.QueryTypes.SELECT,
 				transaction,
 			}
 		);
-		await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
+		if (existingOnSaleBasic && existingOnSaleBasic.esntlId) {
+			await mariaDBSequelize.query(
+				`
+				UPDATE roomStatus
+				SET statusStartDate = ?, statusEndDate = ?, etcStartDate = ?, etcEndDate = ?, updatedAt = NOW()
+				WHERE esntlId = ?
+				`,
+				{
+					replacements: [sellStartDate, sellEndDate, sellStartDate, sellEndDate, existingOnSaleBasic.esntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+			createdStatusIds.push(existingOnSaleBasic.esntlId);
+			await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
+		} else {
+			await closeOpenStatusesForRoom(roomEsntlId, sellStartDate, transaction);
+			const onSaleId = await idsNext('roomStatus', undefined, transaction);
+			createdStatusIds.push(onSaleId);
+			await mariaDBSequelize.query(
+				`
+				INSERT INTO roomStatus (
+					esntlId,
+					roomEsntlId,
+					gosiwonEsntlId,
+					status,
+					statusStartDate,
+					statusEndDate,
+					etcStartDate,
+					etcEndDate,
+					createdAt,
+					updatedAt
+				) VALUES (?, ?, ?, 'ON_SALE', ?, ?, ?, ?, NOW(), NOW())
+				`,
+				{
+					replacements: [
+						onSaleId,
+						roomEsntlId,
+						gosiwonEsntlId,
+						sellStartDate,
+						sellEndDate,
+						sellStartDate, // etcStartDate: statusStartDate와 동일
+						sellEndDate, // etcEndDate: statusEndDate와 동일
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
+					transaction,
+				}
+			);
+			await syncRoomFromRoomStatus(roomEsntlId, 'ON_SALE', {}, transaction);
+		}
 	} else if (check_basic_sell === false) {
 		if (unableCheckInReason) {
 			// unableCheckInReason이 있는 경우: BEFORE_SALES 상태 생성 (기존 미종료 상태는 신규 시작일로 종료 처리)
