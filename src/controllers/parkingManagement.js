@@ -98,13 +98,14 @@ const getCurrentDateTime = () => {
 const syncGosiwonParkingUse = async (gosiwonEsntlId, transaction) => {
 	const countRows = await mariaDBSequelize.query(
 		`
-		SELECT parkType, COUNT(*) AS cnt
-		FROM parkStatus
-		WHERE gosiwonEsntlId = ?
-			AND status = 'CONTRACT'
-			AND deleteYN = 'N'
-			AND (parkType = '자동차' OR parkType = '오토바이')
-		GROUP BY parkType
+		SELECT PS.parkType, COUNT(*) AS cnt
+		FROM parkStatus PS
+		INNER JOIN roomContract RC ON RC.esntlId = PS.contractEsntlId AND RC.status = 'USED'
+		WHERE PS.gosiwonEsntlId = ?
+			AND PS.status = 'CONTRACT'
+			AND PS.deleteYN = 'N'
+			AND (PS.parkType = '자동차' OR PS.parkType = '오토바이')
+		GROUP BY PS.parkType
 		`,
 		{
 			replacements: [gosiwonEsntlId],
@@ -182,6 +183,42 @@ exports.createParking = async (req, res, next) => {
 		}
 
 		const contract = contractInfo[0];
+
+		// 계약서가 사용중(USED) 상태가 아니면 주차 등록 불가
+		if (contract.status !== 'USED') {
+			errorHandler.errorThrow(
+				400,
+				'해당 계약은 사용중(USED) 상태가 아니므로 주차를 등록할 수 없습니다.'
+			);
+		}
+
+		// gosiwonParking 주차 가능 대수(auto, bike) 대비 현재 사용 대수(autoUse, bikeUse) 검증
+		// /v1/roomExtraPayment의 자동차/오토바이 주차 처리와 동일하게, 한도 초과 시 에러 처리
+		const parkingInfo = await parking.findOne({
+			where: { gosiwonEsntlId: contract.gosiwonEsntlId },
+			transaction,
+		});
+
+		if (parkingInfo) {
+			const maxAuto = parkingInfo.auto ?? 0;
+			const maxBike = parkingInfo.bike ?? 0;
+			const currentAutoUse = parkingInfo.autoUse ?? 0;
+			const currentBikeUse = parkingInfo.bikeUse ?? 0;
+
+			if (optionName === '자동차' && currentAutoUse >= maxAuto) {
+				errorHandler.errorThrow(
+					400,
+					`자동차 주차 가능 대수(${maxAuto}대)를 초과했습니다. 현재 사용 중: ${currentAutoUse}대.`
+				);
+			}
+
+			if (optionName === '오토바이' && currentBikeUse >= maxBike) {
+				errorHandler.errorThrow(
+					400,
+					`오토바이 주차 가능 대수(${maxBike}대)를 초과했습니다. 현재 사용 중: ${currentBikeUse}대.`
+				);
+			}
+		}
 
 		// 현재 날짜/시간
 		const { pDate, pTime } = getCurrentDateTime();

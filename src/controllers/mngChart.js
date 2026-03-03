@@ -596,7 +596,7 @@ exports.mngChartMain = async (req, res, next) => {
 			WHERE RS.gosiwonEsntlId = ?
 				AND R.deleteYN = 'N'
 				AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N')
-				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE', 'RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING')
+				AND RS.status IN ('CONTRACT', 'OVERDUE', 'CHECKOUT_REQUESTED', 'ROOM_MOVE', 'RESERVED', 'VBANK_PENDING')
 				AND (
 					(RS.status IN ('CONTRACT', 'OVERDUE', 'ROOM_MOVE')
 						AND RS.statusStartDate <= ?
@@ -610,7 +610,7 @@ exports.mngChartMain = async (req, res, next) => {
 							OR (COALESCE(RS.etcStartDate, RS.statusEndDate) < ? AND COALESCE(RS.etcEndDate, RS.statusEndDate) >= ?)
 						))
 					OR
-					(RS.status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING')
+					(RS.status IN ('RESERVED', 'VBANK_PENDING')
 						AND COALESCE(RS.statusStartDate, RS.etcStartDate, RS.createdAt) <= ?
 						AND (COALESCE(RS.statusEndDate, RS.etcEndDate) >= ? OR (RS.statusEndDate IS NULL AND RS.etcEndDate IS NULL))
 					)
