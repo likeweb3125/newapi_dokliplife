@@ -9,3 +9,9 @@ ALTER TABLE `history` ADD COLUMN `deletedBy` VARCHAR(50) NULL COMMENT '삭제한
 ALTER TABLE `history` ADD COLUMN `deletedAt` DATETIME NULL COMMENT '삭제 시간' AFTER `deletedBy`;
 CREATE INDEX `idx_history_deletedBy` ON `history` (`deletedBy`);
 CREATE INDEX `idx_history_deletedAt` ON `history` (`deletedAt`);
+
+-- ---------------------------------------------
+-- 2. writerName 컬럼 및 인덱스
+-- ---------------------------------------------
+ALTER TABLE `history` ADD COLUMN `writerName` VARCHAR(100) NULL COMMENT '작성자 이름' AFTER `writerType`;
+CREATE INDEX `idx_history_writerName` ON `history` (`writerName`);

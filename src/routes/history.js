@@ -84,6 +84,12 @@ const historyController = require('../controllers/history');
  *           type: string
  *         description: 작성한 고객 고유아이디
  *       - in: query
+ *         name: writerName
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 작성자 이름
+ *       - in: query
  *         name: isPinned
  *         required: false
  *         schema:
@@ -201,6 +207,9 @@ router.get('/list', historyController.getHistoryList);
  *                 enum: [ADMIN, PARTNER]
  *                 default: ADMIN
  *                 description: 작성자 타입
+ *               writerName:
+ *                 type: string
+ *                 description: 작성자 이름
  *               tags:
  *                 type: string
  *                 description: 태그 (쉼표로 구분)

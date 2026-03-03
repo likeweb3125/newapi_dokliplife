@@ -88,6 +88,7 @@ exports.getHistoryList = async (req, res, next) => {
 			writerType,
 			writerAdminId,
 			writerCustomerId,
+			writerName,
 			isPinned,
 			search,
 			hideDeleted = true,
@@ -137,6 +138,9 @@ exports.getHistoryList = async (req, res, next) => {
 		}
 		if (writerCustomerId) {
 			whereCondition.writerCustomerId = writerCustomerId;
+		}
+		if (writerName) {
+			whereCondition.writerName = writerName;
 		}
 
 		// 고정 여부 필터
@@ -266,6 +270,7 @@ exports.createHistory = async (req, res, next) => {
 			publicRange = 0,
 			writerCustomerId,
 			writerType = 'ADMIN',
+			writerName,
 			tags,
 			isPinned = 0,
 		} = req.body;
@@ -319,6 +324,7 @@ exports.createHistory = async (req, res, next) => {
 				writerAdminId: writerAdminId,
 				writerCustomerId: writerCustomerId || null,
 				writerType: writerType,
+				writerName: writerName || null,
 				tags: tags || null,
 				isPinned: isPinned === 1 || isPinned === '1' ? 1 : 0,
 				deleteYN: 'N',
@@ -362,6 +368,7 @@ exports.createHistoryRecord = async (options, transaction = null) => {
 			writerAdminId: options.writerAdminId ?? null,
 			writerCustomerId: options.writerCustomerId ?? null,
 			writerType: options.writerType ?? 'ADMIN',
+			writerName: options.writerName ?? null,
 			tags: options.tags ?? null,
 			isPinned: options.isPinned === 1 || options.isPinned === '1' ? 1 : 0,
 			deleteYN: 'N',

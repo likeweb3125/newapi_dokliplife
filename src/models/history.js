@@ -83,6 +83,12 @@ module.exports = (sequelize, DataTypes) => {
 				field: 'writerType',
 				comment: '작성자 타입 (ADMIN, PARTNER)',
 			},
+			writerName: {
+				type: DataTypes.STRING(100),
+				allowNull: true,
+				field: 'writerName',
+				comment: '작성자 이름',
+			},
 			tags: {
 				type: DataTypes.STRING(500),
 				allowNull: true,
