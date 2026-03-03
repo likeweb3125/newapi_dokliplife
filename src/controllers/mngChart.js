@@ -317,11 +317,15 @@ exports.mngChartMain = async (req, res, next) => {
 				COALESCE(RS.status, 'BEFORE_SALES') AS status,
 				COALESCE(RS.customerName, '') AS currentGuest,
 				COALESCE(RCW.checkinName, C.name, RS.customerName, '') AS checkInName,
+				RCW.checkinName AS checkinName,
+				RCW.checkinPhone AS checkinPhone,
+				RCW.checkinGender AS checkinGender,
+				RCW.checkinAge AS checkinAge,
+				RCW.customerName AS customerName,
+				RCW.customerPhone AS customerPhone,
 				C.gender AS customerGender,
 				C.birth AS customerBirth,
 				RCW.customerAge AS rcwCustomerAge,
-				RCW.checkinGender AS checkinGender,
-				RCW.checkinAge AS checkinAge,
 				RS.customerEsntlId AS _dbg_rsCustomerEsntlId,
 				RS.contractEsntlId AS _dbg_rsContractEsntlId,
 				C.name AS _dbg_customerName,
@@ -455,10 +459,14 @@ exports.mngChartMain = async (req, res, next) => {
 				deposit: room.deposit != null ? (parseInt(room.deposit, 10) || room.deposit) : null,
 				currentGuest: room.currentGuest || '',
 				checkInName: room.checkInName || room.currentGuest || '',
-				customerGender: room.customerGender ?? null,
-				customerAge: room.rcwCustomerAge ?? formatAge(room.customerBirth) ?? null,
-				checkinGender: room.checkinGender ?? null,
+				checkinName: room.checkinName ?? null,
 				checkinAge: room.checkinAge ?? null,
+				checkinGender: room.checkinGender ?? null,
+				checkinPhone: room.checkinPhone ?? null,
+				customerName: room.customerName ?? null,
+				customerAge: room.rcwCustomerAge ?? formatAge(room.customerBirth) ?? null,
+				customerGender: room.customerGender ?? null,
+				customerPhone: room.customerPhone ?? null,
 				stayPeriod: room.stayPeriod || '',
 				value: room.value || 0,
 				roomCategory,
@@ -722,10 +730,14 @@ exports.mngChartMain = async (req, res, next) => {
 				period: startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '',
 				currentGuest: null,
 				guestPhone: null,
-				customerGender: null,
-				customerAge: null,
-				checkinGender: null,
+				checkinName: null,
 				checkinAge: null,
+				checkinGender: null,
+				checkinPhone: null,
+				customerName: null,
+				customerAge: null,
+				customerGender: null,
+				customerPhone: null,
 				className: 'timeline-item',
 				contractNumber: null,
 				guest: null,
@@ -775,10 +787,14 @@ exports.mngChartMain = async (req, res, next) => {
 					const gp = phoneToDisplay(gpRaw) ?? gpRaw;
 					reserveOverrides.currentGuest = gn;
 					reserveOverrides.guestPhone = gp || null;
-					reserveOverrides.customerGender = row.customerGender ?? null;
-					reserveOverrides.customerAge = computedCustomerAge ?? null;
-					reserveOverrides.checkinGender = row.checkinGender ?? null;
+					reserveOverrides.checkinName = row.checkinName ?? null;
 					reserveOverrides.checkinAge = row.checkinAge ?? null;
+					reserveOverrides.checkinGender = row.checkinGender ?? null;
+					reserveOverrides.checkinPhone = row.checkinPhone ?? null;
+					reserveOverrides.customerName = row.contractorName ?? row.customerName ?? null;
+					reserveOverrides.customerAge = row.contractorAge ?? computedCustomerAge ?? null;
+					reserveOverrides.customerGender = row.contractorGender ?? row.customerGender ?? null;
+					reserveOverrides.customerPhone = row.contractorPhone ?? row.customerPhone ?? null;
 					reserveOverrides.guest = `${gn} / ${ga} / ${gg}(${gp})`;
 				} else if (row.status === 'RESERVE_PENDING' && row.rorSn) {
 					const rorHpRaw = row.rorHpNo || '';
@@ -793,12 +809,16 @@ exports.mngChartMain = async (req, res, next) => {
 					const cpRaw = row.contractorPhone ?? row.customerPhone ?? '';
 					const cp = phoneToDisplay(cpRaw) ?? cpRaw;
 					reserveOverrides.contractPerson = `${cn} / ${ca} / ${cg}(${cp})`;
+					if (reserveOverrides.customerName == null) reserveOverrides.customerName = row.contractorName ?? row.customerName ?? null;
+					if (reserveOverrides.customerAge == null) reserveOverrides.customerAge = row.contractorAge ?? computedCustomerAge ?? null;
+					if (reserveOverrides.customerGender == null) reserveOverrides.customerGender = row.contractorGender ?? row.customerGender ?? null;
+					if (reserveOverrides.customerPhone == null) reserveOverrides.customerPhone = row.contractorPhone ?? row.customerPhone ?? null;
 					if (row.customerBank && row.customerBankAccount) {
 						reserveOverrides.accountInfo = `${row.customerBank} ${row.customerBankAccount} ${cn}`;
 					}
 				}
-				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
-				else if (row.status === 'RESERVE_PENDING' && row.rorSn && row.rorMonthlyRent != null && row.rorMonthlyRent !== '') reserveOverrides.entryFee = `${row.rorMonthlyRent}`;
+				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = (parseFloat(row.pyl_goods_amount) || 0) * 10000;
+				else if (row.status === 'RESERVE_PENDING' && row.rorSn && row.rorMonthlyRent != null && row.rorMonthlyRent !== '') reserveOverrides.entryFee = (parseFloat(row.rorMonthlyRent) || 0) * 10000;
 				if (hasContract && (parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
 				else if (row.status === 'RESERVE_PENDING' && row.rorSn) reserveOverrides.paymentAmount = '0';
 				if (hasContract && (parseInt(row.paymentPoint) || 0) > 0) reserveOverrides.paymentPoint = parseInt(row.paymentPoint) || 0;
@@ -819,7 +839,8 @@ exports.mngChartMain = async (req, res, next) => {
 				if (hasContract) {
 					const contractType = getContractType(row.contractDate, row.contractStartDate);
 					const paymentAmount = parseInt(row.paymentAmount) || 0;
-					const entryFee = row.pyl_goods_amount || 0;
+					const entryFeeRaw = parseFloat(row.pyl_goods_amount) || 0;
+					const entryFee = entryFeeRaw * 10000;
 
 					const guestName = row.checkinName || row.customerName || '';
 					const guestAge = row.checkinAge || computedCustomerAge || '';
@@ -846,16 +867,20 @@ exports.mngChartMain = async (req, res, next) => {
 					contractOverrides.period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
 					contractOverrides.currentGuest = guestName;
 					contractOverrides.guestPhone = guestPhone || null;
-					contractOverrides.customerGender = row.customerGender ?? null;
-					contractOverrides.customerAge = computedCustomerAge ?? null;
-					contractOverrides.checkinGender = row.checkinGender ?? null;
+					contractOverrides.checkinName = row.checkinName ?? null;
 					contractOverrides.checkinAge = row.checkinAge ?? null;
+					contractOverrides.checkinGender = row.checkinGender ?? null;
+					contractOverrides.checkinPhone = row.checkinPhone ?? null;
+					contractOverrides.customerName = row.contractorName ?? row.customerName ?? null;
+					contractOverrides.customerAge = row.contractorAge ?? computedCustomerAge ?? null;
+					contractOverrides.customerGender = row.contractorGender ?? row.customerGender ?? null;
+					contractOverrides.customerPhone = row.contractorPhone ?? row.customerPhone ?? null;
 					contractOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
 					contractOverrides.guest = guest;
 					contractOverrides.contractPerson = contractor;
 					contractOverrides.periodType = row.month ? `${row.month}개월` : '1개월';
 					contractOverrides.contractType = contractType;
-					contractOverrides.entryFee = entryFee > 0 ? `${entryFee}` : '0';
+					contractOverrides.entryFee = entryFee > 0 ? entryFee : 0;
 					contractOverrides.paymentAmount = paymentAmount > 0 ? `${paymentAmount}` : '0';
 					contractOverrides.paymentPoint = (parseInt(row.paymentPoint) || 0) > 0 ? parseInt(row.paymentPoint) : 0;
 					contractOverrides.paymentCoupon = (parseInt(row.paymentCoupon) || 0) > 0 ? parseInt(row.paymentCoupon) : 0;
@@ -887,16 +912,20 @@ exports.mngChartMain = async (req, res, next) => {
 					checkoutOverrides.period = startDate && endDate ? `${startDate.slice(5, 7)}-${startDate.slice(8, 10)} ~ ${endDate.slice(5, 7)}-${endDate.slice(8, 10)}` : '';
 					checkoutOverrides.currentGuest = guestName;
 					checkoutOverrides.guestPhone = guestPhoneFmt || null;
-					checkoutOverrides.customerGender = row.customerGender ?? null;
-					checkoutOverrides.customerAge = computedCustomerAge ?? null;
-					checkoutOverrides.checkinGender = row.checkinGender ?? null;
+					checkoutOverrides.checkinName = row.checkinName ?? null;
 					checkoutOverrides.checkinAge = row.checkinAge ?? null;
+					checkoutOverrides.checkinGender = row.checkinGender ?? null;
+					checkoutOverrides.checkinPhone = row.checkinPhone ?? null;
+					checkoutOverrides.customerName = row.contractorName ?? row.customerName ?? null;
+					checkoutOverrides.customerAge = row.contractorAge ?? computedCustomerAge ?? null;
+					checkoutOverrides.customerGender = row.contractorGender ?? row.customerGender ?? null;
+					checkoutOverrides.customerPhone = row.contractorPhone ?? row.customerPhone ?? null;
 					checkoutOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
 					checkoutOverrides.guest = guest;
 					checkoutOverrides.contractPerson = contractor;
 					checkoutOverrides.periodType = row.month ? `${row.month}개월` : '';
 					checkoutOverrides.contractType = row.contractDate && row.contractStartDate ? getContractType(row.contractDate, row.contractStartDate) : '';
-					checkoutOverrides.entryFee = row.pyl_goods_amount ? `${row.pyl_goods_amount}` : '0';
+					checkoutOverrides.entryFee = row.pyl_goods_amount ? (parseFloat(row.pyl_goods_amount) || 0) * 10000 : 0;
 					checkoutOverrides.paymentAmount = (parseInt(row.paymentAmount) || 0) > 0 ? `${parseInt(row.paymentAmount) || 0}` : '0';
 					checkoutOverrides.paymentPoint = (parseInt(row.paymentPoint) || 0) > 0 ? parseInt(row.paymentPoint) : 0;
 					checkoutOverrides.paymentCoupon = (parseInt(row.paymentCoupon) || 0) > 0 ? parseInt(row.paymentCoupon) : 0;

@@ -119,6 +119,38 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           currentGuest:
  *                             type: string
  *                             description: 현재 입실자 이름
+ *                           checkinName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 이름 (roomContractWho.checkinName)"
+ *                           checkinAge:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 나이 (roomContractWho.checkinAge)"
+ *                           checkinGender:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 성별 (roomContractWho.checkinGender)"
+ *                           checkinPhone:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 연락처 (roomContractWho.checkinPhone)"
+ *                           customerName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 이름 (roomContractWho.customerName)"
+ *                           customerAge:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 나이 (roomContractWho.customerAge)"
+ *                           customerGender:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 성별 (customer.gender / roomContractWho)"
+ *                           customerPhone:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 연락처 (roomContractWho.customerPhone)"
  *                           stayPeriod:
  *                             type: string
  *                             description: 체류 기간 (yy-mm-dd~yy-mm-dd 형식)
@@ -203,6 +235,38 @@ const isAuthMiddleware = require('../middleware/is-auth');
  *                           currentGuest:
  *                             type: string
  *                             description: 현재 입실자 이름
+ *                           checkinName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 이름 (roomContractWho.checkinName)"
+ *                           checkinAge:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 나이 (roomContractWho.checkinAge)"
+ *                           checkinGender:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 성별 (roomContractWho.checkinGender)"
+ *                           checkinPhone:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "입실자 연락처 (roomContractWho.checkinPhone)"
+ *                           customerName:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 이름 (roomContractWho.customerName / customer.name)"
+ *                           customerAge:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 나이 (roomContractWho.customerAge)"
+ *                           customerGender:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 성별 (customer.gender)"
+ *                           customerPhone:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "계약자 연락처 (roomContractWho.customerPhone / customer.phone)"
  *                           className:
  *                             type: string
  *                             description: "CSS 클래스명 (고정값: timeline-item)"
