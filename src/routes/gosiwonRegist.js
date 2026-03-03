@@ -154,6 +154,97 @@ router.get('/list', gosiwonRegistController.getAcceptList);
 
 /**
  * @swagger
+ * /v1/gosiwonRegist/selectFileToId:
+ *   get:
+ *     summary: 계약서 파일 조회
+ *     description: "고시원 esntlId로 gosiwon 테이블의 contractFile, contractFileOrgName을 조회합니다."
+ *     tags: [고시원등록관리]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: esntlId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 고시원 고유아이디
+ *     responses:
+ *       200:
+ *         description: 계약서 파일 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 statusCode:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: 계약서 파일 조회 성공
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     contractFile:
+ *                       type: string
+ *                       nullable: true
+ *                       description: "계약서 파일 경로/명 (gosiwon.contractFile)"
+ *                     contractFileOrgName:
+ *                       type: string
+ *                       nullable: true
+ *                       description: "계약서 원본 파일명 (gosiwon.contractFileOrgName)"
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.get('/selectFileToId', gosiwonRegistController.selectFileToId);
+
+/**
+ * @swagger
+ * /v1/gosiwonRegist/updateFile:
+ *   put:
+ *     summary: 계약서 파일 수정
+ *     description: "고시원 esntlId에 해당하는 gosiwon의 contractFile, contractFileOrgName을 수정합니다."
+ *     tags: [고시원등록관리]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - esntlId
+ *             properties:
+ *               esntlId:
+ *                 type: string
+ *                 description: 고시원 고유아이디
+ *               contractFile:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "계약서 파일 경로/명"
+ *               contractFileOrgName:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "계약서 원본 파일명"
+ *     responses:
+ *       200:
+ *         description: 계약서 파일 수정 성공
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+router.put('/updateFile', gosiwonRegistController.updateFile);
+
+/**
+ * @swagger
  * /v1/gosiwonRegist/update:
  *   put:
  *     summary: 가입 관리 고시원 정보 수정

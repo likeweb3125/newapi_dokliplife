@@ -177,6 +177,57 @@ exports.getAcceptList = async (req, res, next) => {
 };
 
 /**
+ * 계약서 파일 조회 (esntlId 기준 contractFile, contractFileOrgName)
+ * GET /v1/gosiwonRegist/selectFileToId?esntlId=xxx
+ */
+exports.selectFileToId = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+		const { esntlId } = req.query;
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+		const [row] = await mariaDBSequelize.query(
+			`SELECT contractFile, contractFileOrgName FROM gosiwon WHERE esntlId = ? LIMIT 1`,
+			{
+				replacements: [esntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+			}
+		);
+		return errorHandler.successThrow(res, '계약서 파일 조회 성공', {
+			contractFile: row?.contractFile ?? null,
+			contractFileOrgName: row?.contractFileOrgName ?? null,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+/**
+ * 계약서 파일 수정 (contractFile, contractFileOrgName)
+ * PUT /v1/gosiwonRegist/updateFile
+ */
+exports.updateFile = async (req, res, next) => {
+	try {
+		verifyAdminToken(req);
+		const { contractFile, contractFileOrgName, esntlId } = req.body;
+		if (!esntlId) {
+			errorHandler.errorThrow(400, 'esntlId를 입력해주세요.');
+		}
+		await mariaDBSequelize.query(
+			`UPDATE gosiwon SET contractFile = ?, contractFileOrgName = ?, update_dtm = NOW() WHERE esntlId = ?`,
+			{
+				replacements: [contractFile ?? null, contractFileOrgName ?? null, esntlId],
+				type: mariaDBSequelize.QueryTypes.UPDATE,
+			}
+		);
+		return errorHandler.successThrow(res, '계약서 파일 수정 성공');
+	} catch (err) {
+		next(err);
+	}
+};
+
+/**
  * 가입 관리 고시원 정보 수정 (gosiwonRegist.update)
  * gosiwon 테이블 업데이트 + status가 DORMANT일 때 해당 고시원의 OPEN 방을 EMPTY로 변경
  */
