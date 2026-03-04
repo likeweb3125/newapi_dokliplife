@@ -1260,6 +1260,8 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 				C.birth AS customerBirth,
 				RCW.checkinName,
 				RCW.checkinPhone,
+				RCW.checkinGender AS checkinGender,
+				RCW.checkinAge AS checkinAge,
 				RCW.customerName AS contractorName,
 				RCW.customerPhone AS contractorPhone
 			FROM roomContract RC
@@ -1335,18 +1337,48 @@ exports.getRefundDataWithDetail = async (req, res, next) => {
 		const cAmtNum = cAmount != null ? parseInt(String(cAmount).replace(/,/g, ''), 10) : 0;
 		const finalPayment = !Number.isNaN(payAmtNum) && !Number.isNaN(cAmtNum) ? payAmtNum - cAmtNum : null;
 
+		// contractInfo: 고객·입실자·계약자 필드 정렬 및 checkinGender/checkinAge 포함
+		const contractInfoPayload = contractInfo
+			? (() => {
+					const ci = contractInfo;
+					const customerAgeVal = formatAge(ci.customerBirth) ?? null;
+					const checkinAgeVal = ci.checkinAge != null ? Number(ci.checkinAge) : (formatAge(ci.customerBirth) ?? null);
+					return {
+						contractId: ci.contractId,
+						contractDate: ci.contractDate,
+						startDate: ci.startDate,
+						endDate: ci.endDate,
+						month: ci.month,
+						roomContractStatus: ci.roomContractStatus,
+						monthlyRent: ci.monthlyRent,
+						gosiwonName: ci.gosiwonName,
+						roomEsntlId: ci.roomEsntlId,
+						roomNumber: ci.roomNumber,
+						roomType: ci.roomType,
+						agreementType: ci.agreementType,
+						agreementContent: ci.agreementContent,
+						gsw_contract: ci.gsw_contract,
+						gs_contract: ci.gs_contract,
+						adminName: ci.adminName,
+						adminPhone: phoneToDisplay(ci.adminPhone) ?? ci.adminPhone,
+						customerName: ci.customerName ?? null,
+						customerPhone: phoneToDisplay(ci.customerPhone) ?? ci.customerPhone ?? null,
+						customerGender: ci.customerGender ?? null,
+						customerBirth: ci.customerBirth ?? null,
+						customerAge: customerAgeVal,
+						checkinName: ci.checkinName ?? null,
+						checkinPhone: phoneToDisplay(ci.checkinPhone) ?? ci.checkinPhone ?? null,
+						checkinGender: ci.checkinGender ?? null,
+						checkinAge: checkinAgeVal,
+						contractorName: ci.contractorName ?? null,
+						contractorPhone: phoneToDisplay(ci.contractorPhone) ?? ci.contractorPhone ?? null,
+					};
+			  })()
+			: null;
+
 		const result = {
 			...baseRow,
-			contractInfo: contractInfo
-				? {
-						...contractInfo,
-						customerAge: formatAge(contractInfo.customerBirth) ?? null,
-						adminPhone: phoneToDisplay(contractInfo.adminPhone) ?? contractInfo.adminPhone,
-						customerPhone: phoneToDisplay(contractInfo.customerPhone) ?? contractInfo.customerPhone,
-						checkinPhone: phoneToDisplay(contractInfo.checkinPhone) ?? contractInfo.checkinPhone,
-						contractorPhone: phoneToDisplay(contractInfo.contractorPhone) ?? contractInfo.contractorPhone,
-				  }
-				: null,
+			contractInfo: contractInfoPayload,
 			paymentInfo: Array.isArray(paymentInfo) ? paymentInfo : [],
 			settlementInfo: {
 				paymentAmount,

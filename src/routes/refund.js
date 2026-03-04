@@ -689,10 +689,50 @@ router.get('/data', refundController.getRefundRequestData);
  *                           type: string
  *                           nullable: true
  *                           description: "고시원 관리자 연락처 (gosiwonAdmin.hp)"
+ *                         customerName:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입주자(고객) 이름 (customer.name)"
+ *                         customerPhone:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입주자(고객) 연락처"
+ *                         customerGender:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입주자(고객) 성별 (customer.gender)"
+ *                         customerBirth:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입주자(고객) 생년월일"
+ *                         customerAge:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: "입주자(고객) 나이 (customerBirth 기준 계산)"
  *                         checkinName:
  *                           type: string
+ *                           nullable: true
+ *                           description: "입실자 이름 (roomContractWho.checkinName)"
+ *                         checkinPhone:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입실자 연락처"
+ *                         checkinGender:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "입실자 성별 (roomContractWho.checkinGender)"
+ *                         checkinAge:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: "입실자 나이 (roomContractWho.checkinAge, 없으면 customerBirth 기준)"
  *                         contractorName:
  *                           type: string
+ *                           nullable: true
+ *                           description: "계약자 이름 (roomContractWho.customerName)"
+ *                         contractorPhone:
+ *                           type: string
+ *                           nullable: true
+ *                           description: "계약자 연락처"
  *                     paymentInfo:
  *                       type: array
  *                       description: "결제정보 (paymentLog 목록)"
