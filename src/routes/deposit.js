@@ -855,6 +855,10 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *                 type: string
  *                 description: "보증금 고유 아이디 (il_room_deposit.rdp_eid)"
  *                 example: RDP0000000001
+ *               depositorName:
+ *                 type: string
+ *                 description: "보증금 납부자 이름 (선택, 입력 시 RETURN 이력에 저장)"
+ *                 example: 홍길동
  *               amount:
  *                 type: integer
  *                 description: 환불 금액 (실제 반환 금액)
@@ -1112,7 +1116,14 @@ router.get('/depositInfo', depositController.getDepositInfo);
  *                       description: 미납 잔액 (목표 금액 - 입금 합계)
  *                       example: 0
  *       400:
- *         $ref: '#/components/responses/BadRequest'
+ *         description: "잘못된 요청. depositEsntlId 누락, amount가 0 이하, 또는 등록 금액이 현재 미납액(목표 금액 - 기존 납부 합계)을 초과하는 경우"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               statusCode: 400
+ *               message: "등록 금액(600,000원)이 미납액(500,000원)을 초과할 수 없습니다."
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       404:

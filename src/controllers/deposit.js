@@ -235,6 +235,14 @@ exports.createDeposit = async (req, res, next) => {
 				},
 				transaction,
 			})) || 0;
+		// 등록 금액 + 기존 납부 합계가 미납액(목표 금액 − 기납부 합계)을 초과하면 안 됨
+		const currentUnpaidAmount = Math.max(0, targetAmount - existingSum);
+		if (finalAmount > currentUnpaidAmount) {
+			errorHandler.errorThrow(
+				400,
+				`등록 금액(${finalAmount.toLocaleString()}원)이 미납액(${currentUnpaidAmount.toLocaleString()}원)을 초과할 수 없습니다.`
+			);
+		}
 		const totalPaidAfter = existingSum + finalAmount;
 		const depositStatus =
 			targetAmount <= 0 || totalPaidAfter >= targetAmount ? 'COMPLETED' : 'PARTIAL';
@@ -1941,6 +1949,7 @@ exports.createDepositRefund = async (req, res, next) => {
 
 		const {
 			depositEsntlId,
+			depositorName: depositorNameBody,
 			amount: refundAmountBody,
 			deductionAmount: deductionAmountBody,
 			deductionItems,
@@ -1955,6 +1964,10 @@ exports.createDepositRefund = async (req, res, next) => {
 		if (!depositEsntlId) {
 			errorHandler.errorThrow(400, 'depositEsntlId는 필수입니다.');
 		}
+		const depositorNameVal =
+			depositorNameBody != null && String(depositorNameBody).trim() !== ''
+				? String(depositorNameBody).trim()
+				: null;
 		const refundAmount = parseInt(refundAmountBody, 10) || 0;
 		const deductionAmount = parseInt(deductionAmountBody, 10) || 0;
 		if (refundAmount < 0 || deductionAmount < 0) {
@@ -2050,6 +2063,7 @@ exports.createDepositRefund = async (req, res, next) => {
 				refundAmount: refundAmount,
 				status,
 				memo: memoJson,
+				depositorName: depositorNameVal,
 				refundDate: refundDate || mariaDBSequelize.literal('CURRENT_TIMESTAMP'),
 				accountBank: accountBank || null,
 				accountNumber: accountNumber || null,
