@@ -299,6 +299,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 					const parkStatusId = await idsNext('parkStatus', undefined, transaction);
 					// optionInfo를 memo·parkNumber에 저장 (차량번호, 차종 등)
 					const parkStatusMemo = optionInfo && optionInfo.trim() !== '' ? optionInfo.trim() : null;
+					const parkStatusCost = Math.abs(parseInt(cost, 10)) || 0;
 					await parkStatus.create(
 						{
 							esntlId: parkStatusId,
@@ -310,6 +311,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 							useEndDate: contract.endDate || null,
 							parkType: parkingOptionName, // 요청 optionName 그대로 (자동차/오토바이)
 							parkNumber: parkStatusMemo, // 차량번호 등
+							cost: parkStatusCost,
 							memo: parkStatusMemo,
 							deleteYN: 'N',
 						},

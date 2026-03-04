@@ -288,6 +288,7 @@ exports.createDeposit = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: getWriterAdminId(decodedToken),
+					writerName: decodedToken.admin?.name || decodedToken.partner?.name || '관리자',
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -464,6 +465,7 @@ exports.updateDeposit = async (req, res, next) => {
 						priority: 'NORMAL',
 						publicRange: 0,
 						writerAdminId: getWriterAdminId(decodedToken),
+						writerName: decodedToken.admin?.name || decodedToken.partner?.name || '관리자',
 						writerType: 'ADMIN',
 					},
 					transaction
@@ -533,6 +535,7 @@ exports.deleteDeposit = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: getWriterAdminId(decodedToken),
+					writerName: decodedToken.admin?.name || decodedToken.partner?.name || '관리자',
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -616,6 +619,7 @@ exports.deleteDepositOnly = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: getWriterAdminId(decodedToken),
+					writerName: decodedToken.admin?.name || decodedToken.partner?.name || '관리자',
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -754,6 +758,7 @@ exports.registerDeposit = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: managerId,
+					writerName: decodedToken.admin?.name || decodedToken.partner?.name || '관리자',
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -2081,6 +2086,7 @@ exports.createDepositRefund = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: getWriterAdminId(decodedToken),
+					writerName: decodedToken.admin?.name || decodedToken.partner?.name || '관리자',
 					writerType: 'ADMIN',
 				},
 				transaction
