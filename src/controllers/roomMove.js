@@ -2,13 +2,26 @@ const { mariaDBSequelize, room } = require('../models');
 const errorHandler = require('../middleware/error');
 const { getWriterAdminId } = require('../utils/auth');
 const historyController = require('./history');
-const { roomAfterUse } = require('./refund');
+const extraPaymentController = require('./extraPayment');
+const refundController = require('./refund');
+const { roomAfterUse } = refundController;
 const { next: idsNext } = require('../utils/idsNext');
 const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
 const { dateToYmd } = require('../utils/dateHelper');
 
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
+
+/** MySQL 데드락(1213, 40001) 여부 판별 */
+const isDeadlockError = (err) => {
+	if (!err) return false;
+	const code = err.parent?.errno ?? err.errno;
+	const sqlState = err.parent?.sqlState ?? err.sqlState;
+	const msg = (err.message || '').toLowerCase();
+	return code === 1213 || sqlState === '40001' || msg.includes('deadlock');
+};
+
+const MAX_DEADLOCK_RETRIES = 3;
 
 // 공통 토큰 검증 함수
 const verifyAdminToken = (req) => {
@@ -51,10 +64,41 @@ const generateRoomMoveStatusId = async (transaction) => {
 	return result?.nextId || `${ROOMMOVE_PREFIX}${String(1).padStart(ROOMMOVE_PADDING, '0')}`;
 };
 
-// 방이동 처리
+// 다른 컨트롤러를 내부에서 호출하기 위한 헬퍼 (req 헤더/메서드는 유지, body만 교체)
+const callControllerWithBody = (handler, req, body) =>
+	new Promise((resolve, reject) => {
+		// Express Request의 프로토타입(get 등 메서드)을 유지하면서 body만 덮어쓴다.
+		const fakeReq = Object.assign(
+			Object.create(Object.getPrototypeOf(req)),
+			req,
+			{ body }
+		);
+
+		const fakeRes = {
+			statusCode: 200,
+			status(code) {
+				this.statusCode = code;
+				return this;
+			},
+			json(payload) {
+				resolve(payload);
+			},
+		};
+		const next = (err) => {
+			if (err) {
+				reject(err);
+			}
+		};
+
+		Promise.resolve(handler(fakeReq, fakeRes, next)).catch(reject);
+	});
+
+// 방이동 처리 (데드락 시 최대 MAX_DEADLOCK_RETRIES 회 재시도)
 exports.processRoomMove = async (req, res, next) => {
-	const transaction = await mariaDBSequelize.transaction();
-	try {
+	let lastErr;
+	for (let attempt = 1; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
+		const transaction = await mariaDBSequelize.transaction();
+		try {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
 
@@ -243,6 +287,71 @@ exports.processRoomMove = async (req, res, next) => {
 		const moveDatePrev = new Date(moveDateParts[0], moveDateParts[1] - 1, moveDateParts[2]);
 		moveDatePrev.setDate(moveDatePrev.getDate() - 1);
 		const moveDateMinusOneStr = `${moveDatePrev.getFullYear()}-${String(moveDatePrev.getMonth() + 1).padStart(2, '0')}-${String(moveDatePrev.getDate()).padStart(2, '0')}`;
+
+		// 방이동 신청 시 추가결제/환불 연동 처리
+		const moveMemo = `방이동: ${originalRoomNumber} → ${targetRoomNumber}`;
+
+		// adjustmentType = ADDITION 인 경우: 추가 결제 요청 등록 (/v1/roomExtraPayment 내부 호출)
+		if (finalAdjustmentType === 'ADDITION' && finalAdjustmentAmount > 0) {
+			// 신청자(입주자) 연락처 조회
+			const customerRows = await mariaDBSequelize.query(
+				`
+				SELECT phone
+				FROM customer
+				WHERE esntlId = ?
+				LIMIT 1
+				`,
+				{
+					replacements: [contractInfo.customerEsntlId],
+					type: mariaDBSequelize.QueryTypes.SELECT,
+					transaction,
+				}
+			);
+			const customerRow = Array.isArray(customerRows) ? customerRows[0] : customerRows;
+			const receiverPhone = customerRow?.phone || null;
+
+			const extraPaymentBody = {
+				contractEsntlId,
+				extraPayments: [
+					{
+						extraCostName: '방이동',
+						cost: finalAdjustmentAmount,
+						memo: moveMemo,
+						extendWithPayment: false,
+						useStartDate: moveDateStr,
+						optionInfo: '',
+						optionName: '',
+					},
+				],
+				receiverPhone,
+				// 발송일: 방이동 신청일 전날
+				sendDate: moveDateMinusOneStr,
+			};
+
+			await callControllerWithBody(extraPaymentController.roomExtraPayment, req, extraPaymentBody);
+		}
+
+		// adjustmentType = REFUND 인 경우: 환불 요청만 등록 (/v1/refund/refundInsert 내부 호출)
+		if (finalAdjustmentType === 'REFUND' && finalAdjustmentAmount > 0) {
+			const refundInsertBody = {
+				gswId: contractInfo.gosiwonEsntlId,
+				romId: contractInfo.roomEsntlId,
+				mbrId: contractInfo.customerEsntlId,
+				contractId: contractEsntlId,
+				type: 'INTERIM',
+				// 퇴실(환불 기준일): 방이동 신청일 전날
+				checkoutDate: moveDateMinusOneStr,
+				// 이동 메모에 귀책사유(reason)를 함께 기록
+				reason: `${moveMemo}, 귀책사유: ${reason}`,
+				paymentAmt: 0,
+				usePeriod: null,
+				useAmt: 0,
+				penalty: 0,
+				refundAmt: finalAdjustmentAmount,
+			};
+
+			await callControllerWithBody(refundController.refundInsert, req, refundInsertBody);
+		}
 
 		const isMoveToday = moveDateStr === todayStr;
 
@@ -811,26 +920,41 @@ exports.processRoomMove = async (req, res, next) => {
 			newRoomStatusId: newRoomStatusId,
 			contractEsntlId: contractEsntlId, // 계약 유지
 		});
-	} catch (err) {
-		await transaction.rollback();
-		// 원인 확인용 상세 로그 (Validation error 디버깅)
-		console.error('[roomMove/process] 에러 발생:', {
-			name: err.name,
-			message: err.message,
-			...(err.errors && { errors: err.errors }),
-			...(err.parent && { sqlMessage: err.parent.message, sql: err.parent.sql }),
-			stack: err.stack,
-		});
+		return;
+		} catch (err) {
+			try {
+				await transaction.rollback();
+			} catch (_rollbackErr) {
+				// 이미 완료된 트랜잭션(commit/rollback 된 경우)에서 rollback 호출 시 무시
+			}
+			lastErr = err;
+			if (attempt < MAX_DEADLOCK_RETRIES && isDeadlockError(err)) {
+				const delayMs = 50 + Math.floor(Math.random() * 150);
+				console.error(`[roomMove/process] 데드락 발생, ${delayMs}ms 후 재시도 (${attempt}/${MAX_DEADLOCK_RETRIES}):`, err.message);
+				await new Promise((r) => setTimeout(r, delayMs));
+				continue;
+			}
+			// 원인 확인용 상세 로그 (Validation error 디버깅)
+			console.error('[roomMove/process] 에러 발생:', {
+				name: err.name,
+				message: err.message,
+				...(err.errors && { errors: err.errors }),
+				...(err.parent && { sqlMessage: err.parent.message, sql: err.parent.sql }),
+				stack: err.stack,
+			});
 
-		// Sequelize ValidationError는 400으로 변환해 상세 메시지 반환
-		if (err.name === 'SequelizeValidationError' && err.errors && err.errors.length > 0) {
-			const detail = err.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
-			const validationErr = new Error(`입력값 검증 실패: ${detail}`);
-			validationErr.statusCode = 400;
-			return next(validationErr);
+			// Sequelize ValidationError는 400으로 변환해 상세 메시지 반환
+			if (err.name === 'SequelizeValidationError' && err.errors && err.errors.length > 0) {
+				const detail = err.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+				const validationErr = new Error(`입력값 검증 실패: ${detail}`);
+				validationErr.statusCode = 400;
+				return next(validationErr);
+			}
+			return next(lastErr);
 		}
-		next(err);
 	}
+	// 재시도 모두 소진 후 데드락이었을 경우
+	return next(lastErr);
 };
 
 // 방이동 삭제 및 원상복구
@@ -1282,7 +1406,11 @@ exports.deleteRoomMove = async (req, res, next) => {
 			message: '방이동 상태가 삭제되고 원상복구되었습니다.',
 		});
 	} catch (error) {
-		await transaction.rollback();
+		try {
+			await transaction.rollback();
+		} catch (_rollbackErr) {
+			// 이미 완료된 트랜잭션에서 rollback 호출 시 무시
+		}
 		next(error);
 	}
 };
@@ -1470,7 +1598,13 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 
 		if (ownTransaction) await txn.commit();
 	} catch (err) {
-		if (ownTransaction && txn) await txn.rollback();
+		if (ownTransaction && txn) {
+			try {
+				await txn.rollback();
+			} catch (_rollbackErr) {
+				// 이미 완료된 트랜잭션에서 rollback 호출 시 무시
+			}
+		}
 		throw err;
 	}
 }
