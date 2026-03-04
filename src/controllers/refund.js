@@ -871,8 +871,8 @@ exports.getRefundRequestList = async (req, res, next) => {
 		const safeLimit = Math.max(parseInt(limit) || 50, 1);
 		const offset = (safePage - 1) * safeLimit;
 
-		// WHERE 조건 구성 (환불 요청 1건당 1행만 나오도록 paymentLog 조인 제거)
-		let whereClause = 'WHERE 1=1 AND COALESCE(RRR.rrr_payment_amt, 0) != 0';
+		// WHERE 조건 구성 (환불 요청 1건당 1행만 나오도록 paymentLog 조인 제거. rrr_refund_total_amt 0원 포함 모두 조회)
+		let whereClause = 'WHERE 1=1';
 		const replacements = [];
 
 		// 고시원 ID 필터 (GOSI로 시작하는 경우만)
@@ -971,15 +971,10 @@ exports.getRefundRequestList = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 전체 개수 조회 (rrr_payment_amt != 0 포함, paymentLog 미조인)
+		// 전체 개수 조회 (rrr_refund_total_amt 0원 포함, 필터 미적용)
 		const totalCountQuery = `
 			SELECT COUNT(*) AS total
 			FROM il_room_refund_request RRR
-			LEFT OUTER JOIN gosiwon AS G ON RRR.gsw_eid = G.esntlId
-			LEFT OUTER JOIN room AS R ON RRR.rom_eid = R.esntlId
-			LEFT OUTER JOIN customer AS C ON RRR.mbr_eid = C.esntlId
-			LEFT OUTER JOIN roomContract AS RC ON RRR.ctt_eid = RC.esntlId
-			WHERE COALESCE(RRR.rrr_payment_amt, 0) != 0
 		`;
 
 		const [countResult, totalCountResult] = await Promise.all([
