@@ -72,19 +72,89 @@ const STATUS_MAP = {
 	'ON_SALE': { color: '#27A644', label: '판매중' },
 	'VBANK_PENDING': { color: '#FFB800', label: '입실로 입금대기중' },
 	'RESERVE_PENDING': { color: '#FFB800', label: '입실료 결제대기중' },
-	'RESERVED': { color: '#35BB88', label: '예약중' },
-	'CONTRACT': { color: '#FF8A00', label: '이용중' },
-	'OVERDUE': { color: '#D25454', label: '체납상태' },
-	'CHECKOUT_REQUESTED': { color: '#9B9B9B', label: '퇴실요청' },
-	'CHECKOUT_CONFIRMED': { color: '#9B9B9B', label: '퇴실확정(원장님이 확인)' },
-	'CHECKOUT_ONSALE': { color: '#9B9B9B', label: '퇴실확정 방 판매중' },
-	'END_DEPOSIT': { color: '#9B9B9B', label: '퇴실완료, 보증금 반환 필요' },
-	'END': { color: '#9B9B9B', label: '퇴실완료, 보증금 반환 완료' },
-	'ROOM_MOVE': { color: '#4A67DD', label: '방이동' },
+	'RESERVED': { color: '#F5CB40', label: '예약중' },
+	'CONTRACT': { color: '#FFA5C1', label: '이용중' },
+	'OVERDUE': { color: '#F41E27', label: '체납상태' },
+	'CHECKOUT_REQUESTED': { color: '#A04083', label: '퇴실요청' },
+	'CHECKOUT_CONFIRMED': { color: '#A04083', label: '퇴실확정(원장님이 확인)' },
+	'CHECKOUT_ONSALE': { color: '#A04083', label: '퇴실확정 방 판매중' },
+	'END_DEPOSIT': { color: '#A04083', label: '퇴실완료, 보증금 반환 필요' },
+	'END': { color: '#A04083', label: '퇴실완료, 보증금 반환 완료' },
+	'ROOM_MOVE': { color: '#F78627', label: '방이동' },
+	'ROOM_MOVE_IN': { color: '#F78627', label: '방이동' },
+	'ROOM_MOVE_OUT': { color: '#F78627', label: '방이동' },
 	'ETC': { color: '#9B9B9B', label: '기타' },
 	'disabled': { color: '#9B9B9B', label: '비활성' },
 	'in-progress': { color: '#FF8A00', label: '이용중' },
 	'leave': { color: '#9B9B9B', label: '퇴실' },
+};
+
+// history CONTENT_PREFIX_TO_STATUS와 동일한 prefix → STATUS_MAP 키 매핑
+const CONTENT_PREFIX_TO_STATUS = [
+	{ prefix: '방이동 취소', statusKey: 'ROOM_MOVE' },
+	{ prefix: '방이동', statusKey: 'ROOM_MOVE' },
+	{ prefix: '환불 및 퇴실처리', statusKey: 'END' },
+	{ prefix: '방 예약 생성', statusKey: 'RESERVED' },
+	{ prefix: '결제완료(입실료)', statusKey: 'CONTRACT' },
+	{ prefix: '결제 요청 취소', statusKey: 'VBANK_PENDING' },
+	{ prefix: '보증금/예약금 등록', statusKey: 'END_DEPOSIT' },
+	{ prefix: '예약금/보증금 삭제', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 추가 입금', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 환불 등록', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 정보 수정', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 정보 삭제', statusKey: 'END_DEPOSIT' },
+	{ prefix: '추가 결제 요청', statusKey: 'CONTRACT' },
+	{ prefix: '주차 등록', statusKey: 'ETC' },
+	{ prefix: '주차 삭제', statusKey: 'ETC' },
+	{ prefix: '주차 정보 수정', statusKey: 'ETC' },
+	{ prefix: '고시원 정보 수정', statusKey: 'ETC' },
+	{ prefix: '고시원 생성', statusKey: 'ETC' },
+	{ prefix: '고시원 삭제', statusKey: 'ETC' },
+	{ prefix: '고시원 즐겨찾기', statusKey: 'ETC' },
+	{ prefix: '운영환경설정 저장', statusKey: 'ETC' },
+	{ prefix: '방 판매 시작(수정)', statusKey: 'ON_SALE' },
+	{ prefix: '방 판매 시작(신규)', statusKey: 'ON_SALE' },
+	{ prefix: '방 상태 추가', statusKey: 'ON_SALE' },
+	{ prefix: '방 상태 취소', statusKey: 'ON_SALE' },
+	{ prefix: '방 상태 수정', statusKey: 'ON_SALE' },
+	{ prefix: '계약 정보 수정', statusKey: 'CONTRACT' },
+	{ prefix: '방 정보가 등록', statusKey: 'ON_SALE' },
+	{ prefix: '방 정보가 삭제', statusKey: 'ON_SALE' },
+	{ prefix: '카테고리 변경', statusKey: 'ETC' },
+	{ prefix: '문자 발송', statusKey: 'ETC' },
+];
+
+// content에서 첫 번째 콜론 앞 문자열 추출 (예: "방이동: ..." → "방이동")
+const getContentPrefixForStatus = (content) => {
+	if (!content || typeof content !== 'string') return '';
+	const beforeColon = content.split(':')[0] || '';
+	return beforeColon.replace(/\*/g, '').trim();
+};
+
+// content prefix → STATUS_MAP 키
+const getStatusKeyFromContentPrefixForStatus = (prefix) => {
+	if (!prefix) return null;
+	const normalized = prefix.trim();
+	for (const { prefix: p, statusKey } of CONTENT_PREFIX_TO_STATUS) {
+		if (normalized === p || normalized.startsWith(p)) return statusKey;
+	}
+	return null;
+};
+
+// content 한 줄에서 STATUS_MAP.color 추출 (없으면 null)
+const getColorFromContentPrefix = (content) => {
+	const prefix = getContentPrefixForStatus(content);
+	const statusKey = getStatusKeyFromContentPrefixForStatus(prefix);
+	if (statusKey && STATUS_MAP[statusKey] && STATUS_MAP[statusKey].color) {
+		return STATUS_MAP[statusKey].color;
+	}
+	return null;
+};
+
+// STATUS_MAP 조회용: status 키 정규화(공백 제거, 대문자) 후 매칭. 없으면 BEFORE_SALES 반환
+const getStatusInfo = (status) => {
+	const key = status != null ? String(status).trim().toUpperCase() : '';
+	return STATUS_MAP[key] || STATUS_MAP['BEFORE_SALES'];
 };
 
 // typeName 조회 (STATUS_MAP.label 기반, ETC는 메모 추가)
@@ -432,7 +502,8 @@ exports.mngChartMain = async (req, res, next) => {
 				? 'ROOM_MOVE'
 				: baseStatus;
 			roomIdToStatusRaw[room.id] = statusKey;
-			const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP['BEFORE_SALES'];
+			// 상태에 맞는 색상(sidebar, statusBorder, statusText) 반환
+			const statusInfo = getStatusInfo(statusKey);
 			const roomCategory = room.roomCategoryEsntlId
 				? {
 					esntlId: room.roomCategoryEsntlId,
@@ -665,7 +736,8 @@ exports.mngChartMain = async (req, res, next) => {
 			if (!roomEsntlId) return;
 			const raw = rowOrStatus[createdAtField] ?? rowOrStatus.createdAt;
 			if (!raw) return;
-			const status = rowOrStatus.status;
+			// ROOM_MOVE_IN, ROOM_MOVE_OUT → 방이동으로 표시
+			const status = (rowOrStatus.subStatus === 'ROOM_MOVE_IN' || rowOrStatus.subStatus === 'ROOM_MOVE_OUT') ? rowOrStatus.subStatus : rowOrStatus.status;
 			const typeName = getTypeName(status, rowOrStatus.statusMemo ?? null);
 			const datetime = formatDateTime(raw);
 			const dateStr = formatDateOnly(raw);
@@ -746,75 +818,11 @@ exports.mngChartMain = async (req, res, next) => {
 				roomStatusCreatedAt: formatDateTime(row.roomStatusCreatedAt) ?? null,
 			});
 
+			// RESERVE_PENDING(예약금 입금대기중), RESERVED(예약중), VBANK_PENDING(입금대기중) → items에 포함하지 않음
 			const isReserveType = ['RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING'].includes(row.status);
-			if (isReserveType) {
-				// RESERVE_PENDING, RESERVED, VBANK_PENDING → contract 형식 (계약 있으면 roomContract/RCW, 없고 RESERVE_PENDING이면 il_room_reservation 기준)
-				const reserveOverrides = {};
-				if (hasContract) {
-					reserveOverrides.contractStart = contractStart;
-					reserveOverrides.contractEnd = contractEnd;
-					reserveOverrides.contractNumber = row.contractEsntlIdVal || row.contractEsntlId;
-					reserveOverrides.periodType = row.month ? `${row.month}개월` : '';
-				} else if (row.status === 'RESERVE_PENDING' && row.rorSn) {
-					// RESERVE_PENDING이고 계약서 없을 때: il_room_reservation 기준으로 반환값 채움
-					const rrContractStart = row.rorContractStartDate ? formatDateTime(formatDateOnly(row.rorContractStartDate)) : null;
-					const rrContractEnd = row.rorContractEndDate ? formatDateTime(formatDateOnly(row.rorContractEndDate) + ' 23:59:59') : null;
-					reserveOverrides.contractNumber = row.reservationEsntlId || row.rorSn;
-					reserveOverrides.contractStart = rrContractStart;
-					reserveOverrides.contractEnd = rrContractEnd;
-					if (row.rorPeriod === 'PART' && row.rorContractStartDate && row.rorContractEndDate) {
-						reserveOverrides.periodType = `${formatDateOnly(row.rorContractStartDate).slice(5, 7)}-${formatDateOnly(row.rorContractStartDate).slice(8, 10)} ~ ${formatDateOnly(row.rorContractEndDate).slice(5, 7)}-${formatDateOnly(row.rorContractEndDate).slice(8, 10)}`;
-					} else {
-						reserveOverrides.periodType = row.rorPeriod === 'MONTH' ? '1개월' : (row.rorPeriod || '');
-					}
-				}
-				if (hasContract && (row.checkinName || row.customerName)) {
-					const gn = row.checkinName || row.customerName || '';
-					const ga = row.checkinAge ?? computedCustomerAge ?? '';
-					const gg = row.checkinGender ?? row.customerGender ?? '';
-					const gpRaw = row.checkinPhone ?? row.customerPhone ?? '';
-					const gp = phoneToDisplay(gpRaw) ?? gpRaw;
-					reserveOverrides.currentGuest = gn;
-					reserveOverrides.guestPhone = gp || null;
-					reserveOverrides.customerGender = row.customerGender ?? null;
-					reserveOverrides.customerAge = computedCustomerAge ?? null;
-					reserveOverrides.checkinGender = row.checkinGender ?? null;
-					reserveOverrides.checkinAge = row.checkinAge ?? null;
-					reserveOverrides.guest = `${gn} / ${ga} / ${gg}(${gp})`;
-				} else if (row.status === 'RESERVE_PENDING' && row.rorSn) {
-					const rorHpRaw = row.rorHpNo || '';
-					const rorHp = phoneToDisplay(rorHpRaw) ?? rorHpRaw;
-					reserveOverrides.guestPhone = rorHp || null;
-					reserveOverrides.guest = rorHp ? `- / - / -(${rorHp})` : null;
-				}
-				if (hasContract && (row.contractorName || row.customerName)) {
-					const cn = row.contractorName || row.customerName || '';
-					const ca = row.contractorAge ?? computedCustomerAge ?? '';
-					const cg = row.contractorGender ?? row.customerGender ?? '';
-					const cpRaw = row.contractorPhone ?? row.customerPhone ?? '';
-					const cp = phoneToDisplay(cpRaw) ?? cpRaw;
-					reserveOverrides.contractPerson = `${cn} / ${ca} / ${cg}(${cp})`;
-					if (row.customerBank && row.customerBankAccount) {
-						reserveOverrides.accountInfo = `${row.customerBank} ${row.customerBankAccount} ${cn}`;
-					}
-				}
-				if (hasContract && row.pyl_goods_amount) reserveOverrides.entryFee = `${row.pyl_goods_amount}`;
-				else if (row.status === 'RESERVE_PENDING' && row.rorSn && row.rorMonthlyRent != null && row.rorMonthlyRent !== '') reserveOverrides.entryFee = `${row.rorMonthlyRent}`;
-				if (hasContract && (parseInt(row.paymentAmount) || 0) > 0) reserveOverrides.paymentAmount = `${parseInt(row.paymentAmount) || 0}`;
-				else if (row.status === 'RESERVE_PENDING' && row.rorSn) reserveOverrides.paymentAmount = '0';
-				if (hasContract && (parseInt(row.paymentPoint) || 0) > 0) reserveOverrides.paymentPoint = parseInt(row.paymentPoint) || 0;
-				if (hasContract && (parseInt(row.paymentCoupon) || 0) > 0) reserveOverrides.paymentCoupon = parseInt(row.paymentCoupon) || 0;
-				if (hasContract && (parseInt(row.roomDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.roomDeposit) || 0).toLocaleString()} 원`;
-				else if (row.status === 'RESERVE_PENDING' && row.rorSn && (parseInt(row.rorDeposit) || 0) > 0) reserveOverrides.deposit = `${(parseInt(row.rorDeposit) || 0).toLocaleString()} 원`;
-				if (row.depositEsntlId != null && String(row.depositEsntlId).trim() !== '') reserveOverrides.depositEsntlId = row.depositEsntlId;
-				if (row.depositCompleteDate != null) reserveOverrides.depositCompleteDate = formatDateTime(row.depositCompleteDate);
-				if (row.depositPrice != null) reserveOverrides.depositPrice = row.depositPrice;
-				if (row.status === 'RESERVE_PENDING' && row.rorSn && row.rorPayMethod) {
-					reserveOverrides.additionalPaymentOption = `결제방법: ${row.rorPayMethod}`;
-				}
-				items.push(baseItem(reserveOverrides));
-				pushStatusLine(row.roomEsntlId, row);
-			} else if (row.status !== 'CHECKOUT_REQUESTED') {
+			if (isReserveType) return;
+
+			if (row.status !== 'CHECKOUT_REQUESTED') {
 				// CONTRACT, OVERDUE, ROOM_MOVE → contract (계약 있으면 정보 포함, 없으면 null, className은 timeline-item 고정)
 				const contractOverrides = {};
 				if (hasContract) {
@@ -1155,9 +1163,17 @@ exports.mngChartMain = async (req, res, next) => {
 				const content = dayLines.map((l) => {
 					const dtShort = l.datetime && l.datetime.length >= 19 ? l.datetime.slice(2, 19) : l.datetime; // YY-MM-DD HH:mm:ss
 					const adminPart = l.adminName ? `${l.adminName}(관리자)` : '(관리자)';
-					return `${l.typeName} ${dtShort} ${adminPart}`.trim();
+					// history 리스트와 동일하게 typeName 뒤에 콜론을 붙여 prefix 기준 색상 매핑이 가능하도록 포맷
+					return `${l.typeName}: ${dtShort} ${adminPart}`.trim();
 				});
-				const colors = dayLines.map((l) => l.color);
+				// content 콜론 앞 prefix → CONTENT_PREFIX_TO_STATUS → STATUS_MAP.color 기준으로 색상 결정
+				const colors = content.map((text, idx) => {
+					const mapped = getColorFromContentPrefix(text);
+					if (mapped) return mapped;
+					// 매핑 실패 시 기존 dayLines 색상 또는 기본값 사용
+					const fallback = dayLines[idx] && dayLines[idx].color;
+					return fallback || '#9B9B9B';
+				});
 				roomStatusesArray.push({
 					id: `room-${roomEsntlId}-statuses-${dateStr}-${statusBlockIdx++}`,
 					group: roomEsntlId,

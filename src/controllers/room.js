@@ -1445,7 +1445,7 @@ exports.roomReserve = async (req, res, next) => {
 
 		// 4. History 기록 생성
 		try {
-			const historyContent = `방 예약 생성: 예약ID ${reservationId}, 입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${monthlyRentToStore ? `, 월세 ${monthlyRentToStore}` : ''}${rorPayMethod ? `, 결제방법 ${rorPayMethod}` : ''}`;
+			const historyContent = `방 예약 생성:  입실일 ${checkInDate}, 계약기간 ${rorPeriod}${rorContractStartDate ? ` (${rorContractStartDate} ~ ${rorContractEndDate})` : ''}, 보증금 ${deposit}원${monthlyRentToStore ? `, 월세 ${monthlyRentToStore}` : ''}${rorPayMethod ? `, 결제방법 ${rorPayMethod} 예약ID ${reservationId}, ` : ''}`;
 
 			await historyController.createHistoryRecord(
 				{

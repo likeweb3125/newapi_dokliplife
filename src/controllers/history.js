@@ -72,6 +72,90 @@ const generateHistoryId = async (transaction) => {
 	return await idsNext('history', 'HIST', transaction);
 };
 
+// content 콜론 앞쪽 → STATUS_MAP 색상 매핑용 (mngChart STATUS_MAP과 동일 hex 사용)
+const STATUS_MAP = {
+	'BEFORE_SALES': { color: '#9B9B9B' },
+	'ON_SALE': { color: '#27A644' },
+	'VBANK_PENDING': { color: '#FFB800' },
+	'RESERVE_PENDING': { color: '#FFB800' },
+	'RESERVED': { color: '#F5CB40' },
+	'CONTRACT': { color: '#FFA5C1' },
+	'OVERDUE': { color: '#F41E27' },
+	'CHECKOUT_REQUESTED': { color: '#A04083' },
+	'CHECKOUT_CONFIRMED': { color: '#A04083' },
+	'CHECKOUT_ONSALE': { color: '#A04083' },
+	'END_DEPOSIT': { color: '#A04083' },
+	'END': { color: '#A04083' },
+	'ROOM_MOVE': { color: '#F78627' },
+	'ROOM_MOVE_IN': { color: '#F78627' },
+	'ROOM_MOVE_OUT': { color: '#F78627' },
+	'ETC': { color: '#9B9B9B' },
+	'disabled': { color: '#9B9B9B' },
+	'in-progress': { color: '#FF8A00' },
+	'leave': { color: '#9B9B9B' },
+};
+
+// content 첫 콜론 앞 문자열(행위 유형) → STATUS_MAP 키. 긴 문구를 앞에 두어 '방이동 취소'가 '방이동'보다 먼저 매칭되도록 함.
+const CONTENT_PREFIX_TO_STATUS = [
+	{ prefix: '방이동 취소', statusKey: 'ROOM_MOVE' },
+	{ prefix: '방이동', statusKey: 'ROOM_MOVE' },
+	{ prefix: '환불 및 퇴실처리', statusKey: 'END' },
+	{ prefix: '방 예약 생성', statusKey: 'RESERVED' },
+	{ prefix: '결제완료(입실료)', statusKey: 'CONTRACT' },
+	{ prefix: '결제 요청 취소', statusKey: 'VBANK_PENDING' },
+	{ prefix: '보증금/예약금 등록', statusKey: 'RESERVED' },
+	{ prefix: '예약금/보증금 삭제', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 추가 입금', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 환불 등록', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 정보 수정', statusKey: 'END_DEPOSIT' },
+	{ prefix: '보증금 정보 삭제', statusKey: 'END_DEPOSIT' },
+	{ prefix: '추가 결제 요청', statusKey: 'CONTRACT' },
+	{ prefix: '주차 등록', statusKey: 'ETC' },
+	{ prefix: '주차 삭제', statusKey: 'ETC' },
+	{ prefix: '주차 정보 수정', statusKey: 'ETC' },
+	{ prefix: '고시원 정보 수정', statusKey: 'ETC' },
+	{ prefix: '고시원 생성', statusKey: 'ETC' },
+	{ prefix: '고시원 삭제', statusKey: 'ETC' },
+	{ prefix: '고시원 즐겨찾기', statusKey: 'ETC' },
+	{ prefix: '운영환경설정 저장', statusKey: 'ETC' },
+	{ prefix: '방 판매 시작(수정)', statusKey: 'ON_SALE' },
+	{ prefix: '방 판매 시작(신규)', statusKey: 'ON_SALE' },
+	{ prefix: '방 상태 추가', statusKey: 'ON_SALE' },
+	{ prefix: '방 상태 취소', statusKey: 'ON_SALE' },
+	{ prefix: '방 상태 수정', statusKey: 'ON_SALE' },
+	{ prefix: '계약 정보 수정', statusKey: 'CONTRACT' },
+	{ prefix: '방 정보가 등록', statusKey: 'ON_SALE' },
+	{ prefix: '방 정보가 삭제', statusKey: 'ON_SALE' },
+	{ prefix: '카테고리 변경', statusKey: 'ETC' },
+	{ prefix: '문자 발송', statusKey: 'ETC' },
+];
+
+/** content에서 첫 번째 콜론 앞 문자열 추출 후 불필요 문자 제거 (예: "**방이동**: ..." → "방이동") */
+function getContentPrefix(content) {
+	if (!content || typeof content !== 'string') return '';
+	const beforeColon = content.split(':')[0] || '';
+	return beforeColon.replace(/\*/g, '').trim();
+}
+
+/** content prefix에 해당하는 STATUS_MAP 키 조회 (긴 문구 우선 매칭) */
+function getStatusKeyFromContentPrefix(prefix) {
+	if (!prefix) return 'ETC';
+	const normalized = prefix.trim();
+	for (const { prefix: p, statusKey } of CONTENT_PREFIX_TO_STATUS) {
+		if (normalized === p || normalized.startsWith(p)) return statusKey;
+	}
+	return 'ETC';
+}
+
+/** content 문자열로 STATUS_MAP 기반 색상 객체 반환 (sidebar, statusBorder, statusText 동일 hex) */
+function getColorForHistoryContent(content) {
+	const prefix = getContentPrefix(content);
+	const statusKey = getStatusKeyFromContentPrefix(prefix);
+	const info = STATUS_MAP[statusKey] || STATUS_MAP['ETC'];
+	const hex = info?.color || '#9B9B9B';
+	return { sidebar: hex, statusBorder: hex, statusText: hex };
+}
+
 // 히스토리 목록 조회
 exports.getHistoryList = async (req, res, next) => {
 	try {
@@ -178,7 +262,7 @@ exports.getHistoryList = async (req, res, next) => {
 			offset: offset,
 		});
 
-		// TINYINT(1) 필드 boolean 변환 + Date 필드는 로컬(KST) 문자열로 변환 (UTC 직렬화 방지)
+		// TINYINT(1) 필드 boolean 변환 + Date 필드는 로컬(KST) 문자열로 변환 (UTC 직렬화 방지) + content 콜론 앞쪽 기준 STATUS_MAP 색상 부여
 		const convertHistoryItem = (item) => {
 			const converted = item.toJSON ? item.toJSON() : { ...item };
 			if (converted.publicRange !== undefined && converted.publicRange !== null) {
@@ -190,6 +274,8 @@ exports.getHistoryList = async (req, res, next) => {
 			// createdAt, updatedAt: Date → 로컬 기준 YYYY-MM-DD HH:mm:ss 문자열
 			if (converted.createdAt) converted.createdAt = dateToYmdHms(converted.createdAt);
 			if (converted.updatedAt) converted.updatedAt = dateToYmdHms(converted.updatedAt);
+			// content 첫 콜론 앞(행위 유형)에 따라 STATUS_MAP 색상 적용
+			converted.color = getColorForHistoryContent(converted.content);
 			return converted;
 		};
 
@@ -232,7 +318,7 @@ exports.getHistoryDetail = async (req, res, next) => {
 			errorHandler.errorThrow(404, '히스토리를 찾을 수 없습니다.');
 		}
 
-		// TINYINT(1) 필드 boolean 변환 + Date 필드 로컬 문자열 변환
+		// TINYINT(1) 필드 boolean 변환 + Date 필드 로컬 문자열 변환 + content 기준 STATUS_MAP 색상
 		const data = historyData.toJSON ? historyData.toJSON() : { ...historyData };
 		if (data.publicRange !== undefined && data.publicRange !== null) {
 			data.publicRange = data.publicRange === 1 || data.publicRange === true || data.publicRange === '1';
@@ -242,6 +328,7 @@ exports.getHistoryDetail = async (req, res, next) => {
 		}
 		if (data.createdAt) data.createdAt = dateToYmdHms(data.createdAt);
 		if (data.updatedAt) data.updatedAt = dateToYmdHms(data.updatedAt);
+		data.color = getColorForHistoryContent(data.content);
 
 		res.status(200).json({
 			success: true,

@@ -101,6 +101,7 @@ exports.processRoomMove = async (req, res, next) => {
 		try {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
+		const writerName = decodedToken.admin?.name ?? decodedToken.partner?.name ?? '관리자';
 
 		const {
 			contractEsntlId,
@@ -762,6 +763,7 @@ exports.processRoomMove = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: writerAdminId,
+					writerName,
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -777,6 +779,7 @@ exports.processRoomMove = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId: writerAdminId,
+					writerName,
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -963,6 +966,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 	try {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
+		const writerName = decodedToken.admin?.name ?? decodedToken.partner?.name ?? '관리자';
 
 		const { roomMoveStatusId } = req.params;
 
@@ -1377,6 +1381,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId,
+					writerName,
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -1391,6 +1396,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId,
+					writerName,
 					writerType: 'ADMIN',
 				},
 				transaction
@@ -1545,6 +1551,7 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 		};
 		let memoWithStatusIds = (row.memo || '').replace(/\s*\[STATUS_IDS:.*?\]\s*/, '') + ` [STATUS_IDS:${JSON.stringify(statusIdsInfo)}]`;
 
+		const scheduledWriterName = writerAdminId === 'SYSTEM' ? '시스템' : null;
 		try {
 			await historyController.createHistoryRecord(
 				{
@@ -1556,6 +1563,7 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId,
+					writerName: scheduledWriterName,
 					writerType: 'ADMIN',
 				},
 				txn
@@ -1570,6 +1578,7 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 					priority: 'NORMAL',
 					publicRange: 0,
 					writerAdminId,
+					writerName: scheduledWriterName,
 					writerType: 'ADMIN',
 				},
 				txn
