@@ -176,6 +176,10 @@ router.post('/send', (req, res, next) => {
  *                           content:
  *                             type: string
  *                             description: 내용
+ *                           imagePath:
+ *                             type: string
+ *                             nullable: true
+ *                             description: "MMS 첨부 이미지 저장 경로 (있으면 /upload 기준 URL로 조회 가능)"
  *                           gosiwonName:
  *                             type: string
  *                             description: 고시원명 (gosiwon 조인)

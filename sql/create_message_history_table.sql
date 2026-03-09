@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `messageSmsHistory` (
   `esntlId` VARCHAR(50) NOT NULL COMMENT 'PK (IDS 테이블 messageSmsHistory, prefix MSH)',
   `title` VARCHAR(200) NOT NULL COMMENT '메시지 제목 (발송 이력)',
   `content` TEXT NOT NULL COMMENT '메시지 내용 (발송 이력)',
+  `imagePath` VARCHAR(500) NULL COMMENT 'MMS 첨부 이미지 저장 경로 (예: upload/message/xxx.jpg)',
   `gosiwonEsntlId` VARCHAR(50) NULL COMMENT '고시원 ID (선택)',
   `userEsntlId` VARCHAR(50) NULL COMMENT '수신자 사용자 ID (전화번호로 customer 중 최신 활성 사용자 esntlId)',
   `receiverPhone` VARCHAR(50) NULL COMMENT '수신자 전화번호 (발송 대상)',

@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 const { mariaDBSequelize } = require('../models');
 const errorHandler = require('../middleware/error');
@@ -6,6 +7,7 @@ const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const historyController = require('./history');
 const { phoneToRaw } = require('../utils/phoneHelper');
+const { dateToYmd } = require('../utils/dateHelper');
 const multerMiddleware = require('../middleware/multer');
 
 // 공통 토큰 검증 함수 (관리자/파트너)
@@ -95,25 +97,48 @@ exports.sendSMS = async (req, res, next) => {
 			}
 		}
 
+		// MMS 발송 시 이미지를 upload/message/{고시원ID}/{날짜}/파일명 구조로 이동 후 경로 저장
+		let savedImagePath = null;
+		if (req.file && req.file.path) {
+			const gosiwonId = gosiwonEsntlId || 'common';
+			const dateStr = dateToYmd(new Date()) || 'unknown';
+			const baseDir = path.join(process.cwd(), 'upload', 'message', gosiwonId, dateStr);
+			if (!fs.existsSync(baseDir)) {
+				fs.mkdirSync(baseDir, { recursive: true });
+			}
+			const filename = path.basename(req.file.path);
+			const targetPath = path.join(baseDir, filename);
+			try {
+				fs.renameSync(path.join(process.cwd(), req.file.path), targetPath);
+			} catch (renameErr) {
+				// 다른 드라이브 등으로 rename 실패 시 복사 후 삭제
+				fs.copyFileSync(path.join(process.cwd(), req.file.path), targetPath);
+				fs.unlinkSync(path.join(process.cwd(), req.file.path));
+			}
+			savedImagePath = ['upload', 'message', gosiwonId, dateStr, filename].join('/');
+		}
+
 		await mariaDBSequelize.query(
 			`
 			INSERT INTO messageSmsHistory (
 				esntlId,
 				title,
 				content,
+				imagePath,
 				gosiwonEsntlId,
 				userEsntlId,
 				receiverPhone,
 				createdBy,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 		`,
 			{
 				replacements: [
 					historyEsntlId,
 					title || '문자 발송',
 					message,
+					savedImagePath,
 					gosiwonEsntlId || null,
 					resolvedUserEsntlId,
 					firstReceiverRaw,
@@ -143,20 +168,12 @@ exports.sendSMS = async (req, res, next) => {
 			// history 실패해도 문자 발송 성공 응답 유지
 		}
 
-		// 발송 성공 후 업로드했던 이미지 임시 파일 삭제
-		if (req.file && req.file.path) {
-			try {
-				multerMiddleware.clearFile(req.file.path);
-			} catch (e) {
-				console.error('문자 발송 이미지 임시 파일 삭제 실패:', e);
-			}
-		}
-
+		// MMS 이미지는 이력 조회용으로 보존 (삭제하지 않음)
 		errorHandler.successThrow(res, '문자 발송 성공', {
 			result,
 		});
 	} catch (err) {
-		// 에러 시 업로드된 이미지 정리
+		// 에러 시에만 업로드된 이미지 임시 파일 삭제
 		if (req.file && req.file.path) {
 			try {
 				multerMiddleware.clearFile(req.file.path);
@@ -189,6 +206,7 @@ exports.getMessageHistory = async (req, res, next) => {
 				M.createdBy AS sentById,
 				M.title,
 				M.content,
+				M.imagePath,
 				G.name AS gosiwonName,
 				C.name AS userName
 			FROM messageSmsHistory M
@@ -207,6 +225,7 @@ exports.getMessageHistory = async (req, res, next) => {
 			sentById: row.sentById || '',
 			title: row.title || '',
 			content: row.content || '',
+			imagePath: row.imagePath || null,
 			gosiwonName: row.gosiwonName || '',
 			userName: row.userName || '',
 		}));
