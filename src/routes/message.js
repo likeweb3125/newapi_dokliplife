@@ -26,7 +26,7 @@ const multerMiddleware = require('../middleware/multer');
  *               receiver:
  *                 type: string
  *                 description: 수신자 번호 (여러 명일 경우 콤마로 구분)
- *                 example: "01012345678,01098765432"
+ *                 example: "01089400670, 01091039151"
  *               message:
  *                 type: string
  *                 description: 문자 내용
@@ -55,7 +55,7 @@ const multerMiddleware = require('../middleware/multer');
  *               receiver:
  *                 type: string
  *                 description: 수신자 번호 (여러 명일 경우 콤마로 구분)
- *                 example: "01012345678,01098765432"
+ *                 example: "01089400670, 01091039151"
  *               message:
  *                 type: string
  *                 description: 문자 내용
