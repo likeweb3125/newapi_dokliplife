@@ -1020,6 +1020,7 @@ exports.mngChartMain = async (req, res, next) => {
 				const formattedEnd = formatDateTime(moveDateStr + ' 23:59:59');
 				const periodStr = `${moveDateStr.slice(5, 7)}-${moveDateStr.slice(8, 10)} ~ ${moveDateStr.slice(5, 7)}-${moveDateStr.slice(8, 10)}`;
 				const info = contractInfoByContractId[move.contractEsntlId] || {};
+				// ROOM_MOVE_PENDING 중 moveRole 'in'(ROOM_MOVE_IN 해당)일 때만 end를 contractEnd와 동일하게 반환
 				const basePendingItem = (group, moveRole) => ({
 					id: itemIdCounter++,
 					group,
@@ -1030,7 +1031,7 @@ exports.mngChartMain = async (req, res, next) => {
 					typeName: roomMovePendingInfo.label,
 					statusMemo: move.memo ?? null,
 					start: formattedStart,
-					end: formattedEnd,
+					end: moveRole === 'in' ? (info.contractEnd ?? formattedEnd) : formattedEnd,
 					contractStart: info.contractStart ?? null,
 					contractEnd: info.contractEnd ?? null,
 					period: periodStr,

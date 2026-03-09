@@ -12,6 +12,9 @@ const { dateToYmd } = require('../utils/dateHelper');
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
 
+/** roomContract.memo2 컬럼 최대 길이 (VARCHAR 제한 초과 방지, DB 컬럼과 맞출 것) */
+const ROOM_CONTRACT_MEMO2_MAX_LENGTH = 255;
+
 /** MySQL 데드락(1213, 40001) 여부 판별 */
 const isDeadlockError = (err) => {
 	if (!err) return false;
@@ -445,7 +448,7 @@ exports.processRoomMove = async (req, res, next) => {
 		}
 
 		// 이하: 이동일이 오늘인 경우에만 계약서·roomStatus·room 실제 반영
-		// 1. 기존 계약 유지: roomEsntlId를 이동할 방으로, startDate/endDate 갱신, memo2에 방이동 기록 추가
+		// 1. 기존 계약 유지: roomEsntlId를 이동할 방으로, startDate/endDate 갱신, memo2에 방이동 기록 추가 (길이 초과 시 잘림)
 		const memo2Append = `방이동: ${originalRoomNumber}에서 → ${targetRoomNumber}로 이동`;
 		await mariaDBSequelize.query(
 			`
@@ -453,11 +456,11 @@ exports.processRoomMove = async (req, res, next) => {
 			SET roomEsntlId = ?,
 				startDate = ?,
 				endDate = ?,
-				memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?))
+				memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?)
 			WHERE esntlId = ?
 		`,
 			{
-				replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, contractEsntlId],
+				replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
 			}
@@ -473,9 +476,9 @@ exports.processRoomMove = async (req, res, next) => {
 			const newRentToStore = Number.isInteger(newRent) ? String(newRent) : String(Number(newRent.toFixed(2)));
 			const adjustmentMemo = `월입실료 조정: ${finalAdjustmentType === 'REFUND' ? '환불' : '추가'} ${finalAdjustmentAmount}원`;
 			await mariaDBSequelize.query(
-				`UPDATE roomContract SET monthlyRent = ?, memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)) WHERE esntlId = ?`,
+				`UPDATE roomContract SET monthlyRent = ?, memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?) WHERE esntlId = ?`,
 				{
-					replacements: [newRentToStore, adjustmentMemo, contractEsntlId],
+					replacements: [newRentToStore, adjustmentMemo, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId],
 					type: mariaDBSequelize.QueryTypes.UPDATE,
 					transaction,
 				}
@@ -1501,8 +1504,8 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 
 		const memo2Append = `방이동: ${originalRoomNumber}에서 → ${targetRoomNumber}로 이동`;
 		await mariaDBSequelize.query(
-			`UPDATE roomContract SET roomEsntlId = ?, startDate = ?, endDate = ?, memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)) WHERE esntlId = ?`,
-			{ replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
+			`UPDATE roomContract SET roomEsntlId = ?, startDate = ?, endDate = ?, memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?) WHERE esntlId = ?`,
+			{ replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
 		);
 
 		// adjustmentAmount가 있으면 월 입실료 차액 반영 (monthlyRent는 만원 단위: 15 = 15만원, 5000원 = 0.5)
@@ -1515,8 +1518,8 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 			const newRentToStore = Number.isInteger(newRent) ? String(newRent) : String(Number(newRent.toFixed(2)));
 			const adjustmentMemo = `월입실료 조정: ${adjType === 'REFUND' ? '환불' : '추가'} ${adjAmount}원`;
 			await mariaDBSequelize.query(
-				`UPDATE roomContract SET monthlyRent = ?, memo2 = TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)) WHERE esntlId = ?`,
-				{ replacements: [newRentToStore, adjustmentMemo, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
+				`UPDATE roomContract SET monthlyRent = ?, memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?) WHERE esntlId = ?`,
+				{ replacements: [newRentToStore, adjustmentMemo, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
 			);
 		}
 
