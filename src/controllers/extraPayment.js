@@ -125,6 +125,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 	try {
 		const decodedToken = verifyAdminToken(req);
 		const writerAdminId = getWriterAdminId(decodedToken);
+		const writerName = decodedToken.admin?.name || decodedToken.partner?.name || '관리자';
 
 		const {
 			contractEsntlId,
@@ -341,6 +342,7 @@ exports.roomExtraPayment = async (req, res, next) => {
 				priority: 'NORMAL',
 				publicRange: 0,
 				writerAdminId: writerAdminId,
+				writerName,
 				writerType: 'ADMIN',
 			},
 			transaction

@@ -83,6 +83,7 @@ const STATUS_MAP = {
 	'ROOM_MOVE': { color: '#F78627', label: '방이동' },
 	'ROOM_MOVE_IN': { color: '#F78627', label: '방이동' },
 	'ROOM_MOVE_OUT': { color: '#F78627', label: '방이동' },
+	'ROOM_MOVE_PENDING': { color: '#F78627', label: '방이동 예정' },
 	'ETC': { color: '#9B9B9B', label: '기타' },
 	'disabled': { color: '#9B9B9B', label: '비활성' },
 	'in-progress': { color: '#FF8A00', label: '이용중' },
@@ -706,10 +707,11 @@ exports.mngChartMain = async (req, res, next) => {
 			type: mariaDBSequelize.QueryTypes.SELECT,
 		});
 
-		// 3. 방이동 목록 조회 (날짜 구간과 겹치는 moveDate)
+		// 3. 방이동 목록 조회 (날짜 구간과 겹치는 moveDate, PENDING 시 계약/입실자 정보용 contractEsntlId 포함)
 		const roomMovesQuery = `
 			SELECT 
 				RMS.esntlId,
+				RMS.contractEsntlId,
 				RMS.originalRoomEsntlId,
 				RMS.targetRoomEsntlId,
 				RMS.moveDate,
@@ -963,6 +965,107 @@ exports.mngChartMain = async (req, res, next) => {
 		items.forEach((it) => {
 			if (it._moveSubStatus !== undefined) delete it._moveSubStatus;
 		});
+
+		// 4-2. 방이동 예정(PENDING) 아이템 추가: roomMoveStatus.status='PENDING'인 건을 원래방/이동방 타임라인에 표시
+		const pendingMoves = (roomMoves || []).filter((m) => m.moveStatus === 'PENDING');
+		if (pendingMoves.length > 0) {
+			const pendingContractIds = [...new Set(pendingMoves.map((m) => m.contractEsntlId).filter(Boolean))];
+			let contractInfoByContractId = {};
+			if (pendingContractIds.length > 0) {
+				const contractRows = await mariaDBSequelize.query(
+					`SELECT RC.esntlId AS contractEsntlId, RC.startDate AS contractStartDate, RC.endDate AS contractEndDate, RC.month,
+						RCW.checkinName, RCW.checkinPhone, RCW.checkinAge, RCW.checkinGender,
+						RCW.customerName AS contractorName, RCW.customerPhone AS contractorPhone, RCW.customerAge AS contractorAge, RCW.customerGender AS contractorGender,
+						C.name AS customerName, C.phone AS customerPhone, C.birth AS customerBirth, C.gender AS customerGender
+					FROM roomContract RC
+					LEFT JOIN roomContractWho RCW ON RC.esntlId = RCW.contractEsntlId
+					LEFT JOIN customer C ON RC.customerEsntlId = C.esntlId
+					WHERE RC.esntlId IN (?)`,
+					{ replacements: [pendingContractIds], type: mariaDBSequelize.QueryTypes.SELECT }
+				);
+				(contractRows || []).forEach((r) => {
+					const cid = r.contractEsntlId;
+					if (!cid) return;
+					const guestName = r.checkinName || r.customerName || '';
+					const guestAge = r.checkinAge ?? formatAge(r.customerBirth) ?? '';
+					const guestGender = r.checkinGender || r.customerGender || '';
+					const guestPhone = phoneToDisplay(r.checkinPhone || r.customerPhone || '') ?? (r.checkinPhone || r.customerPhone || '');
+					const guest = guestName ? `${guestName} / ${guestAge} / ${guestGender}(${guestPhone})` : '';
+					const contractorName = r.contractorName || r.customerName || '';
+					const contractorAge = r.contractorAge ?? formatAge(r.customerBirth) ?? '';
+					const contractorGender = r.contractorGender || r.customerGender || '';
+					const contractorPhone = phoneToDisplay(r.contractorPhone || r.customerPhone || '') ?? (r.contractorPhone || r.customerPhone || '');
+					const contractor = contractorName ? `${contractorName} / ${contractorAge} / ${contractorGender}(${contractorPhone})` : '';
+					const period = r.contractStartDate && r.contractEndDate
+						? `${formatDateOnly(r.contractStartDate).slice(5, 7)}-${formatDateOnly(r.contractStartDate).slice(8, 10)} ~ ${formatDateOnly(r.contractEndDate).slice(5, 7)}-${formatDateOnly(r.contractEndDate).slice(8, 10)}`
+						: '';
+					contractInfoByContractId[cid] = {
+						contractNumber: cid,
+						currentGuest: guestName,
+						guest,
+						contractPerson: contractor,
+						period,
+						contractStart: r.contractStartDate ? formatDateTime(formatDateOnly(r.contractStartDate)) : null,
+						contractEnd: r.contractEndDate ? formatDateTime(formatDateOnly(r.contractEndDate) + ' 23:59:59') : null,
+						periodType: r.month ? `${r.month}개월` : '1개월',
+					};
+				});
+			}
+			const roomMovePendingInfo = getStatusInfo('ROOM_MOVE_PENDING');
+			pendingMoves.forEach((move) => {
+				if (roomIdToGroupIndex[move.originalRoomEsntlId] === undefined || roomIdToGroupIndex[move.targetRoomEsntlId] === undefined) return;
+				const moveDateStr = formatDateOnly(move.moveDate);
+				if (!moveDateStr) return;
+				const formattedStart = formatDateTime(moveDateStr);
+				const formattedEnd = formatDateTime(moveDateStr + ' 23:59:59');
+				const periodStr = `${moveDateStr.slice(5, 7)}-${moveDateStr.slice(8, 10)} ~ ${moveDateStr.slice(5, 7)}-${moveDateStr.slice(8, 10)}`;
+				const info = contractInfoByContractId[move.contractEsntlId] || {};
+				const basePendingItem = (group, moveRole) => ({
+					id: itemIdCounter++,
+					group,
+					roomStatusEsntlId: null,
+					roomMoveStatusId: move.esntlId,
+					itemType: 'contract',
+					itemStatus: 'ROOM_MOVE_PENDING',
+					typeName: roomMovePendingInfo.label,
+					statusMemo: move.memo ?? null,
+					start: formattedStart,
+					end: formattedEnd,
+					contractStart: info.contractStart ?? null,
+					contractEnd: info.contractEnd ?? null,
+					period: periodStr,
+					currentGuest: info.currentGuest ?? null,
+					guest: info.guest ?? null,
+					contractPerson: info.contractPerson ?? null,
+					contractNumber: info.contractNumber ?? null,
+					periodType: info.periodType ?? null,
+					className: 'timeline-item',
+					entryFee: null,
+					paymentAmount: null,
+					paymentPoint: null,
+					paymentCoupon: null,
+					accountInfo: null,
+					deposit: null,
+					additionalPaymentOption: null,
+					depositEsntlId: null,
+					depositCompleteDate: null,
+					depositPrice: null,
+					roomStatusCreatedAt: null,
+				});
+				const outItem = basePendingItem(move.originalRoomEsntlId, 'out');
+				const inItem = basePendingItem(move.targetRoomEsntlId, 'in');
+				items.push(outItem, inItem);
+				const moveID = moveIDCounter++;
+				outItem.moveID = moveID;
+				outItem.moveFrom = outItem.id;
+				outItem.moveTo = inItem.id;
+				outItem.moveRole = 'out';
+				inItem.moveID = moveID;
+				inItem.moveFrom = outItem.id;
+				inItem.moveTo = inItem.id;
+				inItem.moveRole = 'in';
+			});
+		}
 
 		// 5. RoomStatuses 데이터 조회 (방 상태 이력) - ON_SALE, CHECKOUT_ONSALE, END_DEPOSIT, END, ETC, BEFORE_SALES, CHECKOUT_CONFIRMED만 (RESERVE_*, RESERVED, VBANK_PENDING은 items로)
 		// 포함 조건: 생성일이 구간 안에 있거나, 상태 기간(statusStartDate~statusEndDate)이 조회 구간과 겹치는 건 포함 (나중에 입력한 ETC 등도 해당 기간에 표시)

@@ -1970,7 +1970,8 @@ exports.getFreeRoomList = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'goID를 입력해주세요.');
 		}
 
-		// room 기준만 사용, roomStatus 조건 제거. room.status IN ('OPEN', 'EMPTY', 'LEAVE'), deleteYN = 'N'
+		// room 기준만 사용, room.status IN ('OPEN', 'EMPTY', 'LEAVE'), deleteYN = 'N'
+		// 추가 조건: roomStatus에 기간이 남아있는 ROOM_MOVE / RESERVE_PENDING / OVERDUE 상태가 있는 방 제외
 		const query = `
 			SELECT 
 				R.esntlId,
@@ -2006,6 +2007,25 @@ exports.getFreeRoomList = async (req, res, next) => {
 			WHERE R.gosiwonEsntlId = :goID
 				AND R.deleteYN = 'N'
 				AND R.status IN ('OPEN', 'EMPTY', 'LEAVE')
+				AND NOT EXISTS (
+					SELECT 1
+					FROM roomStatus RS
+					WHERE RS.roomEsntlId = R.esntlId
+						AND RS.gosiwonEsntlId = R.gosiwonEsntlId
+						AND (RS.deleteYN IS NULL OR RS.deleteYN = 'N')
+						AND RS.status IN ('CONTRACT', 'ROOM_MOVE', 'RESERVE_PENDING', 'OVERDUE')
+						-- 기간이 남아있는 상태: 종료일이 없거나, 종료일이 오늘 이후(오늘 포함)
+						AND (RS.statusEndDate IS NULL OR DATE(RS.statusEndDate) >= CURDATE())
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM roomMoveStatus RMS
+					WHERE RMS.targetRoomEsntlId = R.esntlId
+						AND RMS.gosiwonEsntlId = R.gosiwonEsntlId
+						AND (RMS.deleteYN IS NULL OR RMS.deleteYN = 'N')
+						AND RMS.status = 'PENDING'
+						AND DATE(RMS.moveDate) >= CURDATE()
+				)
 			ORDER BY R.roomNumber ASC
 		`;
 

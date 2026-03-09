@@ -961,17 +961,18 @@ exports.processRoomMove = async (req, res, next) => {
 };
 
 // 방이동 삭제 및 원상복구
-exports.deleteRoomMove = async (req, res, next) => {
+/**
+ * 방이동 취소 내부 로직 (Express 핸들러와 스케줄러에서 공통 사용)
+ * @param {string} roomMoveStatusId - 방이동 상태 ID
+ * @param {string} writerAdminId - 작성자 ID
+ * @param {string} writerName - 작성자 이름
+ * @returns {Promise<void>}
+ */
+async function cancelRoomMoveInternal(roomMoveStatusId, writerAdminId, writerName) {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
-		const decodedToken = verifyAdminToken(req);
-		const writerAdminId = getWriterAdminId(decodedToken);
-		const writerName = decodedToken.admin?.name ?? decodedToken.partner?.name ?? '관리자';
-
-		const { roomMoveStatusId } = req.params;
-
 		if (!roomMoveStatusId) {
-			errorHandler.errorThrow(400, '방이동 상태 ID를 입력해주세요.');
+			throw new Error('방이동 상태 ID를 입력해주세요.');
 		}
 
 		// 방이동 상태 존재 확인 및 adjustmentStatus 확인
@@ -999,15 +1000,12 @@ exports.deleteRoomMove = async (req, res, next) => {
 		);
 
 		if (!existingRoomMove) {
-			errorHandler.errorThrow(404, '방이동 상태를 찾을 수 없습니다.');
+			throw new Error('방이동 상태를 찾을 수 없습니다.');
 		}
 
 		// adjustmentStatus가 COMPLETED인 경우 삭제 불가
 		if (existingRoomMove.adjustmentStatus === 'COMPLETED') {
-			errorHandler.errorThrow(
-				400,
-				'조정 처리가 완료된 방이동은 삭제할 수 없습니다.'
-			);
+			throw new Error('조정 처리가 완료된 방이동은 삭제할 수 없습니다.');
 		}
 
 		// memo에서 계약서 ID 정보 및 원래 방 roomStatus 복구값 추출
@@ -1050,7 +1048,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 		);
 
 		if (!originalContractInfo) {
-			errorHandler.errorThrow(404, '계약 정보를 찾을 수 없습니다.');
+			throw new Error('계약 정보를 찾을 수 없습니다.');
 		}
 
 		const contractEndDate = originalContractInfo.endDate;
@@ -1097,7 +1095,7 @@ exports.deleteRoomMove = async (req, res, next) => {
 				{ replacements: [newContractEsntlId], type: mariaDBSequelize.QueryTypes.SELECT, transaction }
 			);
 			if (!newContractInfo) {
-				errorHandler.errorThrow(404, '새 계약 정보를 찾을 수 없습니다.');
+				throw new Error('새 계약 정보를 찾을 수 없습니다.');
 			}
 			if (originalContractEsntlId) {
 				// 원래 계약서 복구: roomEsntlId 원래 방으로, endDate 복구, status는 CONTRACT 유지
@@ -1406,17 +1404,37 @@ exports.deleteRoomMove = async (req, res, next) => {
 		}
 
 		await transaction.commit();
-
-		res.status(200).json({
-			success: true,
-			message: '방이동 상태가 삭제되고 원상복구되었습니다.',
-		});
 	} catch (error) {
 		try {
 			await transaction.rollback();
 		} catch (_rollbackErr) {
 			// 이미 완료된 트랜잭션에서 rollback 호출 시 무시
 		}
+		throw error;
+	}
+}
+
+exports.cancelRoomMoveInternal = cancelRoomMoveInternal;
+
+exports.deleteRoomMove = async (req, res, next) => {
+	try {
+		const decodedToken = verifyAdminToken(req);
+		const writerAdminId = getWriterAdminId(decodedToken);
+		const writerName = decodedToken.admin?.name ?? decodedToken.partner?.name ?? '관리자';
+
+		const { roomMoveStatusId } = req.params;
+
+		if (!roomMoveStatusId) {
+			errorHandler.errorThrow(400, '방이동 상태 ID를 입력해주세요.');
+		}
+
+		await cancelRoomMoveInternal(roomMoveStatusId, writerAdminId, writerName);
+
+		res.status(200).json({
+			success: true,
+			message: '방이동 상태가 삭제되고 원상복구되었습니다.',
+		});
+	} catch (error) {
 		next(error);
 	}
 };
@@ -1666,6 +1684,23 @@ exports.runDailyRoomMove = async function runDailyRoomMove(dateStr) {
 
 	for (const row of list) {
 		try {
+			// 방이동 실행 전: extraPayment에서 해당 방·계약 기준 extraCostName='방이동'이고 paymentStatus='PENDING'인 건 확인
+			const pendingExtraPayments = await mariaDBSequelize.query(
+				`SELECT esntlId FROM extraPayment
+				 WHERE contractEsntlId = ? AND roomEsntlId = ? AND extraCostName = '방이동'
+				   AND paymentStatus = 'PENDING' AND deleteYN = 'N'`,
+				{ replacements: [row.contractEsntlId, row.originalRoomEsntlId], type: mariaDBSequelize.QueryTypes.SELECT }
+			);
+
+			if (pendingExtraPayments && pendingExtraPayments.length > 0) {
+				// 방이동 추가비용이 PENDING(미결제) 상태이므로 방이동 취소 처리
+				console.log(`[DailyRoomMove] 방이동 취소: roomMoveStatusId=${row.esntlId}, 미결제 방이동 추가비용 ${pendingExtraPayments.length}건 존재`);
+				await cancelRoomMoveInternal(row.esntlId, process.env.DAILY_ROOMMOVE_REGISTRANT || 'SYSTEM', 'SYSTEM');
+				result.failed += 1;
+				result.errors.push({ roomMoveStatusId: row.esntlId, message: '방이동 추가비용이 미결제(PENDING) 상태이므로 방이동 취소 처리됨' });
+				continue;
+			}
+
 			// targetDateStr(이동예정일)을 기준일로 넘겨서, 오늘이 아니라 해당일 기준으로 처리되도록 함
 			await executeOneScheduledRoomMove(row, process.env.DAILY_ROOMMOVE_REGISTRANT || 'SYSTEM', null, targetDateStr);
 			result.processed += 1;
