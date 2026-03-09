@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 
 const messageController = require('../controllers/message');
+const multerMiddleware = require('../middleware/multer');
 
 /**
  * @swagger
  * /v1/message/send:
  *   post:
- *     summary: 문자 발송 (Aligo)
- *     description: Authorization 토큰이 필요한 관리자/파트너용 문자 발송 API입니다.
+ *     summary: 문자 발송 (SMS/LMS/MMS)
+ *     description: "Authorization 토큰이 필요한 관리자/파트너용 문자 발송 API. application/json이면 SMS/LMS, multipart/form-data에 image를 넣으면 MMS(이미지 문자)로 발송됩니다."
  *     tags: [Message]
  *     security:
  *       - bearerAuth: []
@@ -32,12 +33,53 @@ const messageController = require('../controllers/message');
  *                 example: "입실 안내 메시지입니다."
  *               title:
  *                 type: string
- *                 description: 문자 제목 (LMS/MMS에서 사용, SMS는 무시)
+ *                 description: "문자 제목 (LMS/MMS에서 사용, SMS는 무시)"
  *                 example: "고시원 안내"
  *               gosiwonEsntlId:
  *                 type: string
  *                 description: 고시원 ID (이력 저장용)
  *                 example: GOSI0000000199
+ *               userEsntlId:
+ *                 type: string
+ *                 description: 사용자 ID (이력 저장용, 미입력 시 수신 번호로 조회)
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 ID (이력 저장용)
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - receiver
+ *               - message
+ *             properties:
+ *               receiver:
+ *                 type: string
+ *                 description: 수신자 번호 (여러 명일 경우 콤마로 구분)
+ *                 example: "01012345678,01098765432"
+ *               message:
+ *                 type: string
+ *                 description: 문자 내용
+ *                 example: "입실 안내 메시지입니다."
+ *               title:
+ *                 type: string
+ *                 description: "문자 제목 (LMS/MMS에서 사용)"
+ *                 example: "고시원 안내"
+ *               gosiwonEsntlId:
+ *                 type: string
+ *                 description: 고시원 ID (이력 저장용)
+ *               userEsntlId:
+ *                 type: string
+ *                 description: "사용자 ID (이력 저장용, 미입력 시 수신 번호로 조회)"
+ *               roomEsntlId:
+ *                 type: string
+ *                 description: 방 ID (이력 저장용)
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: "MMS 첨부 이미지 (JPEG/PNG/GIF, 선택). 첨부 시 MMS로 발송. 스웨거 UI에서 'Choose File'로 선택 가능"
+ *           encoding:
+ *             image:
+ *               contentType: "image/jpeg, image/png, image/gif"
  *     responses:
  *       200:
  *         description: 문자 발송 성공
@@ -63,7 +105,16 @@ const messageController = require('../controllers/message');
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/send', messageController.sendSMS);
+// multipart/form-data일 때만 이미지 업로드 multer 적용 후 발송, 그 외에는 JSON body로 발송
+router.post('/send', (req, res, next) => {
+	if (req.is('multipart/form-data')) {
+		return multerMiddleware.messageImageMulter(req, res, (err) => {
+			if (err) return next(err);
+			return messageController.sendSMS(req, res, next);
+		});
+	}
+	return messageController.sendSMS(req, res, next);
+});
 
 /**
  * @swagger

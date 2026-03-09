@@ -1,3 +1,4 @@
+const path = require('path');
 const axios = require('axios');
 const { mariaDBSequelize } = require('../models');
 const errorHandler = require('../middleware/error');
@@ -5,6 +6,7 @@ const { getWriterAdminId } = require('../utils/auth');
 const { next: idsNext } = require('../utils/idsNext');
 const historyController = require('./history');
 const { phoneToRaw } = require('../utils/phoneHelper');
+const multerMiddleware = require('../middleware/multer');
 
 // 공통 토큰 검증 함수 (관리자/파트너)
 const verifyAdminToken = (req) => {
@@ -51,7 +53,9 @@ exports.sendSMS = async (req, res, next) => {
 
 		const firstReceiver = receiver.split(',')[0]?.trim() || receiver;
 		const receiverForAligo = receiver.split(',').map((r) => phoneToRaw(r.trim()) ?? r.trim()).filter(Boolean).join(',');
-		const result = await aligoSMS.send({ receiver: receiverForAligo || receiver, message, title });
+		// 이미지 업로드 시 MMS로 발송 (req.file은 multipart/form-data로 image 필드 전송 시 존재)
+		const imagePath = req.file ? path.join(process.cwd(), req.file.path) : undefined;
+		const result = await aligoSMS.send({ receiver: receiverForAligo || receiver, message, title, imagePath });
 
 		// 발송 이력 저장 (esntlId: IDS 테이블 테이블명으로 조회, userEsntlId: 전화번호로 customer 중 최신 활성 사용자)
 		const firstReceiverRaw = phoneToRaw(firstReceiver) ?? firstReceiver;
@@ -139,10 +143,27 @@ exports.sendSMS = async (req, res, next) => {
 			// history 실패해도 문자 발송 성공 응답 유지
 		}
 
+		// 발송 성공 후 업로드했던 이미지 임시 파일 삭제
+		if (req.file && req.file.path) {
+			try {
+				multerMiddleware.clearFile(req.file.path);
+			} catch (e) {
+				console.error('문자 발송 이미지 임시 파일 삭제 실패:', e);
+			}
+		}
+
 		errorHandler.successThrow(res, '문자 발송 성공', {
 			result,
 		});
 	} catch (err) {
+		// 에러 시 업로드된 이미지 정리
+		if (req.file && req.file.path) {
+			try {
+				multerMiddleware.clearFile(req.file.path);
+			} catch (e) {
+				console.error('문자 발송 이미지 임시 파일 삭제 실패:', e);
+			}
+		}
 		next(err);
 	}
 };

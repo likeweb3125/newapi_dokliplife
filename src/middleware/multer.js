@@ -3,11 +3,12 @@ const moment = require('moment');
 const fs = require('fs');
 const path = require('path');
 
-const fileStorage = (destination) =>
+const fileStorage = (destination, ensureDir = false) =>
 	multer.diskStorage({
 		destination: (req, file, cb) => {
-			console.log('Destination:', destination);
-			console.log(destination);
+			if (ensureDir && !fs.existsSync(destination)) {
+				fs.mkdirSync(destination, { recursive: true });
+			}
 			cb(null, destination);
 		},
 		filename: (req, file, cb) => {
@@ -35,6 +36,17 @@ const fileStorage = (destination) =>
 			cb(null, _fileName);
 		},
 	});
+
+// MMS용 이미지만 허용 (JPEG, PNG, GIF)
+const imageOnlyMimeTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/gif'];
+const imageOnlyFilter = (req, file, cb) => {
+	const ext = (file.originalname || '').split('.').pop().toLowerCase();
+	if (imageOnlyMimeTypes.includes(file.mimetype) && ['png', 'jpg', 'jpeg', 'gif'].includes(ext)) {
+		cb(null, true);
+	} else {
+		cb(null, false);
+	}
+};
 
 const allowedMimeTypes = [
 	'image/png',
@@ -116,3 +128,10 @@ exports.bannerMulter = multer({
 	fileFilter: fileFilter,
 	limits: { fileSize: fileSizeLimit },
 }).single('b_file');
+
+// 문자 발송(MMS)용 이미지 1개 (선택). multipart 시 필드명 image. upload/message 폴더 없으면 생성
+exports.messageImageMulter = multer({
+	storage: fileStorage('upload/message', true),
+	fileFilter: imageOnlyFilter,
+	limits: { fileSize: fileSizeLimit },
+}).single('image');
