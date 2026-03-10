@@ -1666,6 +1666,48 @@ exports.runDailyRoomMoveAPI = async (req, res, next) => {
 };
 
 /**
+ * 어제 이동 예정이었던 PENDING 방이동 중, extraPayment(방이동)가 COMPLETED가 아닌 건을 조회하여
+ * DELETE /v1/roomMove/:roomMoveStatusId 와 동일하게 방이동 취소(원상복구) 처리
+ * @returns {Promise<{ cancelled: number, errors: Array<{ roomMoveStatusId: string, message: string }> }>}
+ */
+exports.runCancelUnpaidYesterdayRoomMoves = async function runCancelUnpaidYesterdayRoomMoves() {
+	const yesterday = new Date();
+	yesterday.setDate(yesterday.getDate() - 1);
+	const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+	const writerId = process.env.DAILY_ROOMMOVE_REGISTRANT || 'SYSTEM';
+	const writerName = 'SYSTEM';
+	const result = { cancelled: 0, errors: [] };
+
+	const rows = await mariaDBSequelize.query(
+		`
+		SELECT DISTINCT RMS.esntlId
+		FROM roomMoveStatus RMS
+		INNER JOIN extraPayment EP ON EP.contractEsntlId = RMS.contractEsntlId
+			AND EP.roomEsntlId = RMS.originalRoomEsntlId
+			AND EP.extraCostName = '방이동'
+			AND (EP.paymentStatus IS NULL OR EP.paymentStatus != 'COMPLETED')
+			AND (EP.deleteYN IS NULL OR EP.deleteYN = 'N')
+		WHERE DATE(RMS.moveDate) = ?
+			AND RMS.status = 'PENDING'
+			AND (RMS.deleteYN IS NULL OR RMS.deleteYN = 'N')
+		ORDER BY RMS.esntlId
+		`,
+		{ replacements: [yesterdayStr], type: mariaDBSequelize.QueryTypes.SELECT }
+	);
+	const list = Array.isArray(rows) ? rows : [];
+
+	for (const row of list) {
+		try {
+			await cancelRoomMoveInternal(row.esntlId, writerId, writerName);
+			result.cancelled += 1;
+		} catch (err) {
+			result.errors.push({ roomMoveStatusId: row.esntlId, message: err.message || String(err) });
+		}
+	}
+	return result;
+};
+
+/**
  * PENDING 방이동 일괄 실행 (스케줄러·수동 API용)
  * @param {string|null} [dateStr] - 실행할 이동일 (YYYY-MM-DD). 없으면 당일.
  * @returns {Promise<{ total: number, processed: number, failed: number, errors: Array<{ roomMoveStatusId: string, message: string }>, targetDate: string }>}
