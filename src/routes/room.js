@@ -561,6 +561,10 @@ router.post('/addEventDirectly', roomController.addEventDirectly);
  *                       type: integer
  *                       description: 보증금 미납 (status = UNPAID)
  *                       example: 3
+ *                     returnRequest:
+ *                       type: integer
+ *                       description: "반환요청 대기 (il_room_deposit_history 동일 contractEsntlId 중 type=RETURN_REQUEST 존재하고, type=RETURN 이면서 status COMPLETED/RETURN_COMPLETED 인 행이 없는 계약 건수)"
+ *                       example: 2
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       500:

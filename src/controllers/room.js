@@ -243,7 +243,21 @@ exports.getDashboardCnt = async (req, res, next) => {
 					SUM(CASE WHEN status = 'UNPAID' THEN 1 ELSE 0 END) AS unpaid
 				FROM latest_per_contract
 				WHERE rn = 1
-			)
+			),
+			-- il_room_deposit_history: RETURN_REQUEST는 있으나 type=RETURN 이면서 COMPLETED/RETURN_COMPLETED 인 행이 없는 contractEsntlId 개수
+			return_request_only AS (
+				SELECT DISTINCT H.contractEsntlId
+				FROM il_room_deposit_history H
+				WHERE H.type = 'RETURN_REQUEST'
+					AND H.contractEsntlId IS NOT NULL AND H.contractEsntlId != ''
+					AND NOT EXISTS (
+						SELECT 1 FROM il_room_deposit_history H2
+						WHERE H2.contractEsntlId = H.contractEsntlId
+							AND H2.type = 'RETURN'
+							AND H2.status IN ('COMPLETED', 'RETURN_COMPLETED')
+					)
+			),
+			return_request_cnt AS (SELECT COUNT(*) AS returnRequest FROM return_request_only)
 			SELECT
 				T.total,
 				COALESCE(S.pending, 0) AS pending,
@@ -251,9 +265,11 @@ exports.getDashboardCnt = async (req, res, next) => {
 				COALESCE(S.inUse, 0) AS inUse,
 				COALESCE(S.overdue, 0) AS overdue,
 				COALESCE(S.checkoutConfirmed, 0) AS checkoutConfirmed,
-				COALESCE(S.unpaid, 0) AS unpaid
+				COALESCE(S.unpaid, 0) AS unpaid,
+				COALESCE(R.returnRequest, 0) AS returnRequest
 			FROM total_ct T
 			CROSS JOIN status_counts S
+			CROSS JOIN return_request_cnt R
 			`,
 			{ type: mariaDBSequelize.QueryTypes.SELECT }
 		);
@@ -266,6 +282,7 @@ exports.getDashboardCnt = async (req, res, next) => {
 			overdue: Number(row?.overdue ?? 0),
 			checkoutConfirmed: Number(row?.checkoutConfirmed ?? 0),
 			unpaid: Number(row?.unpaid ?? 0),
+			returnRequest: Number(row?.returnRequest ?? 0),
 		};
 
 		errorHandler.successThrow(res, '대시보드 집계 조회 성공', data);

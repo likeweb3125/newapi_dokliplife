@@ -6,7 +6,7 @@ const extraPaymentController = require('./extraPayment');
 const refundController = require('./refund');
 const { roomAfterUse } = refundController;
 const { next: idsNext } = require('../utils/idsNext');
-const { closeOpenStatusesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
+const { closeOpenStatusesForRoom, endActiveBeforeSalesForRoom, syncRoomFromRoomStatus } = require('../utils/roomStatusHelper');
 const { dateToYmd } = require('../utils/dateHelper');
 
 const ROOMMOVE_PREFIX = 'RMV';
@@ -362,6 +362,8 @@ exports.processRoomMove = async (req, res, next) => {
 		// 이동일이 오늘이 아니면: 계약서·room·roomStatus는 변경하지 않고 roomMoveStatus만 등록 (해당 이동일에 스케줄러가 실제 처리)
 		// 단, 이동할 방(타겟)은 방이동일까지 RESERVE로 표시하기 위해 room 갱신 + roomStatus RESERVED 추가
 		if (!isMoveToday) {
+			// 타겟 방의 활성 BEFORE_SALES가 있으면 오늘 날짜로 종료 후, RESERVE/roomStatus 추가
+			await endActiveBeforeSalesForRoom(targetRoomEsntlId, todayStr, transaction);
 			// 이동할 방을 방이동날까지 RESERVE로 표시 (room 테이블 + roomStatus RESERVED로 목록 API에서 기간 노출)
 			await mariaDBSequelize.query(
 				`UPDATE room SET status = ?, startDate = ?, endDate = ? WHERE esntlId = ?`,

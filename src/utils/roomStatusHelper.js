@@ -135,7 +135,34 @@ function addDaysToDateStr(dateStr, days) {
 }
 
 /**
+ * 해당 방의 활성(날짜가 살아있는) BEFORE_SALES roomStatus를 endDateStr(보통 오늘)로 종료한다.
+ * roomStatus 입력 시 호출하여, 기존 판매전 상태를 오늘 기준으로 마감한다.
+ * @param {string} roomEsntlId - 방 고유 아이디
+ * @param {string} endDateStr - 종료일 (YYYY-MM-DD 또는 YYYY-MM-DD HH:mm:ss, 보통 오늘)
+ * @param {object} [transaction] - Sequelize 트랜잭션 (선택)
+ */
+async function endActiveBeforeSalesForRoom(roomEsntlId, endDateStr, transaction = null) {
+	if (!roomEsntlId || endDateStr == null) return;
+	const endDtm = toDateStr(endDateStr);
+	if (!endDtm) return;
+	await mariaDBSequelize.query(
+		`UPDATE roomStatus
+		 SET statusEndDate = ?, updatedAt = NOW()
+		 WHERE roomEsntlId = ?
+		   AND status = 'BEFORE_SALES'
+		   AND (deleteYN IS NULL OR deleteYN = 'N')
+		   AND (statusEndDate IS NULL OR statusEndDate > ? OR statusEndDate >= '9999-12-31 23:59:59')`,
+		{
+			replacements: [endDtm, roomEsntlId, endDtm],
+			type: mariaDBSequelize.QueryTypes.UPDATE,
+			transaction,
+		}
+	);
+}
+
+/**
  * 해당 방의 미종료(열린) roomStatus 행들을 newStatusStartDate - 1일로 종료한다.
+ * 그 전에 BEFORE_SALES 활성 건은 오늘 날짜로 먼저 종료한다.
  * @param {string} roomEsntlId - 방 고유 아이디
  * @param {string} newStatusStartDate - 새 상태 시작일 (YYYY-MM-DD 등)
  * @param {object} [transaction] - Sequelize 트랜잭션 (선택)
@@ -144,14 +171,20 @@ function addDaysToDateStr(dateStr, days) {
 async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transaction = null, options = null) {
 	if (!roomEsntlId || newStatusStartDate == null) return;
 	const excludeStatuses = (options && options.excludeStatuses && options.excludeStatuses.length) ? options.excludeStatuses : [];
-	let endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
 
+	// BEFORE_SALES 활성(날짜 살아있음·9999-12-31) 건은 오늘 날짜로 statusEndDate 업데이트 (이하 일반 종료 대상에서 제외)
+	const now = new Date();
+	const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+	await endActiveBeforeSalesForRoom(roomEsntlId, todayStr, transaction);
+
+	let endDtm = addDaysToDateStr(toDateStr(newStatusStartDate), -1);
+	const excludeForUpdate = [...excludeStatuses, 'BEFORE_SALES'];
 	const whereBase = `roomEsntlId = ? AND (deleteYN IS NULL OR deleteYN = 'N') AND (statusEndDate IS NULL OR statusEndDate > ?)`;
-	const whereExclude = excludeStatuses.length ? ` AND status NOT IN (${excludeStatuses.map(() => '?').join(',')})` : '';
+	const whereExclude = excludeForUpdate.length ? ` AND status NOT IN (${excludeForUpdate.map(() => '?').join(',')})` : '';
 
 	// -1일이 계약(상태) 시작일보다 작으면 안 됨: 갱신 대상 행들 중 최소 statusStartDate보다 작으면 그날과 같게 함
 	const selectReplacements = [roomEsntlId, endDtm];
-	if (excludeStatuses.length) selectReplacements.push(...excludeStatuses);
+	if (excludeForUpdate.length) selectReplacements.push(...excludeForUpdate);
 	const [minRow] = await mariaDBSequelize.query(
 		`SELECT MIN(statusStartDate) AS minStart FROM roomStatus
 		 WHERE ${whereBase}${whereExclude}`,
@@ -166,10 +199,10 @@ async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transac
 		endDtm = minStartStr;
 	}
 
-	console.log('[closeOpenStatusesForRoom] roomEsntlId=', roomEsntlId, 'newStatusStartDate=', newStatusStartDate, '→ endDtm=', endDtm, excludeStatuses.length ? `(CONTRACT 계열 제외: ${excludeStatuses.join(',')})` : '', '(statusEndDate IS NULL OR statusEndDate > endDtm 인 행을 이 날짜로 종료)');
+	console.log('[closeOpenStatusesForRoom] roomEsntlId=', roomEsntlId, 'newStatusStartDate=', newStatusStartDate, '→ endDtm=', endDtm, excludeForUpdate.length ? `(BEFORE_SALES+제외: ${excludeForUpdate.join(',')})` : '', '(statusEndDate IS NULL OR statusEndDate > endDtm 인 행을 이 날짜로 종료)');
 
 	const updateReplacements = [endDtm, endDtm, roomEsntlId, endDtm];
-	if (excludeStatuses.length) updateReplacements.push(...excludeStatuses);
+	if (excludeForUpdate.length) updateReplacements.push(...excludeForUpdate);
 	await mariaDBSequelize.query(
 		`UPDATE roomStatus 
 		 SET statusEndDate = GREATEST(?, COALESCE(statusStartDate, ?)), updatedAt = NOW() 
@@ -185,6 +218,7 @@ async function closeOpenStatusesForRoom(roomEsntlId, newStatusStartDate, transac
 
 module.exports = {
 	closeOpenStatusesForRoom,
+	endActiveBeforeSalesForRoom,
 	ROOM_STATUS_TO_ROOM_STATUS,
 	ROOM_STATUS_TO_RS_STATUS_LIST,
 	getRoomStatusFromRoomStatus,
