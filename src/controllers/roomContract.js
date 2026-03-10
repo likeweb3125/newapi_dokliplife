@@ -140,6 +140,19 @@ exports.getContractList = async (req, res, next) => {
 					ORDER BY D.rdp_regist_dtm DESC
 					LIMIT 1
 				) AS depositEsntlId,
+				(
+					SELECT D.rdp_price
+					FROM il_room_deposit D
+					WHERE D.rom_eid = RC.roomEsntlId
+					  AND D.rdp_delete_dtm IS NULL
+					  AND TRIM(IFNULL(D.rdp_customer_name, '')) != ''
+					  AND (
+						  TRIM(IFNULL(D.rdp_customer_name, '')) = TRIM(IFNULL(RCW.checkinName, ''))
+						  OR TRIM(IFNULL(D.rdp_customer_name, '')) = TRIM(IFNULL(RCW.customerName, ''))
+					  )
+					ORDER BY D.rdp_regist_dtm DESC
+					LIMIT 1
+				) AS realDeposit,
 				GU.deposit AS gosiwonDeposit,
 				R.roomType,
 				R.window,

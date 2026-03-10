@@ -173,7 +173,11 @@ const roomContractController = require('../controllers/roomContract');
 			 *                           depositEsntlId:
 			 *                             type: string
 			 *                             nullable: true
-			 *                             description: "보증금 고유 아이디 (il_room_deposit.rdp_eid, roomEsntlId+gosiwonEsntlId 기준 최신 1건)"
+			 *                             description: "보증금 고유 아이디 (il_room_deposit.rdp_eid, roomEsntlId+고객명 기준 최신 1건)"
+			 *                           realDeposit:
+			 *                             type: integer
+			 *                             nullable: true
+			 *                             description: "보증금 실제 금액 (il_room_deposit.rdp_price, depositEsntlId와 동일 행의 값)"
  *                           gosiwonDeposit:
  *                             type: integer
  *                             nullable: true
