@@ -328,8 +328,8 @@ exports.processRoomMove = async (req, res, next) => {
 					},
 				],
 				receiverPhone,
-				// 발송일: 방이동 신청일 전날
-				sendDate: moveDateMinusOneStr,
+				// 발송일: 추가 결제 요청일(신청일, 오늘 기준)
+				sendDate: todayStr,
 			};
 
 			await callControllerWithBody(extraPaymentController.roomExtraPayment, req, extraPaymentBody);
