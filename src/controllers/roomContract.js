@@ -127,6 +127,19 @@ exports.getContractList = async (req, res, next) => {
 				RC.spacialContract,
 				R.roomNumber,
 				R.deposit AS roomDeposit,
+				(
+					SELECT D.rdp_eid
+					FROM il_room_deposit D
+					WHERE D.rom_eid = RC.roomEsntlId
+					  AND D.rdp_delete_dtm IS NULL
+					  AND TRIM(IFNULL(D.rdp_customer_name, '')) != ''
+					  AND (
+						  TRIM(IFNULL(D.rdp_customer_name, '')) = TRIM(IFNULL(RCW.checkinName, ''))
+						  OR TRIM(IFNULL(D.rdp_customer_name, '')) = TRIM(IFNULL(RCW.customerName, ''))
+					  )
+					ORDER BY D.rdp_regist_dtm DESC
+					LIMIT 1
+				) AS depositEsntlId,
 				GU.deposit AS gosiwonDeposit,
 				R.roomType,
 				R.window,

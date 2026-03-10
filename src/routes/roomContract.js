@@ -170,6 +170,10 @@ const roomContractController = require('../controllers/roomContract');
  *                             type: integer
  *                             nullable: true
  *                             description: "방 보증금 (room.deposit)"
+			 *                           depositEsntlId:
+			 *                             type: string
+			 *                             nullable: true
+			 *                             description: "보증금 고유 아이디 (il_room_deposit.rdp_eid, roomEsntlId+gosiwonEsntlId 기준 최신 1건)"
  *                           gosiwonDeposit:
  *                             type: integer
  *                             nullable: true
