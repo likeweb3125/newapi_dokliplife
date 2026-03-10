@@ -360,7 +360,51 @@ exports.processRoomMove = async (req, res, next) => {
 		const isMoveToday = moveDateStr === todayStr;
 
 		// 이동일이 오늘이 아니면: 계약서·room·roomStatus는 변경하지 않고 roomMoveStatus만 등록 (해당 이동일에 스케줄러가 실제 처리)
+		// 단, 이동할 방(타겟)은 방이동일까지 RESERVE로 표시하기 위해 room 갱신 + roomStatus RESERVED 추가
 		if (!isMoveToday) {
+			// 이동할 방을 방이동날까지 RESERVE로 표시 (room 테이블 + roomStatus RESERVED로 목록 API에서 기간 노출)
+			await mariaDBSequelize.query(
+				`UPDATE room SET status = ?, startDate = ?, endDate = ? WHERE esntlId = ?`,
+				{
+					replacements: ['RESERVE', todayStr, moveDateStr, targetRoomEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+			const roomMoveReserveStatusId = await idsNext('roomStatus', undefined, transaction);
+			await mariaDBSequelize.query(
+				`
+				INSERT INTO roomStatus (
+					esntlId, roomEsntlId, gosiwonEsntlId, status, subStatus,
+					customerEsntlId, customerName, reservationEsntlId, reservationName,
+					contractorEsntlId, contractorName, contractEsntlId,
+					statusStartDate, statusEndDate, etcStartDate, etcEndDate, statusMemo,
+					createdAt, updatedAt
+				) VALUES (?, ?, ?, 'RESERVED', 'ROOM_MOVE_RESERVE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+				`,
+				{
+					replacements: [
+						roomMoveReserveStatusId,
+						targetRoomEsntlId,
+						contractInfo.gosiwonEsntlId,
+						contractInfo.roomStatusCustomerEsntlId,
+						contractInfo.roomStatusCustomerName,
+						contractInfo.roomStatusReservationEsntlId,
+						contractInfo.roomStatusReservationName,
+						contractInfo.roomStatusContractorEsntlId,
+						contractInfo.roomStatusContractorName,
+						contractEsntlId,
+						todayStr,
+						moveDateStr,
+						contractInfo.etcStartDate,
+						contractInfo.etcEndDate,
+						'방이동 예약 (이동일까지)',
+					],
+					type: mariaDBSequelize.QueryTypes.INSERT,
+					transaction,
+				}
+			);
+
 			const [targetRoomOnSaleForMemo] = await mariaDBSequelize.query(
 				`
 				SELECT esntlId, statusEndDate, subStatus
@@ -661,7 +705,7 @@ exports.processRoomMove = async (req, res, next) => {
 		);
 
 		// room 테이블: 타겟방 먼저, 기존 방 나중 (계약 유지 방식이라 extraPayment/parkStatus contractEsntlId 변경 없음)
-		// 타겟방: roomStatus(CONTRACT) 반영 → status=CONTRACT, startDate/endDate 설정
+		// 타겟방: roomStatus(CONTRACT) 반영 → status=CONTRACT, startDate/endDate 설정 (이동일이 오늘인 경우만 이 경로 진입)
 		await syncRoomFromRoomStatus(
 			targetRoomEsntlId,
 			'CONTRACT',
