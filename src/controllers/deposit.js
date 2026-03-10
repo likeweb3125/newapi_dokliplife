@@ -1099,7 +1099,7 @@ exports.getRoomDepositList = async (req, res, next) => {
 };
 
 // 보증금 ID(il_room_deposit.rdp_eid) 기준 il_room_deposit_history 이력 조회 (리턴값은 getRoomDepositList와 동일)
-// type 필수: DEPOSIT(보증금 입금), RETURN(환불)
+// type 필수: DEPOSIT(보증금 입금), RETURN(환불·반환요청: RETURN, RETURN_REQUEST 포함)
 exports.getRoomDepositListById = async (req, res, next) => {
 	try {
 		verifyAdminToken(req);
@@ -1113,7 +1113,9 @@ exports.getRoomDepositListById = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'type은 DEPOSIT 또는 RETURN 중 하나 필수입니다.');
 		}
 
-		const where = { depositEsntlId, type };
+		const where = type === 'RETURN'
+			? { depositEsntlId, type: { [Op.in]: ['RETURN', 'RETURN_REQUEST'] } }
+			: { depositEsntlId, type };
 
 		const rows = await ilRoomDepositHistory.findAll({
 			where,
@@ -1156,7 +1158,7 @@ exports.getRoomDepositListById = async (req, res, next) => {
 				manager: r.manager || null,
 				depositorName: r.depositorName || null,
 			};
-			if (r.type === 'RETURN') {
+			if (r.type === 'RETURN' || r.type === 'RETURN_REQUEST') {
 				let deductionItems = [];
 				if (r.memo && typeof r.memo === 'string') {
 					try {
@@ -1760,6 +1762,7 @@ exports.getDepositList = async (req, res, next) => {
 				MAX(COALESCE(RCW.customerName, RCW_RS.customerName)) as contractorName,
 				MAX(COALESCE(RCW.customerPhone, RCW_RS.customerPhone)) as contractorPhone,
 				MAX(D.rdp_price) as depositAmount,
+				(SELECT COALESCE(SUM(H_rq.deductionAmount), 0) FROM il_room_deposit_history H_rq WHERE H_rq.depositEsntlId = D.rdp_eid AND H_rq.type = 'RETURN_REQUEST') as returnRequest,
 				MAX(COALESCE(RS.contractEsntlId, RC.esntlId)) as contractEsntlId,
 				MAX(DATE(COALESCE(RC_RS.startDate, RC.startDate))) as moveInDate,
 				MAX(DATE(COALESCE(RC_RS.endDate, RC.endDate))) as moveOutDate,
@@ -1915,6 +1918,7 @@ exports.getDepositList = async (req, res, next) => {
 				contractorName: row.contractorName || null,
 				contractorPhone: phoneToDisplay(row.contractorPhone) ?? row.contractorPhone ?? null,
 				depositAmount: row.depositAmount || null,
+				returnRequest: row.returnRequest != null ? Number(row.returnRequest) : 0,
 				contractEsntlId: row.contractEsntlId || null,
 				moveInDate: row.moveInDate || null,
 				moveOutDate: row.moveOutDate || null,
@@ -1941,7 +1945,7 @@ exports.getDepositList = async (req, res, next) => {
 	}
 };
 
-// 보증금 환불 등록 (depositRefundRegist) - depositEsntlId 기준 il_room_deposit_history에 type=RETURN 이력만 INSERT
+// 보증금 환불 등록 (depositRefundRegist) - depositEsntlId 기준 il_room_deposit_history에 type=RETURN 또는 RETURN_REQUEST 이력 INSERT. body.type 기본값 RETURN
 exports.createDepositRefund = async (req, res, next) => {
 	const transaction = await mariaDBSequelize.transaction();
 	try {
@@ -1949,9 +1953,11 @@ exports.createDepositRefund = async (req, res, next) => {
 
 		const {
 			depositEsntlId,
+			type: typeBody, // RETURN(기본) | RETURN_REQUEST
 			depositorName: depositorNameBody,
 			amount: refundAmountBody,
 			deductionAmount: deductionAmountBody,
+			totalReturnAmount: totalReturnAmountBody, // 전체 반환금(이번 건 기준). 입력 시 반환금액 = totalReturnAmount - deductionAmount
 			deductionItems,
 			contractEsntlId,
 			refundDate,
@@ -1960,7 +1966,12 @@ exports.createDepositRefund = async (req, res, next) => {
 			accountHolder,
 		} = req.body;
 
-		// 필수: depositEsntlId(il_room_deposit.rdp_eid), amount(환불 금액), deductionAmount(차감 금액, 0 가능)
+		const historyType = (typeBody && String(typeBody).trim()) || 'RETURN';
+		if (historyType !== 'RETURN' && historyType !== 'RETURN_REQUEST') {
+			errorHandler.errorThrow(400, 'type은 RETURN 또는 RETURN_REQUEST만 가능합니다.');
+		}
+
+		// 필수: depositEsntlId(il_room_deposit.rdp_eid). 금액은 (amount + deductionAmount) 또는 (totalReturnAmount + deductionAmount) 방식 중 하나
 		if (!depositEsntlId) {
 			errorHandler.errorThrow(400, 'depositEsntlId는 필수입니다.');
 		}
@@ -1968,13 +1979,38 @@ exports.createDepositRefund = async (req, res, next) => {
 			depositorNameBody != null && String(depositorNameBody).trim() !== ''
 				? String(depositorNameBody).trim()
 				: null;
-		const refundAmount = parseInt(refundAmountBody, 10) || 0;
 		const deductionAmount = parseInt(deductionAmountBody, 10) || 0;
-		if (refundAmount < 0 || deductionAmount < 0) {
-			errorHandler.errorThrow(400, 'amount(환불 금액)와 deductionAmount(차감 금액)는 0 이상이어야 합니다.');
+		if (deductionAmount < 0) {
+			errorHandler.errorThrow(400, 'deductionAmount(차감 금액)는 0 이상이어야 합니다.');
 		}
-		if (refundAmount === 0 && deductionAmount === 0) {
-			errorHandler.errorThrow(400, 'amount(환불 금액)와 deductionAmount(차감 금액) 중 하나는 0보다 커야 합니다.');
+
+		let refundAmount;
+		if (historyType === 'RETURN_REQUEST') {
+			// RETURN_REQUEST: amount·totalReturnAmount 검증 없이 값만 설정 (미입력 시 0)
+			const totalReturnAmountInput = totalReturnAmountBody != null ? parseInt(totalReturnAmountBody, 10) : null;
+			if (totalReturnAmountInput != null && !Number.isNaN(totalReturnAmountInput)) {
+				refundAmount = Math.max(0, totalReturnAmountInput - deductionAmount);
+			} else {
+				refundAmount = parseInt(refundAmountBody, 10) || 0;
+			}
+		} else {
+			const totalReturnAmountInput = totalReturnAmountBody != null ? parseInt(totalReturnAmountBody, 10) : null;
+			if (totalReturnAmountInput != null && !Number.isNaN(totalReturnAmountInput)) {
+				// 입력 방식: 전체 반환금 + 차감액 → 반환금액 = 전체 반환금 - 차감액 (예: 전체 500,000, 차감 100,000 → 반환 400,000)
+				if (totalReturnAmountInput < deductionAmount) {
+					errorHandler.errorThrow(
+						400,
+						`totalReturnAmount(전체 반환금 ${totalReturnAmountInput.toLocaleString()}원)는 deductionAmount(차감액 ${deductionAmount.toLocaleString()}원) 이상이어야 합니다.`
+					);
+				}
+				refundAmount = totalReturnAmountInput - deductionAmount;
+			} else {
+				// 기존 방식: amount(실제 반환 금액) + deductionAmount. amount=0 허용
+				refundAmount = parseInt(refundAmountBody, 10) || 0;
+				if (refundAmount < 0) {
+					errorHandler.errorThrow(400, 'amount(환불 금액)는 0 이상이어야 합니다.');
+				}
+			}
 		}
 
 		// 차감내용: memo에 JSON 배열로 저장. deductionItems가 있으면 합계가 deductionAmount와 일치하는지 검증
@@ -2038,17 +2074,21 @@ exports.createDepositRefund = async (req, res, next) => {
 		const thisReturnTotal = refundAmount + deductionAmount;
 		const totalAfter = existingReturnSum + thisReturnTotal;
 
-		// 검증: 환불+차감 합계는 보증금 목표액(il_room_deposit.amount)을 초과할 수 없음
-		if (depositTargetAmount > 0 && totalAfter > depositTargetAmount) {
+		// 검증: 환불+차감 합계는 보증금 목표액(il_room_deposit.amount)을 초과할 수 없음 (RETURN_REQUEST는 검증 생략)
+		if (historyType !== 'RETURN_REQUEST' && depositTargetAmount > 0 && totalAfter > depositTargetAmount) {
 			errorHandler.errorThrow(
 				400,
 				`환불+차감 합계가 보증금 금액을 초과합니다. (보증금: ${depositTargetAmount.toLocaleString()}, 기존 반환 합계: ${existingReturnSum.toLocaleString()}, 이번 환불+차감: ${thisReturnTotal.toLocaleString()}, 최대 가능: ${(depositTargetAmount - existingReturnSum).toLocaleString()})`
 			);
 		}
 
-		// status: 실제 입금액(또는 보증금 목표액) 대비 환불+차감 합계로 PARTIAL/COMPLETED 판단 (DEPOSIT의 PARTIAL/COMPLETED와 동일한 방식)
+		// status: RETURN_REQUEST는 PENDING, RETURN은 실제 입금액 대비 환불+차감 합계로 PARTIAL/COMPLETED 판단
 		const status =
-			targetAmountForStatus <= 0 || totalAfter >= targetAmountForStatus ? 'COMPLETED' : 'PARTIAL';
+			historyType === 'RETURN_REQUEST'
+				? 'PENDING'
+				: targetAmountForStatus <= 0 || totalAfter >= targetAmountForStatus
+					? 'COMPLETED'
+					: 'PARTIAL';
 
 		const historyId = await generateIlRoomDepositHistoryId(transaction);
 		await ilRoomDepositHistory.create(
@@ -2057,7 +2097,7 @@ exports.createDepositRefund = async (req, res, next) => {
 				depositEsntlId,
 				roomEsntlId: deposit.roomEsntlId,
 				contractEsntlId: contractEsntlId || null,
-				type: 'RETURN',
+				type: historyType,
 				amount: refundAmount,
 				deductionAmount,
 				refundAmount: refundAmount,
@@ -2114,6 +2154,7 @@ exports.createDepositRefund = async (req, res, next) => {
 		return errorHandler.successThrow(res, '보증금 환불 등록 성공', {
 			depositEsntlId,
 			historyId,
+			type: historyType,
 			amount: refundAmount,
 			deductionAmount,
 			status,

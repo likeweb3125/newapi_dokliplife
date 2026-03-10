@@ -836,8 +836,8 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  * @swagger
  * /v1/deposit/depositRefundRegist:
  *   post:
- *     summary: 보증금 환불 등록 (il_room_deposit_history에 type=RETURN 이력만 INSERT)
- *     description: "depositEsntlId(il_room_deposit) 기준으로 환불 이력을 il_room_deposit_history에만 등록합니다. type=RETURN, amount=환불금액, deductionAmount=차감금액, memo=차감내용 JSON 배열. 환불+차감 합계가 보증금 금액과 동일하면 status=COMPLETED, 아니면 PARTIAL. 전액 반환 시 il_room_deposit.rdp_return_dtm 갱신."
+ *     summary: 보증금 환불 등록 (il_room_deposit_history에 type=RETURN 또는 RETURN_REQUEST 이력 INSERT)
+ *     description: "depositEsntlId(il_room_deposit) 기준으로 환불 이력을 il_room_deposit_history에만 등록합니다. type 기본값 RETURN, RETURN 또는 RETURN_REQUEST 가능. 금액 입력은 두 가지 방식 지원. (1) amount=실제 반환금, deductionAmount=차감금 (2) totalReturnAmount=전체 반환금, deductionAmount=차감금 → 반환금액은 자동 계산(전체-차감). memo=차감내용 JSON 배열. 환불+차감 합계가 보증금 금액과 동일하면 status=COMPLETED, 아니면 PARTIAL. 전액 반환 시 il_room_deposit.rdp_return_dtm 갱신."
  *     tags: [Deposit]
  *     security:
  *       - bearerAuth: []
@@ -849,34 +849,42 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *             type: object
  *             required:
  *               - depositEsntlId
- *               - amount
  *             properties:
  *               depositEsntlId:
  *                 type: string
  *                 description: "보증금 고유 아이디 (il_room_deposit.rdp_eid)"
  *                 example: RDP0000000001
+ *               type:
+ *                 type: string
+ *                 enum: [RETURN, RETURN_REQUEST]
+ *                 description: "이력 타입. 기본 RETURN. RETURN=실제 반환, RETURN_REQUEST=반환 요청"
+ *                 example: RETURN
  *               depositorName:
  *                 type: string
  *                 description: "보증금 납부자 이름 (선택, 입력 시 RETURN 이력에 저장)"
  *                 example: 홍길동
  *               amount:
  *                 type: integer
- *                 description: 환불 금액 (실제 반환 금액)
- *                 example: 900000
+ *                 description: "환불 금액(실제 반환 금액). totalReturnAmount 미사용 시 필수."
+ *                 example: 400000
+ *               totalReturnAmount:
+ *                 type: integer
+ *                 description: "전체 반환금(이번 건 기준). 입력 시 반환금액 = totalReturnAmount - deductionAmount (예: 500000, 차감 100000 → 반환 400000)"
+ *                 example: 500000
  *               deductionAmount:
  *                 type: integer
- *                 description: 차감 금액 (0 가능)
+ *                 description: "차감 금액 (0 가능). totalReturnAmount 사용 시 필수."
  *                 example: 100000
  *               deductionItems:
  *                 type: array
- *                 description: "차감 내역 배열. memo에 JSON 배열로 저장되며, amount 합계는 deductionAmount와 일치해야 함."
+ *                 description: "차감 내역 배열. memo에 JSON 배열로 저장되며, amount 합계는 deductionAmount와 일치해야 함. (예: 청소비 100000)"
  *                 items:
  *                   type: object
  *                   properties:
  *                     content:
  *                       type: string
  *                       description: 차감 항목 내용
- *                       example: '위약금 차감'
+ *                       example: '청소비'
  *                     amount:
  *                       type: integer
  *                       description: 차감 항목 금액
@@ -926,6 +934,10 @@ router.get('/contract-coupon-info', depositController.getContractCouponInfo);
  *                       type: string
  *                       description: 생성된 il_room_deposit_history 고유 아이디
  *                       example: RDPH0000000001
+ *                     type:
+ *                       type: string
+ *                       description: "등록된 이력 타입 (RETURN 또는 RETURN_REQUEST)"
+ *                       example: RETURN
  *                     amount:
  *                       type: integer
  *                       description: 환불 금액
