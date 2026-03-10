@@ -1062,7 +1062,33 @@ exports.reserveCancel = async (req, res, next) => {
 			errorHandler.errorThrow(400, 'roomEsntlId를 입력해주세요.');
 		}
 
-		// 1. 예약 상태를 CANCEL로 업데이트
+		// 오늘 날짜 (YYYY-MM-DD) 기준
+		const today = new Date();
+		const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+		// 1. 해당 방의 WAIT 상태 예약 중 최신 1건 조회 (RESERVE_PENDING과 매핑되는 예약 ID 확보용)
+		const [latestWaitReservation] = await mariaDBSequelize.query(
+			`
+			SELECT ror_sn
+			FROM il_room_reservation
+			WHERE rom_sn = ?
+				AND ror_status_cd = 'WAIT'
+			ORDER BY ror_update_dtm DESC, ror_regist_dtm DESC
+			LIMIT 1
+			`,
+			{
+				replacements: [roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		if (!latestWaitReservation || !latestWaitReservation.ror_sn) {
+			errorHandler.errorThrow(404, '취소할 예약을 찾을 수 없습니다. (WAIT 상태의 예약이 없습니다.)');
+		}
+		const reservationId = latestWaitReservation.ror_sn;
+
+		// 2. 예약 상태를 CANCEL로 업데이트 (해당 방의 WAIT 상태 전체)
 		const updateReservationQuery = `
 			UPDATE il_room_reservation 
 			SET ror_status_cd = 'CANCEL',
@@ -1072,21 +1098,112 @@ exports.reserveCancel = async (req, res, next) => {
 				AND ror_status_cd = 'WAIT'
 		`;
 
-		const updateResult = await mariaDBSequelize.query(updateReservationQuery, {
+		await mariaDBSequelize.query(updateReservationQuery, {
 			replacements: [userSn, roomEsntlId],
 			type: mariaDBSequelize.QueryTypes.UPDATE,
 			transaction,
 		});
 
-		// 업데이트된 행이 없으면 예약이 없거나 이미 취소된 상태
-		if (updateResult[1] === 0) {
-			errorHandler.errorThrow(404, '취소할 예약을 찾을 수 없습니다. (WAIT 상태의 예약이 없습니다.)');
+		// 3. RESERVE_PENDING에 저장된 ON_SALE/CAN_CHECKIN 원래 종료일 복구 및 RESERVE_PENDING 소프트 삭제
+		const [reserveStatusRow] = await mariaDBSequelize.query(
+			`
+			SELECT esntlId, statusMemo
+			FROM roomStatus
+			WHERE roomEsntlId = ?
+				AND reservationEsntlId = ?
+				AND status = 'RESERVE_PENDING'
+				AND (deleteYN IS NULL OR deleteYN = 'N')
+			ORDER BY createdAt DESC, esntlId DESC
+			LIMIT 1
+			`,
+			{
+				replacements: [roomEsntlId, reservationId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		let originalOnSaleEnd = null;
+		let originalCanCheckinEnd = null;
+		if (reserveStatusRow && reserveStatusRow.statusMemo && typeof reserveStatusRow.statusMemo === 'string') {
+			const memoStr = reserveStatusRow.statusMemo;
+			const match = memoStr.match(/\[RESERVE_ORIGINAL_DATES:(.*)\]$/);
+			if (match && match[1]) {
+				try {
+					const parsed = JSON.parse(match[1]);
+					if (parsed && typeof parsed === 'object') {
+						const normalize = (val) => {
+							if (!val) return null;
+							const s = String(val).trim();
+							if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00`;
+							if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s)) return s.slice(0, 19);
+							// 예전 형식(Sun Mar 15 2026 00:00:00 GMT+0900 ...) 지원: Date 파싱 후 YYYY-MM-DD 00:00:00 로 변환
+							const d = new Date(s);
+							if (!Number.isNaN(d.getTime())) {
+								const y = d.getFullYear();
+								const m = String(d.getMonth() + 1).padStart(2, '0');
+								const day = String(d.getDate()).padStart(2, '0');
+								return `${y}-${m}-${day} 00:00:00`;
+							}
+							return null;
+						};
+						if (parsed.ON_SALE) originalOnSaleEnd = normalize(parsed.ON_SALE);
+						if (parsed.CAN_CHECKIN) originalCanCheckinEnd = normalize(parsed.CAN_CHECKIN);
+					}
+				} catch (e) {
+					// JSON 파싱 실패 시 원복 정보 없음으로 간주
+				}
+			}
 		}
 
-		// 2. roomStatus: 해당 방의 예약 관련 상태(RESERVE_PENDING 등)를 소프트 삭제
+		// 저장해 둔 종료일이 있으면 ON_SALE / CAN_CHECKIN의 statusEndDate를 복구
+		if (originalOnSaleEnd) {
+			await mariaDBSequelize.query(
+				`
+				UPDATE roomStatus
+				SET statusEndDate = ?, updatedAt = NOW()
+				WHERE roomEsntlId = ?
+					AND status = 'ON_SALE'
+					AND (deleteYN IS NULL OR deleteYN = 'N')
+				ORDER BY statusEndDate DESC, esntlId DESC
+				LIMIT 1
+				`,
+				{
+					replacements: [originalOnSaleEnd, roomEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+		if (originalCanCheckinEnd) {
+			await mariaDBSequelize.query(
+				`
+				UPDATE roomStatus
+				SET statusEndDate = ?, updatedAt = NOW()
+				WHERE roomEsntlId = ?
+					AND status = 'CAN_CHECKIN'
+					AND (deleteYN IS NULL OR deleteYN = 'N')
+				ORDER BY statusEndDate DESC, esntlId DESC
+				LIMIT 1
+				`,
+				{
+					replacements: [originalCanCheckinEnd, roomEsntlId],
+					type: mariaDBSequelize.QueryTypes.UPDATE,
+					transaction,
+				}
+			);
+		}
+
+		// RESERVE_PENDING, RESERVED, VBANK_PENDING 은 소프트 삭제 (예약 관련 상태 정리)
 		await mariaDBSequelize.query(
-			`UPDATE roomStatus SET deleteYN = 'Y', deletedBy = ?, deletedAt = NOW(), updatedAt = NOW()
-			 WHERE roomEsntlId = ? AND status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING') AND (deleteYN IS NULL OR deleteYN = 'N')`,
+			`UPDATE roomStatus
+			 SET deleteYN = 'Y',
+				 deletedBy = ?,
+				 deletedAt = NOW(),
+				 updatedAt = NOW()
+			 WHERE roomEsntlId = ?
+			   AND status IN ('RESERVE_PENDING', 'RESERVED', 'VBANK_PENDING')
+			   AND (deleteYN IS NULL OR deleteYN = 'N')`,
 			{
 				replacements: [userSn, roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
@@ -1094,11 +1211,37 @@ exports.reserveCancel = async (req, res, next) => {
 			}
 		);
 
-		// 3. room: 해당 방을 EMPTY로 변경
-		await mariaDBSequelize.query(
-			`UPDATE room SET status = 'EMPTY', startDate = NULL, endDate = NULL WHERE esntlId = ?`,
+		// 4. 복구된 ON_SALE / CAN_CHECKIN 종료일 기준으로 room.status 결정
+		const [dateRow] = await mariaDBSequelize.query(
+			`
+			SELECT
+				MAX(CASE WHEN status = 'ON_SALE' THEN DATE(statusEndDate) ELSE NULL END) AS onSaleEndDate,
+				MAX(CASE WHEN status = 'CAN_CHECKIN' THEN DATE(statusEndDate) ELSE NULL END) AS canCheckinEndDate
+			FROM roomStatus
+			WHERE roomEsntlId = ?
+				AND status IN ('ON_SALE', 'CAN_CHECKIN')
+				AND (deleteYN IS NULL OR deleteYN = 'N')
+			`,
 			{
 				replacements: [roomEsntlId],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+
+		const onSaleEndDate = dateRow?.onSaleEndDate ? String(dateRow.onSaleEndDate) : null;
+		const canCheckinEndDate = dateRow?.canCheckinEndDate ? String(dateRow.canCheckinEndDate) : null;
+
+		const hasFutureOpen =
+			(onSaleEndDate && onSaleEndDate >= todayStr) ||
+			(canCheckinEndDate && canCheckinEndDate >= todayStr);
+
+		const newRoomStatus = hasFutureOpen ? 'OPEN' : 'END';
+
+		await mariaDBSequelize.query(
+			`UPDATE room SET status = ?, startDate = NULL, endDate = NULL WHERE esntlId = ?`,
+			{
+				replacements: [newRoomStatus, roomEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
 			}
@@ -1114,9 +1257,9 @@ exports.reserveCancel = async (req, res, next) => {
 			errorHandler.errorThrow(404, '방 정보를 찾을 수 없거나 고시원 정보가 없습니다.');
 		}
 
-		// 4. 히스토리 생성
+		// 5. 히스토리 생성
 		try {
-			const historyContent = '결제 요청 취소: 예약 관련 roomStatus(RESERVE_PENDING, RESERVED, VBANK_PENDING) 소프트삭제, room을 EMPTY로 변경';
+			const historyContent = '결제 요청 취소: 예약 관련 roomStatus(RESERVE_PENDING, RESERVED, VBANK_PENDING) 소프트삭제, ON_SALE/CAN_CHECKIN 기간 복구 및 room.status를 OPEN/END로 재설정';
 
 			await historyController.createHistoryRecord(
 				{
@@ -1140,7 +1283,7 @@ exports.reserveCancel = async (req, res, next) => {
 
 		errorHandler.successThrow(res, '결제 요청 취소 성공', {
 			roomEsntlId: roomEsntlId,
-			roomStatus: 'EMPTY',
+			roomStatus: newRoomStatus,
 		});
 	} catch (err) {
 		await transaction.rollback();
@@ -1422,6 +1565,58 @@ exports.roomReserve = async (req, res, next) => {
 			? dateToYmd(contractEndDateRow.statusEndDate) || todayStr
 			: todayStr;
 
+		// 2-1. 예약 생성 시점에 활성화된 ON_SALE, CAN_CHECKIN의 종료일을 statusMemo에 저장 (예약 만료 시 원복용)
+		let reservePendingStatusMemo = null;
+		const originalOpenStatusRows = await mariaDBSequelize.query(
+			`SELECT status, statusEndDate
+			 FROM roomStatus
+			 WHERE roomEsntlId = ?
+			   AND status IN ('ON_SALE', 'CAN_CHECKIN')
+			   AND (deleteYN IS NULL OR deleteYN = 'N')
+			   AND (statusEndDate IS NULL OR statusEndDate > ?)`,
+			{
+				replacements: [roomEsntlId, todayStr],
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		if (Array.isArray(originalOpenStatusRows) && originalOpenStatusRows.length > 0) {
+			const memoPayload = {};
+			for (const row of originalOpenStatusRows) {
+				const key = row.status != null ? String(row.status).trim() : '';
+				if (!key || (key !== 'ON_SALE' && key !== 'CAN_CHECKIN')) continue;
+				if (row.statusEndDate != null) {
+					// Date 객체면 YYYY-MM-DD 00:00:00 형식으로, 문자열이면 가능한 한 YYYY-MM-DD HH:mm:ss 로 정규화
+					if (row.statusEndDate instanceof Date) {
+						const ymd = dateToYmd(row.statusEndDate);
+						if (ymd) {
+							memoPayload[key] = `${ymd} 00:00:00`;
+						}
+					} else {
+						const raw = String(row.statusEndDate).trim();
+						if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+							memoPayload[key] = `${raw} 00:00:00`;
+						} else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(raw)) {
+							memoPayload[key] = raw.slice(0, 19);
+						} else {
+							// 그 외 문자열은 Date로 한번 파싱해서 YYYY-MM-DD 00:00:00 형태로 저장 시도
+							const d = new Date(raw);
+							if (!Number.isNaN(d.getTime())) {
+								const ymd = dateToYmd(d);
+								if (ymd) {
+									memoPayload[key] = `${ymd} 00:00:00`;
+								}
+							}
+						}
+					}
+				}
+			}
+			if (Object.keys(memoPayload).length > 0) {
+				// roomStatus.statusMemo에 JSON 문자열을 저장하되, 다른 용도와 구분되도록 접두어를 붙인다.
+				reservePendingStatusMemo = `[RESERVE_ORIGINAL_DATES:${JSON.stringify(memoPayload)}]`;
+			}
+		}
+
 		// 3. roomStatus 테이블: RESERVE_PENDING 레코드 추가. 연장이면 statusStartDate=기존 계약 종료일, 신규면 오늘. statusEndDate=예약일(checkInDate)
 		// 연장일 때는 closeOpenStatusesForRoom을 호출하지 않아 기존 CONTRACT의 statusEndDate가 절대 변경되지 않도록 함
 		if (!hasOpenContract) {
@@ -1434,17 +1629,19 @@ exports.roomReserve = async (req, res, next) => {
 				roomEsntlId,
 				gosiwonEsntlId,
 				status,
+				statusMemo,
 				reservationEsntlId,
 				statusStartDate,
 				statusEndDate,
 				createdAt,
 				updatedAt
-			) VALUES (?, ?, ?, 'RESERVE_PENDING', ?, ?, ?, NOW(), NOW())`,
+			) VALUES (?, ?, ?, 'RESERVE_PENDING', ?, ?, ?, ?, NOW(), NOW())`,
 			{
 				replacements: [
 					newRoomStatusId,
 					roomEsntlId,
 					roomBasicInfo.gosiwonEsntlId,
+					reservePendingStatusMemo,
 					reservationId,
 					reservePendingStartDate,
 					checkInDate || null,
