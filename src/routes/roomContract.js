@@ -261,6 +261,10 @@ const roomContractController = require('../controllers/roomContract');
  *                     totalPages:
  *                       type: integer
  *                       description: 전체 페이지 수
+ *                     gosiwonUseDeposit:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: "고시원 보증금 사용 여부 (gosiwon.use_deposit, 1이면 사용, 0이면 미사용). 보통 searchString 또는 gosiwonEsntlId로 특정 고시원 조회 시 사용"
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

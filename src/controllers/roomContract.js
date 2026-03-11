@@ -123,6 +123,7 @@ exports.getContractList = async (req, res, next) => {
 				RC.gosiwonEsntlId,
 				G.name AS gosiwonName,
 				G.address AS gosiwonAddress,
+				G.use_deposit AS gosiwonUseDeposit,
 				RC.contract,
 				RC.spacialContract,
 				R.roomNumber,
@@ -269,6 +270,18 @@ exports.getContractList = async (req, res, next) => {
 			contractCustomerPhone: phoneToDisplay(row.contractCustomerPhone) ?? row.contractCustomerPhone,
 		}));
 
+		// 검색 결과의 첫 번째 행 기준으로 고시원 보증금 사용 여부(gosiwon.use_deposit) 반환 (혼합된 경우가 아니도록 호출 측에서 필터링 가정)
+		let gosiwonUseDeposit = null;
+		if (resultList.length > 0 && resultList[0].gosiwonUseDeposit !== undefined) {
+			const rawVal = resultList[0].gosiwonUseDeposit;
+			gosiwonUseDeposit =
+				rawVal === null || rawVal === undefined
+					? null
+					: Number(rawVal) === 1
+						? 1
+						: 0;
+		}
+
 		// 응답 데이터 구성
 		const response = {
 			resultList: resultList,
@@ -276,6 +289,7 @@ exports.getContractList = async (req, res, next) => {
 			page: pageNum,
 			limit: limitNum,
 			totalPages: Math.ceil(totalCount / limitNum),
+			gosiwonUseDeposit,
 		};
 
 		errorHandler.successThrow(res, '계약현황 목록 조회 성공', response);

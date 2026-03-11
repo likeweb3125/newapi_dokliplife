@@ -1140,7 +1140,8 @@ exports.getRoomDepositListById = async (req, res, next) => {
 				'accountHolder',
 				'createdAt',
 			],
-			order: [[type === 'RETURN' ? 'refundDate' : 'depositDate', 'DESC'], ['createdAt', 'DESC']],
+			// 입력 시간(createdAt) 기준으로 최신순 정렬
+			order: [['createdAt', 'DESC']],
 			raw: true,
 		});
 
@@ -2057,7 +2058,33 @@ exports.createDepositRefund = async (req, res, next) => {
 		);
 		const totalPaidFromDeposit = parseInt(paidResult?.totalPaid || 0, 10);
 		// 환불 완료 판단 기준: 실제 입금액이 있으면 그 금액, 없으면 보증금 목표액(il_room_deposit.amount)
-		const targetAmountForStatus = totalPaidFromDeposit > 0 ? totalPaidFromDeposit : depositTargetAmount;
+		const targetAmountForStatusBase =
+			totalPaidFromDeposit > 0 ? totalPaidFromDeposit : depositTargetAmount;
+
+		// 같은 계약서 기준 RETURN_REQUEST 차감 합계(없으면 0)를 기준 금액에서 차감하여 실제 반환 기준 금액 산정
+		const replacementsForRequest = contractEsntlId
+			? [depositEsntlId, contractEsntlId]
+			: [depositEsntlId];
+		const contractFilterSql = contractEsntlId ? ' AND contractEsntlId = ?' : '';
+		const [requestResult] = await mariaDBSequelize.query(
+			`SELECT COALESCE(SUM(deductionAmount), 0) AS totalRequestDeduction
+			 FROM il_room_deposit_history
+			 WHERE depositEsntlId = ? AND type = 'RETURN_REQUEST'${contractFilterSql}`,
+			{
+				replacements: replacementsForRequest,
+				type: mariaDBSequelize.QueryTypes.SELECT,
+				transaction,
+			}
+		);
+		const totalReturnRequestDeduction = parseInt(
+			requestResult?.totalRequestDeduction || 0,
+			10
+		);
+		// RETURN_REQUEST 차감 금액을 반영한 실제 반환 기준 금액 (0 미만이면 0으로 설정)
+		const targetAmountForStatus = Math.max(
+			0,
+			targetAmountForStatusBase - totalReturnRequestDeduction
+		);
 
 		// 기존 RETURN 이력의 (amount + deductionAmount) 합계
 		const [sumResult] = await mariaDBSequelize.query(
@@ -2074,15 +2101,15 @@ exports.createDepositRefund = async (req, res, next) => {
 		const thisReturnTotal = refundAmount + deductionAmount;
 		const totalAfter = existingReturnSum + thisReturnTotal;
 
-		// 검증: 환불+차감 합계는 보증금 목표액(il_room_deposit.amount)을 초과할 수 없음 (RETURN_REQUEST는 검증 생략)
-		if (historyType !== 'RETURN_REQUEST' && depositTargetAmount > 0 && totalAfter > depositTargetAmount) {
+		// 검증: 환불+차감 합계는 RETURN_REQUEST 차감 금액을 반영한 실제 반환 가능 금액을 초과할 수 없음 (RETURN_REQUEST는 검증 생략)
+		if (historyType !== 'RETURN_REQUEST' && targetAmountForStatus > 0 && totalAfter > targetAmountForStatus) {
 			errorHandler.errorThrow(
 				400,
-				`환불+차감 합계가 보증금 금액을 초과합니다. (보증금: ${depositTargetAmount.toLocaleString()}, 기존 반환 합계: ${existingReturnSum.toLocaleString()}, 이번 환불+차감: ${thisReturnTotal.toLocaleString()}, 최대 가능: ${(depositTargetAmount - existingReturnSum).toLocaleString()})`
+				`환불+차감 합계가 반환 가능 금액을 초과합니다. (반환 가능 금액: ${targetAmountForStatus.toLocaleString()}, 기존 반환 합계: ${existingReturnSum.toLocaleString()}, 이번 환불+차감: ${thisReturnTotal.toLocaleString()}, 최대 가능: ${(targetAmountForStatus - existingReturnSum).toLocaleString()})`
 			);
 		}
 
-		// status: RETURN_REQUEST는 PENDING, RETURN은 실제 입금액 대비 환불+차감 합계로 PARTIAL/COMPLETED 판단
+		// status: RETURN_REQUEST는 PENDING, RETURN은 RETURN_REQUEST 차감 금액을 반영한 실제 반환 기준 금액 대비 환불+차감 합계로 PARTIAL/COMPLETED 판단
 		const status =
 			historyType === 'RETURN_REQUEST'
 				? 'PENDING'
