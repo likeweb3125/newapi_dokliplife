@@ -1614,14 +1614,17 @@ exports.getReservationList = async (req, res, next) => {
 				SELECT 
 					D.rom_eid as roomEsntlId,
 					D.gsw_eid as gosiwonEsntlId,
+					D.rdp_registrant_id as registrantId,
 					CASE WHEN D.rdp_completed_dtm IS NULL THEN 'PENDING' ELSE 'COMPLETED' END as status,
 					D.rdp_price as amount,
 					D.rdp_check_in_date as checkInDate,
 					D.rdp_customer_name as checkinName,
 					D.rdp_customer_phone as checkinPhone,
 					DATE(D.rdp_regist_dtm) as recordDate,
-					DATE_FORMAT(D.rdp_regist_dtm, '%H:%i') as recordTime
+					DATE_FORMAT(D.rdp_regist_dtm, '%H:%i') as recordTime,
+					A.name as managerName
 				FROM il_room_deposit D
+				LEFT JOIN admin A ON A.esntlId = D.rdp_registrant_id
 				WHERE D.rom_eid IN (${roomEsntlIds.map(() => '?').join(',')})
 					AND D.rdp_delete_dtm IS NULL
 				ORDER BY D.rom_eid, D.rdp_regist_dtm DESC
@@ -1637,6 +1640,9 @@ exports.getReservationList = async (req, res, next) => {
 				const id = row.roomEsntlId;
 				if (!depositByRoom[id]) depositByRoom[id] = [];
 				if (depositByRoom[id].length < DEPOSIT_HISTORY_PER_ROOM) {
+					const manager = (row.registrantId && String(row.registrantId).toUpperCase() === 'SYSTEM')
+						? '결제등록'
+						: (row.managerName || null);
 					depositByRoom[id].push({
 						roomEsntlId: row.roomEsntlId,
 						gosiwonEsntlId: row.gosiwonEsntlId,
@@ -1647,7 +1653,7 @@ exports.getReservationList = async (req, res, next) => {
 							checkinName: row.checkinName || null,
 							checkinPhone: phoneToDisplay(row.checkinPhone) ?? row.checkinPhone ?? null,
 						},
-						manager: null,
+						manager,
 						recordDate: row.recordDate || null,
 						recordTime: row.recordTime || null,
 					});
