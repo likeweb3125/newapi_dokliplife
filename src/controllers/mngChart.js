@@ -1334,6 +1334,46 @@ exports.mngChartMain = async (req, res, next) => {
 			}
 		});
 
+		// 검색 기간 내 groups 기준 방(group)당 가장 최근 item 하나만 유지 (end → start → id 기준 최신). ROOM_MOVE, ROOM_MOVE_PENDING은 예외로 전부 표시
+		const moveExceptionStatuses = ['ROOM_MOVE', 'ROOM_MOVE_PENDING'];
+		const exceptionItems = items.filter((it) => moveExceptionStatuses.includes(it.itemStatus));
+		const normalItems = items.filter((it) => !moveExceptionStatuses.includes(it.itemStatus));
+		const itemsByGroup = {};
+		normalItems.forEach((it) => {
+			const g = it.group;
+			if (g == null) return;
+			if (!itemsByGroup[g]) itemsByGroup[g] = [];
+			itemsByGroup[g].push(it);
+		});
+		const endForSort = (it) => (it.end && String(it.end).trim() ? String(it.end).trim() : '9999-12-31 23:59:59');
+		const startForSort = (it) => (it.start && String(it.start).trim() ? String(it.start).trim() : '0000-00-00 00:00:00');
+		const filteredNormalItems = [];
+		Object.keys(itemsByGroup).forEach((g) => {
+			const list = itemsByGroup[g];
+			list.sort((a, b) => {
+				const ae = endForSort(a);
+				const be = endForSort(b);
+				if (be !== ae) return be.localeCompare(ae);
+				const as = startForSort(a);
+				const bs = startForSort(b);
+				if (bs !== as) return bs.localeCompare(as);
+				return (b.id ?? 0) - (a.id ?? 0);
+			});
+			filteredNormalItems.push(list[0]);
+		});
+		const filteredItems = [...filteredNormalItems, ...exceptionItems];
+		const oldIdToNewId = {};
+		filteredItems.forEach((it, idx) => {
+			oldIdToNewId[it.id] = idx;
+			it.id = idx;
+		});
+		filteredItems.forEach((it) => {
+			if (it.moveFrom != null && oldIdToNewId[it.moveFrom] != null) it.moveFrom = oldIdToNewId[it.moveFrom];
+			if (it.moveTo != null && oldIdToNewId[it.moveTo] != null) it.moveTo = oldIdToNewId[it.moveTo];
+		});
+		items.length = 0;
+		items.push(...filteredItems);
+
 		// 7. 전체 페이지 수 계산 (최대 12개월까지 조회 가능하다고 가정)
 		const totalPages = 12; // 1년치 데이터
 

@@ -1145,14 +1145,30 @@ exports.getRoomDepositListById = async (req, res, next) => {
 			raw: true,
 		});
 
+		// 날짜·시간은 DB/로컬 기준 그대로 표시 (UTC·ISO 변환 금지, cursorrules 준수)
+		const formatDateTimeLocal = (dateValue) => {
+			if (!dateValue) return null;
+			const d = new Date(dateValue);
+			const year = d.getFullYear();
+			const month = String(d.getMonth() + 1).padStart(2, '0');
+			const day = String(d.getDate()).padStart(2, '0');
+			const hours = String(d.getHours()).padStart(2, '0');
+			const minutes = String(d.getMinutes()).padStart(2, '0');
+			const seconds = String(d.getSeconds()).padStart(2, '0');
+			return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+		};
+
 		const result = (rows || []).map((r) => {
+			const dateDeposit = r.depositDate ? formatDateTimeLocal(r.depositDate) : null;
+			const dateRefund = r.refundDate ? formatDateTimeLocal(r.refundDate) : null;
+			const dateCreated = r.createdAt ? formatDateTimeLocal(r.createdAt) : null;
 			const base = {
 				esntlId: r.esntlId || null,
 				depositEsntlId: r.depositEsntlId || null,
 				contractEsntlId: r.contractEsntlId || null,
 				type: r.type || null,
 				status: r.status || null,
-				date: r.depositDate || r.refundDate || r.createdAt || null,
+				date: dateDeposit || dateRefund || dateCreated || null,
 				amount: r.amount ?? null,
 				paidAmount: (r.status === 'COMPLETED' || r.status === 'PARTIAL') ? (r.amount ?? 0) : 0,
 				unpaidAmount: r.unpaidAmount != null && r.unpaidAmount !== '' ? Number(r.unpaidAmount) : 0,
@@ -1171,11 +1187,11 @@ exports.getRoomDepositListById = async (req, res, next) => {
 				}
 				return {
 					...base,
-					date: r.refundDate || r.createdAt || null,
+					date: dateRefund || dateCreated || null,
 					amount: r.amount ?? null,
 					deductionAmount: r.deductionAmount != null ? Number(r.deductionAmount) : 0,
 					refundAmount: r.refundAmount != null ? Number(r.refundAmount) : (r.amount ?? 0),
-					refundDate: r.refundDate || null,
+					refundDate: dateRefund || null,
 					deductionItems,
 					accountBank: r.accountBank || null,
 					accountNumber: r.accountNumber || null,
