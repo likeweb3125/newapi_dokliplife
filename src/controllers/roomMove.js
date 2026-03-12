@@ -12,8 +12,8 @@ const { dateToYmd } = require('../utils/dateHelper');
 const ROOMMOVE_PREFIX = 'RMV';
 const ROOMMOVE_PADDING = 10;
 
-/** roomContract.memo2 컬럼 최대 길이 (VARCHAR 제한 초과 방지, DB 컬럼과 맞출 것) */
-const ROOM_CONTRACT_MEMO2_MAX_LENGTH = 255;
+/** roomContract.memo2 컬럼 최대 길이 (TEXT로 변경 후에도 과도한 누적 방지용으로 적용, DB는 TEXT) */
+const ROOM_CONTRACT_MEMO2_MAX_LENGTH = 2000;
 
 /** MySQL 데드락(1213, 40001) 여부 판별 */
 const isDeadlockError = (err) => {
@@ -494,19 +494,17 @@ exports.processRoomMove = async (req, res, next) => {
 		}
 
 		// 이하: 이동일이 오늘인 경우에만 계약서·roomStatus·room 실제 반영
-		// 1. 기존 계약 유지: roomEsntlId를 이동할 방으로, startDate/endDate 갱신, memo2에 방이동 기록 추가 (길이 초과 시 잘림)
-		const memo2Append = `방이동: ${originalRoomNumber}에서 → ${targetRoomNumber}로 이동`;
+		// 1. 기존 계약 유지: roomEsntlId를 이동할 방으로, startDate/endDate 갱신 (방이동 이력은 history 테이블에만 저장)
 		await mariaDBSequelize.query(
 			`
 			UPDATE roomContract
 			SET roomEsntlId = ?,
 				startDate = ?,
-				endDate = ?,
-				memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?)
+				endDate = ?
 			WHERE esntlId = ?
 		`,
 			{
-				replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId],
+				replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, contractEsntlId],
 				type: mariaDBSequelize.QueryTypes.UPDATE,
 				transaction,
 			}
@@ -520,15 +518,35 @@ exports.processRoomMove = async (req, res, next) => {
 				? Math.max(0, currentRent - delta)
 				: currentRent + delta;
 			const newRentToStore = Number.isInteger(newRent) ? String(newRent) : String(Number(newRent.toFixed(2)));
-			const adjustmentMemo = `월입실료 조정: ${finalAdjustmentType === 'REFUND' ? '환불' : '추가'} ${finalAdjustmentAmount}원`;
+			const adjustmentMemo = `월입실료 조정: ${finalAdjustmentType === 'REFUND' ? '환불' : '추가'} ${finalAdjustmentAmount}원 (기존 ${currentRent} → 변경 ${newRentToStore})`;
 			await mariaDBSequelize.query(
-				`UPDATE roomContract SET monthlyRent = ?, memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?) WHERE esntlId = ?`,
+				`UPDATE roomContract SET monthlyRent = ? WHERE esntlId = ?`,
 				{
-					replacements: [newRentToStore, adjustmentMemo, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId],
+					replacements: [newRentToStore, contractEsntlId],
 					type: mariaDBSequelize.QueryTypes.UPDATE,
 					transaction,
 				}
 			);
+			// 월 입실료 조정 내역은 history에만 상세히 기록
+			try {
+				await historyController.createHistoryRecord(
+					{
+						gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+						roomEsntlId: targetRoomEsntlId,
+						contractEsntlId: contractEsntlId,
+						content: `방이동 월입실료 조정: ${adjustmentMemo}`,
+						category: 'CONTRACT',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId: writerAdminId,
+						writerName,
+						writerType: 'ADMIN',
+					},
+					transaction
+				);
+			} catch (historyErr) {
+				console.error('방이동 월입실료 조정 history 생성 실패:', historyErr);
+			}
 		}
 
 		// 2. 원래 방의 roomStatus 처리
@@ -1548,10 +1566,10 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 		const targetRoomNumber = (targetRoom && targetRoom.roomNumber) || targetRoomEsntlId;
 		const originalRoomNumber = (originalRoom && originalRoom.roomNumber) || originalRoomEsntlId;
 
-		const memo2Append = `방이동: ${originalRoomNumber}에서 → ${targetRoomNumber}로 이동`;
+		// roomContract.memo2에는 방이동 내용을 더 이상 누적하지 않고, 계약만 갱신 (이력은 history에 저장)
 		await mariaDBSequelize.query(
-			`UPDATE roomContract SET roomEsntlId = ?, startDate = ?, endDate = ?, memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?) WHERE esntlId = ?`,
-			{ replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, memo2Append, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
+			`UPDATE roomContract SET roomEsntlId = ?, startDate = ?, endDate = ? WHERE esntlId = ?`,
+			{ replacements: [targetRoomEsntlId, moveDateStr, originalContractEndDate, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
 		);
 
 		// adjustmentAmount가 있으면 월 입실료 차액 반영 (monthlyRent는 만원 단위: 15 = 15만원, 5000원 = 0.5)
@@ -1562,11 +1580,31 @@ async function executeOneScheduledRoomMove(row, writerAdminId, transaction, effe
 			const delta = adjAmount / 10000;
 			const newRent = adjType === 'REFUND' ? Math.max(0, currentRent - delta) : currentRent + delta;
 			const newRentToStore = Number.isInteger(newRent) ? String(newRent) : String(Number(newRent.toFixed(2)));
-			const adjustmentMemo = `월입실료 조정: ${adjType === 'REFUND' ? '환불' : '추가'} ${adjAmount}원`;
+			const adjustmentMemo = `월입실료 조정: ${adjType === 'REFUND' ? '환불' : '추가'} ${adjAmount}원 (기존 ${currentRent} → 변경 ${newRentToStore})`;
 			await mariaDBSequelize.query(
-				`UPDATE roomContract SET monthlyRent = ?, memo2 = LEFT(TRIM(CONCAT(IFNULL(memo2, ''), IF(IFNULL(TRIM(memo2), '') = '', '', ' '), ?)), ?) WHERE esntlId = ?`,
-				{ replacements: [newRentToStore, adjustmentMemo, ROOM_CONTRACT_MEMO2_MAX_LENGTH, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
+				`UPDATE roomContract SET monthlyRent = ? WHERE esntlId = ?`,
+				{ replacements: [newRentToStore, contractEsntlId], type: mariaDBSequelize.QueryTypes.UPDATE, transaction: txn }
 			);
+			// 월 입실료 조정 내역은 history에만 상세히 기록
+			try {
+				await historyController.createHistoryRecord(
+					{
+						gosiwonEsntlId: contractInfo.gosiwonEsntlId,
+						roomEsntlId: targetRoomEsntlId,
+						contractEsntlId: contractEsntlId,
+						content: `방이동 월입실료 조정: ${adjustmentMemo}`,
+						category: 'CONTRACT',
+						priority: 'NORMAL',
+						publicRange: 0,
+						writerAdminId,
+						writerName,
+						writerType: 'ADMIN',
+					},
+					txn
+				);
+			} catch (historyErr) {
+				console.error('방이동 월입실료 조정 history 생성 실패 (스케줄러):', historyErr);
+			}
 		}
 
 		if (contractInfo.roomStatusSubStatus === 'ROOM_MOVE_IN') {
