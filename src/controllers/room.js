@@ -1236,7 +1236,7 @@ exports.reserveCancel = async (req, res, next) => {
 			(onSaleEndDate && onSaleEndDate >= todayStr) ||
 			(canCheckinEndDate && canCheckinEndDate >= todayStr);
 
-		const newRoomStatus = hasFutureOpen ? 'OPEN' : 'END';
+		const newRoomStatus = hasFutureOpen ? 'OPEN' : 'EMPTY';
 
 		await mariaDBSequelize.query(
 			`UPDATE room SET status = ?, startDate = NULL, endDate = NULL WHERE esntlId = ?`,
@@ -1259,7 +1259,7 @@ exports.reserveCancel = async (req, res, next) => {
 
 		// 5. 히스토리 생성
 		try {
-			const historyContent = '결제 요청 취소: 예약 관련 roomStatus(RESERVE_PENDING, RESERVED, VBANK_PENDING) 소프트삭제, ON_SALE/CAN_CHECKIN 기간 복구 및 room.status를 OPEN/END로 재설정';
+			const historyContent = '결제 요청 취소: 예약 관련 roomStatus(RESERVE_PENDING, RESERVED, VBANK_PENDING) 소프트삭제, ON_SALE/CAN_CHECKIN 기간 복구 및 room.status를 OPEN/EMPTY로 재설정';
 
 			await historyController.createHistoryRecord(
 				{

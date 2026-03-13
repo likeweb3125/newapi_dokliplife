@@ -207,15 +207,23 @@ exports.getContractList = async (req, res, next) => {
 						INNER JOIN (
 							SELECT depositEsntlId, MAX(createdAt) AS maxCreatedAt
 							FROM il_room_deposit_history
+							WHERE type = 'DEPOSIT'
 							GROUP BY depositEsntlId
-						) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt
+						) H2 ON H1.depositEsntlId = H2.depositEsntlId AND H1.createdAt = H2.maxCreatedAt AND H1.type = 'DEPOSIT'
 					) DH ON D.rdp_eid = DH.depositEsntlId
 					WHERE D.rom_eid = RC.roomEsntlId
 					  AND D.gsw_eid = RC.gosiwonEsntlId
 					  AND D.rdp_delete_dtm IS NULL
 					ORDER BY D.rdp_regist_dtm DESC
 					LIMIT 1
-				), 'PENDING') AS depositStatus
+				), 'PENDING') AS depositStatus,
+				(
+					SELECT GREATEST(0,
+						COALESCE((SELECT SUM(H.amount) FROM il_room_deposit_history H WHERE H.depositEsntlId = (SELECT D2.rdp_eid FROM il_room_deposit D2 WHERE D2.rom_eid = RC.roomEsntlId AND D2.rdp_delete_dtm IS NULL AND TRIM(IFNULL(D2.rdp_customer_name, '')) != '' AND (TRIM(IFNULL(D2.rdp_customer_name, '')) = TRIM(IFNULL(RCW.checkinName, '')) OR TRIM(IFNULL(D2.rdp_customer_name, '')) = TRIM(IFNULL(RCW.customerName, ''))) ORDER BY D2.rdp_regist_dtm DESC LIMIT 1) AND H.type = 'DEPOSIT' AND H.status = 'COMPLETED'), 0)
+						- COALESCE((SELECT SUM(H_rq.deductionAmount) FROM il_room_deposit_history H_rq WHERE H_rq.depositEsntlId = (SELECT D2.rdp_eid FROM il_room_deposit D2 WHERE D2.rom_eid = RC.roomEsntlId AND D2.rdp_delete_dtm IS NULL AND TRIM(IFNULL(D2.rdp_customer_name, '')) != '' AND (TRIM(IFNULL(D2.rdp_customer_name, '')) = TRIM(IFNULL(RCW.checkinName, '')) OR TRIM(IFNULL(D2.rdp_customer_name, '')) = TRIM(IFNULL(RCW.customerName, ''))) ORDER BY D2.rdp_regist_dtm DESC LIMIT 1) AND H_rq.type = 'RETURN_REQUEST'), 0)
+						- COALESCE((SELECT SUM(H_ret.amount + COALESCE(H_ret.deductionAmount, 0)) FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = (SELECT D2.rdp_eid FROM il_room_deposit D2 WHERE D2.rom_eid = RC.roomEsntlId AND D2.rdp_delete_dtm IS NULL AND TRIM(IFNULL(D2.rdp_customer_name, '')) != '' AND (TRIM(IFNULL(D2.rdp_customer_name, '')) = TRIM(IFNULL(RCW.checkinName, '')) OR TRIM(IFNULL(D2.rdp_customer_name, '')) = TRIM(IFNULL(RCW.customerName, ''))) ORDER BY D2.rdp_regist_dtm DESC LIMIT 1) AND H_ret.type = 'RETURN' AND H_ret.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')), 0)
+					)
+				) AS remainReturnAmount
 			FROM roomContract RC
 			JOIN gosiwon G ON RC.gosiwonEsntlId = G.esntlId
 			JOIN customer C ON RC.customerEsntlId = C.esntlId
@@ -1148,7 +1156,12 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				(SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN') AS refundCreatedAt,
 				(SELECT H_ret.status FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' ORDER BY COALESCE(H_ret.refundDate, H_ret.createdAt) DESC, H_ret.createdAt DESC LIMIT 1) AS returnStatus,
 				(SELECT COALESCE(SUM(H_ret.amount + COALESCE(H_ret.deductionAmount, 0)), 0) FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' AND H_ret.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')) AS returnLastestAmount,
-				(SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN') AS returnLastestTime
+				(SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i') FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN') AS returnLastestTime,
+				(SELECT GREATEST(0,
+					COALESCE((SELECT SUM(H.amount) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT' AND H.status = 'COMPLETED'), 0)
+					- COALESCE((SELECT SUM(H_rq.deductionAmount) FROM il_room_deposit_history H_rq WHERE H_rq.depositEsntlId = D.rdp_eid AND H_rq.type = 'RETURN_REQUEST'), 0)
+					- COALESCE((SELECT SUM(H_ret.amount + COALESCE(H_ret.deductionAmount, 0)) FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' AND H_ret.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')), 0)
+				)) AS remainReturnAmount
 			FROM il_room_deposit D
 			WHERE D.gsw_eid = ?
 				AND D.rdp_delete_dtm IS NULL
@@ -1222,6 +1235,7 @@ exports.getDepositAndExtra = async (req, res, next) => {
 				returnStatus: row.returnStatus || null,
 				returnLastestAmount: row.returnLastestAmount != null ? Number(row.returnLastestAmount) : null,
 				returnLastestTime: row.returnLastestTime || null,
+				remainReturnAmount: row.remainReturnAmount != null ? Number(row.remainReturnAmount) : 0,
 			}));
 		} else {
 			console.log('[depositAndExtra] 입실자/계약자 정보 없음 - deposit 조회 생략');

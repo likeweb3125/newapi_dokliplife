@@ -91,6 +91,31 @@ const resolveDepositHistoryStatus = async (roomEsntlId, contractEsntlId, newAmou
 	return { depositStatus, contractDepositAmount, totalPaidAfter, unpaidAmount };
 };
 
+/**
+ * depositEsntlId 기준 잔여 반환금 계산
+ * - 총 반환금액: COMPLETED 상태의 DEPOSIT 타입 amount 합계
+ * - 차감된 금액: RETURN_REQUEST 타입 deductionAmount 합계
+ * - 실제 반환된 금액: RETURN 타입(COMPLETED/PARTIAL/RETURN_COMPLETED) amount+deductionAmount 합계
+ * - remainReturnAmount = 총 반환금액 - 차감된 금액 - 실제 반환된 금액 (0 미만이면 0)
+ * @param {string|null} depositEsntlId - il_room_deposit.rdp_eid
+ * @returns {Promise<number>}
+ */
+const getRemainReturnAmount = async (depositEsntlId) => {
+	if (!depositEsntlId) return 0;
+	const [row] = await mariaDBSequelize.query(
+		`SELECT GREATEST(0,
+			COALESCE((SELECT SUM(H.amount) FROM il_room_deposit_history H WHERE H.depositEsntlId = ? AND H.type = 'DEPOSIT' AND H.status = 'COMPLETED'), 0)
+			- COALESCE((SELECT SUM(H_rq.deductionAmount) FROM il_room_deposit_history H_rq WHERE H_rq.depositEsntlId = ? AND H_rq.type = 'RETURN_REQUEST'), 0)
+			- COALESCE((SELECT SUM(H_ret.amount + COALESCE(H_ret.deductionAmount, 0)) FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = ? AND H_ret.type = 'RETURN' AND H_ret.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')), 0)
+		) AS remainReturnAmount`,
+		{
+			replacements: [depositEsntlId, depositEsntlId, depositEsntlId],
+			type: mariaDBSequelize.QueryTypes.SELECT,
+		}
+	);
+	return row && row.remainReturnAmount != null ? Number(row.remainReturnAmount) : 0;
+};
+
 const generateDepositDeductionId = async (transaction) => {
 	const latest = await depositDeduction.findOne({
 		attributes: ['esntlId'],
@@ -1830,7 +1855,14 @@ exports.getDepositList = async (req, res, next) => {
 					SELECT DATE_FORMAT(MAX(COALESCE(H_ret.refundDate, H_ret.createdAt)), '%Y-%m-%d %H:%i')
 					FROM il_room_deposit_history H_ret
 					WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN'
-				) as returnLastestTime
+				) as returnLastestTime,
+				(
+					SELECT GREATEST(0,
+						COALESCE((SELECT SUM(H.amount) FROM il_room_deposit_history H WHERE H.depositEsntlId = D.rdp_eid AND H.type = 'DEPOSIT' AND H.status = 'COMPLETED'), 0)
+						- COALESCE((SELECT SUM(H_rq.deductionAmount) FROM il_room_deposit_history H_rq WHERE H_rq.depositEsntlId = D.rdp_eid AND H_rq.type = 'RETURN_REQUEST'), 0)
+						- COALESCE((SELECT SUM(H_ret.amount + COALESCE(H_ret.deductionAmount, 0)) FROM il_room_deposit_history H_ret WHERE H_ret.depositEsntlId = D.rdp_eid AND H_ret.type = 'RETURN' AND H_ret.status IN ('COMPLETED', 'PARTIAL', 'RETURN_COMPLETED')), 0)
+					)
+				) AS remainReturnAmount
 			FROM il_room_deposit D
 			LEFT JOIN room R ON R.esntlId = D.rom_eid AND R.gosiwonEsntlId = D.gsw_eid
 			LEFT JOIN gosiwon G ON R.gosiwonEsntlId = G.esntlId
@@ -1954,6 +1986,7 @@ exports.getDepositList = async (req, res, next) => {
 				returnStatus: row.returnStatus || null,
 				returnLastestAmount: row.returnLastestAmount != null ? Number(row.returnLastestAmount) : null,
 				returnLastestTime: row.returnLastestTime || null,
+				remainReturnAmount: row.remainReturnAmount != null ? Number(row.remainReturnAmount) : 0,
 			};
 		});
 

@@ -249,6 +249,9 @@ const roomContractController = require('../controllers/roomContract');
  *                             nullable: true
  *                             description: "보증금 상태 (il_room_deposit_history 최신 이력 기준, /v1/deposit/depositList와 동일). PENDING, PARTIAL, DELETED, COMPLETE 등"
  *                             enum: [PENDING, PARTIAL, DELETED, COMPLETE]
+ *                           remainReturnAmount:
+ *                             type: integer
+ *                             description: "잔여 반환금 (총 반환금액 - RETURN_REQUEST 차감 합계 - RETURN 실제 반환 합계, 0 미만이면 0)"
  *                     totcnt:
  *                       type: integer
  *                       description: 전체 개수
@@ -899,6 +902,9 @@ router.put('/detail', roomContractController.updateContract);
  *                             type: integer
  *                           returnLastestTime:
  *                             type: string
+ *                           remainReturnAmount:
+ *                             type: integer
+ *                             description: "잔여 반환금 (총 반환금액 - RETURN_REQUEST 차감 합계 - RETURN 실제 반환 합계, 0 미만이면 0)"
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:

@@ -6,7 +6,7 @@
  *   2) status가 CONTRACT이고 statusEndDate가 기준일 이전인 경우: status를 OVERDUE로 업데이트
  * - il_room_reservation에서 전일 입실예정(ror_check_in_date가 기준일의 전날)인데 여전히 WAIT 상태인 예약을 EXPIRED로 변경하고,
  *   예약 시점에 roomStatus.RESERVE_PENDING.statusMemo에 저장해둔 ON_SALE/CAN_CHECKIN의 원래 statusEndDate를 복구한 뒤,
- *   RESERVE_PENDING은 소프트 삭제 처리하며, 복구된 종료일이 오늘 이후이면 room.status=OPEN, 모두 오늘 이전이면 room.status=END로 설정
+ *   RESERVE_PENDING은 소프트 삭제 처리하며, 복구된 종료일이 오늘 이후이면 room.status=OPEN, 모두 오늘 이전이면 room.status=EMPTY로 설정
  * - 매일 00:05 스케줄러에서 호출
  * - 수동 실행: GET /v1/room/daily/statusEnd (query.date 없으면 당일 기준)
  */
@@ -229,7 +229,7 @@ async function run(dateStr) {
 					(onSaleEndDate && onSaleEndDate >= targetDateStr) ||
 					(canCheckinEndDate && canCheckinEndDate >= targetDateStr);
 
-				const newRoomStatus = hasFutureOpen ? 'OPEN' : 'END';
+				const newRoomStatus = hasFutureOpen ? 'OPEN' : 'EMPTY';
 
 				const [roomMeta] = await mariaDBSequelize.query(
 					`

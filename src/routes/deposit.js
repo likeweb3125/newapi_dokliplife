@@ -718,6 +718,10 @@ router.delete('/reservationDelete', depositController.deleteDeposit);
  *                             nullable: true
  *                             description: "해당 보증금의 RETURN 이력 중 가장 최근 반환일시 (형식: YYYY-MM-DD HH:MM). 반환 이력 없으면 null"
  *                             example: '2026-01-15 10:00'
+ *                           remainReturnAmount:
+ *                             type: integer
+ *                             description: "잔여 반환금 (총 반환금액 - RETURN_REQUEST 차감 합계 - RETURN 실제 반환 합계, 0 미만이면 0)"
+ *                             example: 500000
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
