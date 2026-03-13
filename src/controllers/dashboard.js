@@ -413,29 +413,28 @@ exports.getDailySchedule = async (req, res, next) => {
 			});
 		}
 
-		// 5) 룸투어: 오늘 등록된 예약요청 / 오늘이 방문 예정일인 예약방문
+		// 5) 룸투어: il_tour_reservation 기준 — 오늘 등록된 예약요청(RESERVE) / 오늘이 방문 예정일인 예약방문(ACCEPT)
 		const roomTourRequestQuery = `
 			SELECT
 				G.name AS gosiwonName,
-				R.roomNumber,
-				RR.ror_hp_no AS phone,
-				RR.ror_regist_dtm
-			FROM il_room_reservation RR
-			INNER JOIN room R ON R.esntlId = RR.rom_sn AND (R.deleteYN IS NULL OR R.deleteYN = 'N')
-			INNER JOIN gosiwon G ON G.esntlId = R.gosiwonEsntlId
-			WHERE RR.ror_status_cd = 'WAIT'
-				AND DATE(RR.ror_regist_dtm) = ?
+				R.roomNumber
+			FROM il_tour_reservation T
+			INNER JOIN room R ON R.esntlId = T.rom_eid AND (R.deleteYN IS NULL OR R.deleteYN = 'N')
+			INNER JOIN gosiwon G ON G.esntlId = T.gsw_eid
+			WHERE T.rtr_status = 'RESERVE'
+				AND DATE(T.rtr_regist_dtm) = ?
 		`;
 		const roomTourVisitQuery = `
 			SELECT
 				G.name AS gosiwonName,
 				R.roomNumber,
-				RR.ror_hp_no AS phone
-			FROM il_room_reservation RR
-			INNER JOIN room R ON R.esntlId = RR.rom_sn AND (R.deleteYN IS NULL OR R.deleteYN = 'N')
-			INNER JOIN gosiwon G ON G.esntlId = R.gosiwonEsntlId
-			WHERE RR.ror_status_cd = 'WAIT'
-				AND DATE(RR.ror_check_in_date) = ?
+				C.phone AS phone
+			FROM il_tour_reservation T
+			INNER JOIN room R ON R.esntlId = T.rom_eid AND (R.deleteYN IS NULL OR R.deleteYN = 'N')
+			INNER JOIN gosiwon G ON G.esntlId = T.gsw_eid
+			LEFT JOIN customer C ON C.esntlId = T.cus_eid
+			WHERE T.rtr_status = 'ACCEPT'
+				AND DATE(T.rtr_tour_dtm) = ?
 		`;
 		const tourRequestRows = await mariaDBSequelize.query(roomTourRequestQuery, {
 			replacements: [targetDateStr],
@@ -450,7 +449,7 @@ exports.getDailySchedule = async (req, res, next) => {
 				statusValue: '룸투어 예약요청',
 				gosiwonName: row.gosiwonName || '',
 				roomNumber: row.roomNumber != null ? String(row.roomNumber) : '',
-				content: `${row.gosiwonName || ''} ${row.roomNumber != null ? row.roomNumber + '호' : ''} 룸투어 예약이 요청되었습니다.`.trim(),
+				content: `${row.gosiwonName || ''} ${row.roomNumber != null ? row.roomNumber + '(호)' : ''} 룸투어 예약이 요청되었습니다.`.trim(),
 				sortOrder: DAILY_SCHEDULE_ORDER.룸투어_예약요청,
 			});
 		}
